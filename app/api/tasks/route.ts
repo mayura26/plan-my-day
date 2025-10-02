@@ -141,11 +141,11 @@ export async function POST(request: NextRequest) {
         created_at, updated_at
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `, [
-      task.id, task.user_id, task.title, task.description, task.priority,
-      task.status, task.duration, task.scheduled_start, task.scheduled_end,
-      task.locked, task.group_id, task.template_id, task.task_type,
-      task.google_calendar_event_id, task.notification_sent, task.depends_on_task_id,
-      task.energy_level_required, task.estimated_completion_time, task.created_at, task.updated_at
+      task.id, task.user_id, task.title, task.description || null, task.priority,
+      task.status, task.duration || null, task.scheduled_start || null, task.scheduled_end || null,
+      task.locked, task.group_id || null, task.template_id || null, task.task_type,
+      task.google_calendar_event_id || null, task.notification_sent, task.depends_on_task_id || null,
+      task.energy_level_required, task.estimated_completion_time || null, task.created_at, task.updated_at
     ])
 
     return NextResponse.json({ task }, { status: 201 })
