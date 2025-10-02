@@ -6,6 +6,7 @@ import { CreateTaskGroupRequest, TaskGroup } from '@/lib/types'
 import { generateGroupId } from '@/lib/task-utils'
 
 // GET /api/task-groups - Get all task groups for the authenticated user
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)

@@ -1,22 +1,19 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { Task, TaskStatus, TaskType, TaskFilters } from '@/lib/types'
+import { useState } from 'react'
+import { Task, TaskStatus, TaskType } from '@/lib/types'
 import { TaskCard } from './task-card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { 
   sortTasksByPriority, 
   sortTasksByScheduledTime, 
-  sortTasksByCreatedTime,
-  filterTasksByStatus,
-  filterTasksByPriority,
-  filterTasksByType
+  sortTasksByCreatedTime
 } from '@/lib/task-utils'
-import { Plus, Search, Filter, Calendar, List } from 'lucide-react'
+import { Plus, Search, Filter, Calendar } from 'lucide-react'
 
 interface TaskListProps {
   tasks: Task[]

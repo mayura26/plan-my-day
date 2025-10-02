@@ -47,7 +47,7 @@ export function TaskForm({ onSubmit, onCancel, initialData, isLoading = false }:
         ...initialData
       })
     }
-  }, [initialData?.title, initialData?.task_type]) // Only re-run when key fields change
+  }, [initialData]) // Re-run when initialData changes
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()

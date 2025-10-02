@@ -8,9 +8,7 @@ import { TaskList } from '@/components/task-list'
 import { TaskForm } from '@/components/task-form'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import { Plus, Calendar, List, BarChart3 } from 'lucide-react'
+import { Calendar, BarChart3 } from 'lucide-react'
 
 export default function TasksPage() {
   const { data: session, status } = useSession()

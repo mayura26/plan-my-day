@@ -8,7 +8,7 @@ import { AuthButton } from "@/components/auth-button";
 import { useSession } from "next-auth/react";
 
 export default function Home() {
-  const { data: session, status } = useSession()
+  const { data: session } = useSession()
 
   return (
     <div className="min-h-screen bg-background">

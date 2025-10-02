@@ -19,7 +19,7 @@ import {
   canRescheduleTask,
   canExtendTask
 } from '@/lib/task-utils'
-import { Clock, Calendar, Zap, Lock, Unlock, MoreHorizontal } from 'lucide-react'
+import { Clock, Calendar, Zap, Lock, MoreHorizontal } from 'lucide-react'
 
 interface TaskCardProps {
   task: Task
@@ -39,6 +39,7 @@ export function TaskCard({
   onEdit,
   onSchedule, 
   onExtend,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   showGroup = false,
   compact = false 
 }: TaskCardProps) {
