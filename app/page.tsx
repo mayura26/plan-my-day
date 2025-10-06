@@ -6,9 +6,31 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import Link from "next/link";
 import { AuthButton } from "@/components/auth-button";
 import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
+import { useEffect } from "react";
 
 export default function Home() {
-  const { data: session } = useSession()
+  const { data: session, status } = useSession()
+  const router = useRouter()
+
+  // Redirect authenticated users to calendar (main dashboard)
+  useEffect(() => {
+    if (status === 'authenticated') {
+      router.push('/calendar')
+    }
+  }, [status, router])
+
+  // Show loading while checking auth or redirecting
+  if (status === 'loading' || session) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -23,79 +45,9 @@ export default function Home() {
         </div>
       </header>
 
-      {/* Main Content */}
+      {/* Main Content - Marketing Page for Non-Authenticated Users */}
       <main className="container mx-auto px-4 py-8">
-        {session ? (
-          // Authenticated User Dashboard
-          <div className="max-w-6xl mx-auto space-y-8">
-            <div className="text-center space-y-4">
-              <h1 className="text-4xl font-bold">Welcome back, {session.user?.name}!</h1>
-              <p className="text-xl text-muted-foreground">
-                Ready to plan your day?
-              </p>
-            </div>
-
-            {/* Quick Actions */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              <Card className="hover:shadow-lg transition-shadow">
-                <CardHeader>
-                  <CardTitle className="text-lg flex items-center gap-2">
-                    📝 Manage Tasks
-                  </CardTitle>
-                  <CardDescription>Create and organize your tasks</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <Link href="/tasks">
-                    <Button className="w-full">Go to Tasks</Button>
-                  </Link>
-                </CardContent>
-              </Card>
-
-              <Card className="hover:shadow-lg transition-shadow">
-                <CardHeader>
-                  <CardTitle className="text-lg flex items-center gap-2">
-                    📅 Calendar View
-                  </CardTitle>
-                  <CardDescription>View tasks in calendar format</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <Button className="w-full" disabled>
-                    Coming Soon
-                  </Button>
-                </CardContent>
-              </Card>
-
-              <Card className="hover:shadow-lg transition-shadow">
-                <CardHeader>
-                  <CardTitle className="text-lg flex items-center gap-2">
-                    🤖 AI Scheduling
-                  </CardTitle>
-                  <CardDescription>Let AI optimize your schedule</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <Button className="w-full" disabled>
-                    Coming Soon
-                  </Button>
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Recent Activity Placeholder */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Recent Activity</CardTitle>
-                <CardDescription>Your latest tasks and updates</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <p className="text-muted-foreground text-center py-8">
-                  No recent activity yet. <Link href="/tasks" className="text-primary hover:underline">Create your first task</Link> to get started!
-                </p>
-              </CardContent>
-            </Card>
-          </div>
-        ) : (
-          // Marketing Page for Non-Authenticated Users
-          <div className="max-w-6xl mx-auto space-y-16">
+        <div className="max-w-6xl mx-auto space-y-16">
             {/* Hero Section */}
             <div className="text-center space-y-6">
               <h1 className="text-5xl font-bold tracking-tight">
@@ -193,7 +145,6 @@ export default function Home() {
               </CardContent>
             </Card>
           </div>
-        )}
       </main>
     </div>
   );

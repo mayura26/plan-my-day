@@ -121,6 +121,8 @@ export interface CreateTaskRequest {
   energy_level_required?: number
   estimated_completion_time?: number
   depends_on_task_id?: string
+  scheduled_start?: string
+  scheduled_end?: string
 }
 
 export interface UpdateTaskRequest extends Partial<CreateTaskRequest> {

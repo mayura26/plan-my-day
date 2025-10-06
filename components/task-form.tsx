@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { CreateTaskRequest, TaskType } from '@/lib/types'
+import { CreateTaskRequest, TaskType, TaskGroup } from '@/lib/types'
 import { PRIORITY_LABELS, ENERGY_LABELS, TASK_TYPE_LABELS } from '@/lib/task-utils'
 
 interface TaskFormProps {
@@ -17,6 +17,22 @@ interface TaskFormProps {
 }
 
 export function TaskForm({ onSubmit, onCancel, initialData, isLoading = false }: TaskFormProps) {
+  // Convert ISO datetime to datetime-local format
+  const formatDateTimeLocal = (isoString?: string) => {
+    if (!isoString) return ''
+    try {
+      const date = new Date(isoString)
+      const year = date.getFullYear()
+      const month = String(date.getMonth() + 1).padStart(2, '0')
+      const day = String(date.getDate()).padStart(2, '0')
+      const hours = String(date.getHours()).padStart(2, '0')
+      const minutes = String(date.getMinutes()).padStart(2, '0')
+      return `${year}-${month}-${day}T${hours}:${minutes}`
+    } catch {
+      return ''
+    }
+  }
+
   const [formData, setFormData] = useState<CreateTaskRequest>({
     title: initialData?.title || '',
     description: initialData?.description || '',
@@ -25,10 +41,31 @@ export function TaskForm({ onSubmit, onCancel, initialData, isLoading = false }:
     task_type: initialData?.task_type || 'task',
     energy_level_required: initialData?.energy_level_required || 3,
     estimated_completion_time: initialData?.estimated_completion_time || undefined,
-    ...initialData
+    group_id: initialData?.group_id || undefined,
+    template_id: initialData?.template_id || undefined,
+    depends_on_task_id: initialData?.depends_on_task_id || undefined,
+    scheduled_start: formatDateTimeLocal(initialData?.scheduled_start),
+    scheduled_end: formatDateTimeLocal(initialData?.scheduled_end),
   })
 
   const [errors, setErrors] = useState<Record<string, string>>({})
+  const [taskGroups, setTaskGroups] = useState<TaskGroup[]>([])
+
+  // Fetch task groups
+  useEffect(() => {
+    const fetchTaskGroups = async () => {
+      try {
+        const response = await fetch('/api/task-groups')
+        if (response.ok) {
+          const data = await response.json()
+          setTaskGroups(data.groups || [])
+        }
+      } catch (error) {
+        console.error('Error fetching task groups:', error)
+      }
+    }
+    fetchTaskGroups()
+  }, [])
 
   // Update form data when initialData changes (for edit mode)
   useEffect(() => {
@@ -44,10 +81,11 @@ export function TaskForm({ onSubmit, onCancel, initialData, isLoading = false }:
         group_id: initialData.group_id || undefined,
         template_id: initialData.template_id || undefined,
         depends_on_task_id: initialData.depends_on_task_id || undefined,
-        ...initialData
+        scheduled_start: formatDateTimeLocal(initialData.scheduled_start),
+        scheduled_end: formatDateTimeLocal(initialData.scheduled_end),
       })
     }
-  }, [initialData]) // Re-run when initialData changes
+  }, [initialData?.title, initialData?.scheduled_start, initialData?.scheduled_end]) // Re-run when initialData changes
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -74,14 +112,65 @@ export function TaskForm({ onSubmit, onCancel, initialData, isLoading = false }:
     }
 
     try {
-      await onSubmit(formData)
+      // Convert datetime-local to ISO format
+      const submissionData = { ...formData }
+      if (submissionData.scheduled_start) {
+        submissionData.scheduled_start = new Date(submissionData.scheduled_start).toISOString()
+      }
+      if (submissionData.scheduled_end) {
+        submissionData.scheduled_end = new Date(submissionData.scheduled_end).toISOString()
+      }
+      
+      await onSubmit(submissionData)
     } catch (error) {
       console.error('Error submitting task:', error)
     }
   }
 
   const handleInputChange = (field: keyof CreateTaskRequest, value: any) => {
-    setFormData(prev => ({ ...prev, [field]: value }))
+    setFormData(prev => {
+      const updated = { ...prev, [field]: value }
+      
+      // Auto-calculate end time if start time and duration are set
+      if (field === 'scheduled_start' || field === 'duration') {
+        const startTime = field === 'scheduled_start' ? value : prev.scheduled_start
+        const duration = field === 'duration' ? value : prev.duration
+        
+        if (startTime && duration && !prev.scheduled_end) {
+          try {
+            const startDate = new Date(startTime)
+            const endDate = new Date(startDate.getTime() + duration * 60000) // duration is in minutes
+            const year = endDate.getFullYear()
+            const month = String(endDate.getMonth() + 1).padStart(2, '0')
+            const day = String(endDate.getDate()).padStart(2, '0')
+            const hours = String(endDate.getHours()).padStart(2, '0')
+            const minutes = String(endDate.getMinutes()).padStart(2, '0')
+            updated.scheduled_end = `${year}-${month}-${day}T${hours}:${minutes}`
+          } catch (error) {
+            console.error('Error calculating end time:', error)
+          }
+        }
+      }
+      
+      // Also update end time if start time changes and end time already exists
+      if (field === 'scheduled_start' && prev.scheduled_end && prev.duration) {
+        try {
+          const startDate = new Date(value)
+          const endDate = new Date(startDate.getTime() + prev.duration * 60000)
+          const year = endDate.getFullYear()
+          const month = String(endDate.getMonth() + 1).padStart(2, '0')
+          const day = String(endDate.getDate()).padStart(2, '0')
+          const hours = String(endDate.getHours()).padStart(2, '0')
+          const minutes = String(endDate.getMinutes()).padStart(2, '0')
+          updated.scheduled_end = `${year}-${month}-${day}T${hours}:${minutes}`
+        } catch (error) {
+          console.error('Error updating end time:', error)
+        }
+      }
+      
+      return updated
+    })
+    
     if (errors[field]) {
       setErrors(prev => ({ ...prev, [field]: '' }))
     }
@@ -173,6 +262,35 @@ export function TaskForm({ onSubmit, onCancel, initialData, isLoading = false }:
             </div>
           </div>
 
+          {/* Group Selection */}
+          <div className="space-y-2">
+            <label htmlFor="group_id" className="text-sm font-medium">
+              Task Group
+            </label>
+            <Select
+              value={formData.group_id || 'no-group'}
+              onValueChange={(value) => handleInputChange('group_id', value === 'no-group' ? undefined : value)}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select a group (optional)" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="no-group">No Group</SelectItem>
+                {taskGroups.map((group) => (
+                  <SelectItem key={group.id} value={group.id}>
+                    <div className="flex items-center gap-2">
+                      <div 
+                        className="w-3 h-3 rounded-full border" 
+                        style={{ backgroundColor: group.color }}
+                      />
+                      {group.name}
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
           {/* Duration and Energy Level */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
@@ -230,6 +348,38 @@ export function TaskForm({ onSubmit, onCancel, initialData, isLoading = false }:
               placeholder="e.g., 90"
               min="0"
             />
+          </div>
+
+          {/* Scheduling Section */}
+          <div className="border-t pt-4">
+            <h3 className="text-sm font-medium mb-3">Schedule Task (Optional)</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <label htmlFor="scheduled_start" className="text-sm font-medium">
+                  Start Date & Time
+                </label>
+                <Input
+                  id="scheduled_start"
+                  type="datetime-local"
+                  value={formData.scheduled_start || ''}
+                  onChange={(e) => handleInputChange('scheduled_start', e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <label htmlFor="scheduled_end" className="text-sm font-medium">
+                  End Date & Time
+                </label>
+                <Input
+                  id="scheduled_end"
+                  type="datetime-local"
+                  value={formData.scheduled_end || ''}
+                  onChange={(e) => handleInputChange('scheduled_end', e.target.value)}
+                />
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground mt-2">
+              Schedule your task to appear in the calendar view
+            </p>
           </div>
 
           {/* Action Buttons */}

@@ -29,13 +29,30 @@
 - [x] Fix Next.js 15+ async params issue in API routes
 - [x] Fix task type editing functionality and dialog accessibility
 - [x] Fix API route missing task_type field in update logic
+- [x] Basic calendar view component with weekly view and task display
+- [x] Task grouping system UI with group management
+- [x] Navigation component with calendar integration
+- [x] Task form with group selection
+- [x] Weekly time-based calendar view with hourly time slots
+- [x] Task scheduling with date/time pickers in task form
+- [x] Tasks displayed as colored blocks in calendar
+- [x] Calendar sidebar with task groups, stats, and unscheduled tasks
+- [x] Week navigation (previous/next week) in calendar view
+- [x] Calendar view set as main dashboard/homepage for authenticated users
+- [x] Marketing page for non-authenticated users
+- [x] Navigation restructured with Calendar as primary page
+- [x] Task creation dialog integrated into calendar page
+- [x] Auto-calculate end time from start time + duration
+- [x] Current time indicator (red line) on calendar with live updates
+- [x] Auto-scroll to current time on calendar load
+- [x] Task detail dialog with full task information display
+- [x] Edit, delete, and status change buttons in task detail
+- [x] Quick actions for starting tasks and marking complete
 
 ### 🔄 In Progress
-- [ ] Basic calendar view component
-- [ ] Task grouping system UI
+- [ ] User onboarding flow
 
 ### ⏳ Pending
-- [ ] User onboarding flow
 - [ ] PWA setup with service worker
 - [ ] Basic offline functionality
 - [ ] User onboarding tutorial and help system
@@ -101,10 +118,15 @@
    - Implement data models ✅
    - Create API endpoints for tasks ✅
 
-3. **Basic Calendar View** (Next)
-   - Weekly calendar component
-   - Task display in calendar
-   - Basic filtering options
+3. **Basic Calendar View** ✅
+   - Weekly calendar component ✅
+   - Task display in calendar ✅
+   - Basic filtering options ✅
+
+4. **Task Grouping System** ✅
+   - Group management UI ✅
+   - Task filtering by group ✅
+   - Group selection in task form ✅
 
 ---
 

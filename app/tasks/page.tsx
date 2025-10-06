@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import { Task, CreateTaskRequest } from '@/lib/types'
 import { TaskList } from '@/components/task-list'
 import { TaskForm } from '@/components/task-form'
+import { TaskGroupManager } from '@/components/task-group-manager'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Calendar, BarChart3 } from 'lucide-react'
@@ -20,6 +21,7 @@ export default function TasksPage() {
   const [editingTask, setEditingTask] = useState<Task | null>(null)
   const [isEditing, setIsEditing] = useState(false)
   const [isUpdating, setIsUpdating] = useState(false)
+  const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null)
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -181,6 +183,11 @@ export default function TasksPage() {
     // TODO: Implement task extension
   }
 
+  // Filter tasks by selected group
+  const filteredTasks = selectedGroupId 
+    ? tasks.filter(task => task.group_id === selectedGroupId)
+    : tasks
+
   if (status === 'loading' || isLoading) {
     return (
       <div className="min-h-screen bg-background">
@@ -228,15 +235,28 @@ export default function TasksPage() {
 
       {/* Main Content */}
       <main className="container mx-auto px-4 py-8">
-        <TaskList
-          tasks={tasks}
-          onUpdateTask={handleUpdateTaskStatus}
-          onDeleteTask={handleDeleteTask}
-          onEditTask={handleEditTask}
-          onScheduleTask={handleScheduleTask}
-          onExtendTask={handleExtendTask}
-          onCreateTask={() => setShowCreateForm(true)}
-        />
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+          {/* Sidebar - Task Groups */}
+          <div className="lg:col-span-1">
+            <TaskGroupManager
+              onGroupSelect={setSelectedGroupId}
+              selectedGroupId={selectedGroupId}
+            />
+          </div>
+
+          {/* Main Content - Task List */}
+          <div className="lg:col-span-3">
+            <TaskList
+              tasks={filteredTasks}
+              onUpdateTask={handleUpdateTaskStatus}
+              onDeleteTask={handleDeleteTask}
+              onEditTask={handleEditTask}
+              onScheduleTask={handleScheduleTask}
+              onExtendTask={handleExtendTask}
+              onCreateTask={() => setShowCreateForm(true)}
+            />
+          </div>
+        </div>
       </main>
 
       {/* Create Task Dialog */}
@@ -279,7 +299,9 @@ export default function TasksPage() {
                 template_id: editingTask.template_id || undefined,
                 energy_level_required: editingTask.energy_level_required,
                 estimated_completion_time: editingTask.estimated_completion_time || undefined,
-                depends_on_task_id: editingTask.depends_on_task_id || undefined
+                depends_on_task_id: editingTask.depends_on_task_id || undefined,
+                scheduled_start: editingTask.scheduled_start || undefined,
+                scheduled_end: editingTask.scheduled_end || undefined
               }}
               isLoading={isUpdating}
             />
