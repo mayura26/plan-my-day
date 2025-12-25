@@ -48,6 +48,9 @@
 - [x] Task detail dialog with full task information display
 - [x] Edit, delete, and status change buttons in task detail
 - [x] Quick actions for starting tasks and marking complete
+- [x] Collapsible task groups showing tasks within each group
+- [x] Toggle to show all tasks vs unscheduled tasks only
+- [x] Task counts per group with dynamic updates
 
 ### 🔄 In Progress
 - [ ] User onboarding flow

@@ -29,6 +29,7 @@ export default function CalendarPage() {
   const [editingTask, setEditingTask] = useState<Task | null>(null)
   const [isEditing, setIsEditing] = useState(false)
   const [isUpdating, setIsUpdating] = useState(false)
+  const [showAllTasks, setShowAllTasks] = useState(false)
 
   useEffect(() => {
     if (status === 'unauthenticated') {
@@ -206,8 +207,14 @@ export default function CalendarPage() {
     ? tasks.filter(task => task.group_id === selectedGroupId)
     : tasks
 
-  const scheduledTasks = filteredTasks.filter(task => task.scheduled_start && task.scheduled_end)
+  const scheduledTasks = showAllTasks 
+    ? filteredTasks.filter(task => task.scheduled_start && task.scheduled_end)
+    : filteredTasks.filter(task => task.scheduled_start && task.scheduled_end)
+  
   const unscheduledTasks = filteredTasks.filter(task => !task.scheduled_start || !task.scheduled_end)
+  
+  // For display in calendar - only show scheduled tasks
+  const calendarTasks = scheduledTasks
 
   if (status === 'loading' || isLoading) {
     return (
@@ -244,6 +251,10 @@ export default function CalendarPage() {
           <TaskGroupManager
             onGroupSelect={setSelectedGroupId}
             selectedGroupId={selectedGroupId}
+            tasks={filteredTasks}
+            onTaskClick={handleTaskClick}
+            showAllTasks={showAllTasks}
+            onShowAllTasksChange={setShowAllTasks}
           />
 
           {/* Quick Stats */}
@@ -319,7 +330,7 @@ export default function CalendarPage() {
       {/* Main Calendar Area */}
       <div className="flex-1 overflow-hidden">
         <WeeklyCalendar 
-          tasks={scheduledTasks} 
+          tasks={calendarTasks} 
           onTaskClick={handleTaskClick}
         />
       </div>

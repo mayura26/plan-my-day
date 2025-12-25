@@ -115,7 +115,7 @@ export function TaskDetailDialog({
             </Badge>
             <Badge className={getPriorityColor(task.priority)}>
               <Flag className="h-3 w-3 mr-1" />
-              Priority {task.priority} - {PRIORITY_LABELS[task.priority]}
+              Priority {task.priority} - {PRIORITY_LABELS[task.priority as keyof typeof PRIORITY_LABELS]}
             </Badge>
             {task.locked && (
               <Badge variant="destructive">
@@ -194,7 +194,7 @@ export function TaskDetailDialog({
                     <Zap className="h-4 w-4 text-muted-foreground" />
                     <span className="text-muted-foreground">Energy:</span>
                     <span className="font-medium">
-                      {ENERGY_LABELS[task.energy_level_required]}
+                      {ENERGY_LABELS[task.energy_level_required as keyof typeof ENERGY_LABELS]}
                     </span>
                   </div>
                 )}
