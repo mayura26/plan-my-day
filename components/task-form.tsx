@@ -131,6 +131,11 @@ export function TaskForm({ onSubmit, onCancel, initialData, isLoading = false }:
     setFormData(prev => {
       const updated = { ...prev, [field]: value }
       
+      // Auto-match duration to estimated_completion_time when estimated_completion_time is set
+      if (field === 'estimated_completion_time' && value && !prev.duration) {
+        updated.duration = value
+      }
+      
       // Auto-calculate end time if start time and duration are set
       if (field === 'scheduled_start' || field === 'duration') {
         const startTime = field === 'scheduled_start' ? value : prev.scheduled_start
@@ -305,6 +310,11 @@ export function TaskForm({ onSubmit, onCancel, initialData, isLoading = false }:
                 placeholder="e.g., 60"
                 min="0"
               />
+              {formData.estimated_completion_time && formData.duration === formData.estimated_completion_time && (
+                <p className="text-xs text-muted-foreground">
+                  Automatically matched to estimated completion time
+                </p>
+              )}
               {errors.duration && (
                 <p className="text-sm text-red-500">{errors.duration}</p>
               )}

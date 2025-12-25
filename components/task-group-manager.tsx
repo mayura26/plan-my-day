@@ -10,6 +10,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Plus, Edit, Trash2, ChevronDown, ChevronRight, Folder, CheckSquare } from 'lucide-react'
 import { TaskGroup, CreateTaskGroupRequest, Task } from '@/lib/types'
 import { cn } from '@/lib/utils'
+import { useDraggable } from '@dnd-kit/core'
+import { CSS } from '@dnd-kit/utilities'
 
 interface TaskGroupManagerProps {
   onGroupSelect?: (groupId: string | null) => void
@@ -31,6 +33,45 @@ const defaultColors = [
   { name: 'Gray', value: '#6B7280' },
 ]
 
+// Draggable task item component for sidebar
+function DraggableTaskItem({ task, onTaskClick }: { task: Task, onTaskClick?: (taskId: string) => void }) {
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+    id: task.id,
+    disabled: task.locked,
+    data: {
+      type: 'sidebar-task',
+      task,
+    },
+  })
+
+  const style = {
+    transform: CSS.Translate.toString(transform),
+    opacity: isDragging ? 0.5 : 1,
+  }
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      {...listeners}
+      {...attributes}
+      className={cn(
+        "p-2 rounded border bg-card hover:bg-accent/50 transition-colors cursor-grab active:cursor-grabbing text-sm",
+        task.locked && "cursor-not-allowed opacity-75"
+      )}
+      onClick={() => onTaskClick?.(task.id)}
+    >
+      <div className="font-medium truncate">{task.title}</div>
+      <Badge variant="outline" className="text-xs mt-1">
+        Priority {task.priority}
+      </Badge>
+      {task.locked && (
+        <div className="text-xs text-muted-foreground mt-1">🔒 Locked</div>
+      )}
+    </div>
+  )
+}
+
 export function TaskGroupManager({ 
   onGroupSelect, 
   selectedGroupId, 
@@ -51,6 +92,35 @@ export function TaskGroupManager({
   useEffect(() => {
     fetchGroups()
   }, [])
+
+  // Auto-rotate color when create dialog opens
+  useEffect(() => {
+    if (isCreateDialogOpen) {
+      const getNextColor = () => {
+        const usedColors = new Set(groups.map(g => g.color))
+        
+        // Find first unused color
+        for (const color of defaultColors) {
+          if (!usedColors.has(color.value)) {
+            return color.value
+          }
+        }
+        
+        // All colors used, cycle to next color after last created group
+        if (groups.length > 0) {
+          const lastGroup = groups[groups.length - 1]
+          const lastColorIndex = defaultColors.findIndex(c => c.value === lastGroup.color)
+          const nextColorIndex = (lastColorIndex + 1) % defaultColors.length
+          return defaultColors[nextColorIndex].value
+        }
+        
+        // No groups exist, start with first color
+        return defaultColors[0].value
+      }
+      
+      setNewGroupColor(getNextColor())
+    }
+  }, [isCreateDialogOpen, groups])
 
   const fetchGroups = async () => {
     try {
@@ -180,6 +250,19 @@ export function TaskGroupManager({
       }
       return isUnscheduled && task.group_id === groupId
     })
+  }
+
+  const getAllTasksForGroup = (groupId: string | null) => {
+    return tasks.filter(task => {
+      if (groupId === null) {
+        return !task.group_id
+      }
+      return task.group_id === groupId
+    })
+  }
+
+  const getTasksForGroup = (groupId: string | null) => {
+    return showAllTasks ? getAllTasksForGroup(groupId) : getUnscheduledTasksForGroup(groupId)
   }
 
   const getTaskCountForGroup = (groupId: string | null) => {
@@ -335,19 +418,14 @@ export function TaskGroupManager({
           {/* Ungrouped Tasks */}
           {expandedGroups.has('ungrouped') && (
             <div className="ml-7 space-y-1">
-              {getUnscheduledTasksForGroup(null).map((task) => (
-                <div
+              {getTasksForGroup(null).map((task) => (
+                <DraggableTaskItem
                   key={task.id}
-                  className="p-2 rounded border bg-card hover:bg-accent/50 transition-colors cursor-pointer text-sm"
-                  onClick={() => onTaskClick?.(task.id)}
-                >
-                  <div className="font-medium truncate">{task.title}</div>
-                  <Badge variant="outline" className="text-xs mt-1">
-                    Priority {task.priority}
-                  </Badge>
-                </div>
+                  task={task}
+                  onTaskClick={onTaskClick}
+                />
               ))}
-              {getUnscheduledTasksForGroup(null).length === 0 && (
+              {getTasksForGroup(null).length === 0 && (
                 <p className="text-xs text-muted-foreground p-2">No {showAllTasks ? 'tasks' : 'unscheduled tasks'}</p>
               )}
             </div>
@@ -420,19 +498,14 @@ export function TaskGroupManager({
             {/* Group Tasks */}
             {expandedGroups.has(group.id) && (
               <div className="ml-7 space-y-1">
-                {getUnscheduledTasksForGroup(group.id).map((task) => (
-                  <div
+                {getTasksForGroup(group.id).map((task) => (
+                  <DraggableTaskItem
                     key={task.id}
-                    className="p-2 rounded border bg-card hover:bg-accent/50 transition-colors cursor-pointer text-sm"
-                    onClick={() => onTaskClick?.(task.id)}
-                  >
-                    <div className="font-medium truncate">{task.title}</div>
-                    <Badge variant="outline" className="text-xs mt-1">
-                      Priority {task.priority}
-                    </Badge>
-                  </div>
+                    task={task}
+                    onTaskClick={onTaskClick}
+                  />
                 ))}
-                {getUnscheduledTasksForGroup(group.id).length === 0 && (
+                {getTasksForGroup(group.id).length === 0 && (
                   <p className="text-xs text-muted-foreground p-2">No {showAllTasks ? 'tasks' : 'unscheduled tasks'}</p>
                 )}
               </div>

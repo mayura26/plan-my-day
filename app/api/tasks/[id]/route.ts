@@ -70,8 +70,36 @@ export async function PUT(
     const { id } = await params
     const body: UpdateTaskRequest = await request.json()
     
-    // Validate task data
-    const errors = validateTaskData(body)
+    // Validate task data (only validate provided fields for partial updates)
+    const errors: string[] = []
+    
+    // Only validate title if it's being updated
+    if (body.title !== undefined) {
+      if (!body.title || body.title.trim().length === 0) {
+        errors.push('Title is required')
+      }
+    }
+    
+    if (body.priority !== undefined && (body.priority < 1 || body.priority > 5)) {
+      errors.push('Priority must be between 1 and 5')
+    }
+    
+    if (body.energy_level_required !== undefined && (body.energy_level_required < 1 || body.energy_level_required > 5)) {
+      errors.push('Energy level must be between 1 and 5')
+    }
+    
+    if (body.duration !== undefined && body.duration < 0) {
+      errors.push('Duration must be positive')
+    }
+    
+    if (body.scheduled_start && body.scheduled_end) {
+      const start = new Date(body.scheduled_start)
+      const end = new Date(body.scheduled_end)
+      if (start >= end) {
+        errors.push('End time must be after start time')
+      }
+    }
+    
     if (errors.length > 0) {
       return NextResponse.json({ error: 'Validation failed', details: errors }, { status: 400 })
     }

@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
+import { DndContext, DragEndEvent, DragOverEvent, DragStartEvent, PointerSensor, useSensor, useSensors, closestCenter } from '@dnd-kit/core'
 import { WeeklyCalendar } from '@/components/weekly-calendar'
 import { TaskGroupManager } from '@/components/task-group-manager'
 import { TaskForm } from '@/components/task-form'
@@ -13,7 +14,7 @@ import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Calendar as CalendarIcon, Plus, CheckSquare, Clock } from 'lucide-react'
 import { Task, TaskGroup, CreateTaskRequest } from '@/lib/types'
-import { format } from 'date-fns'
+import { format, startOfWeek } from 'date-fns'
 
 export default function CalendarPage() {
   const { data: session, status } = useSession()
@@ -30,6 +31,17 @@ export default function CalendarPage() {
   const [isEditing, setIsEditing] = useState(false)
   const [isUpdating, setIsUpdating] = useState(false)
   const [showAllTasks, setShowAllTasks] = useState(false)
+  const [activeDragId, setActiveDragId] = useState<string | null>(null)
+  const [resizingTaskId, setResizingTaskId] = useState<string | null>(null)
+  
+  // Configure drag sensors
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8, // Require 8px movement before drag starts
+      },
+    })
+  )
 
   useEffect(() => {
     if (status === 'unauthenticated') {
@@ -216,6 +228,189 @@ export default function CalendarPage() {
   // For display in calendar - only show scheduled tasks
   const calendarTasks = scheduledTasks
 
+  const handleDragStart = (event: DragStartEvent) => {
+    const activeData = event.active.data.current
+    setActiveDragId(event.active.id as string)
+    
+    // Track if we're resizing
+    if (activeData?.type === 'resize-handle') {
+      setResizingTaskId(activeData.task?.id || null)
+    }
+  }
+
+  const handleDragOver = (event: DragOverEvent) => {
+    // Handle real-time resize preview if needed
+    // For now, we'll handle resize on drop
+  }
+
+  const handleDragEnd = async (event: DragEndEvent) => {
+    setActiveDragId(null)
+    setResizingTaskId(null)
+    const { active, over } = event
+    
+    if (!over) return
+    
+    const activeData = active.data.current
+    const dropData = over.data.current
+    
+    // Handle resize handle drag
+    if (activeData?.type === 'resize-handle') {
+      const task = activeData.task as Task
+      if (!task.locked && dropData?.type === 'calendar-slot' && task.scheduled_start) {
+        // Calculate new end time based on drop position
+        const { day, time } = dropData
+        const endDate = new Date(day)
+        // Snap to 15-minute intervals
+        const totalMinutes = time * 60
+        const snappedMinutes = Math.round(totalMinutes / 15) * 15
+        const hours = Math.floor(snappedMinutes / 60)
+        const minutes = snappedMinutes % 60
+        endDate.setHours(hours, minutes, 0, 0)
+        
+        // Ensure end time is after start time
+        const startDate = new Date(task.scheduled_start)
+        if (endDate > startDate) {
+          await handleTaskResize(task.id, endDate)
+        }
+      }
+      return
+    }
+    
+    // Handle task drag (scheduling/rescheduling)
+    // Get task from active data (for sidebar tasks) or find it (for calendar tasks)
+    const taskId = active.id as string
+    let task = activeData?.task as Task | undefined
+    if (!task) {
+      task = tasks.find(t => t.id === taskId)
+    }
+    
+    if (!task || task.locked) return
+    
+    // Get drop target data
+    if (dropData?.type === 'calendar-slot') {
+      const { day, time } = dropData
+      
+      // If task is already scheduled, reschedule it; otherwise schedule it
+      if (task.scheduled_start) {
+        await handleRescheduleTaskDrop(taskId, day, time)
+      } else {
+        await handleScheduleTaskDrop(taskId, day, time)
+      }
+    }
+  }
+  
+  const handleTaskResize = async (taskId: string, newEndTime: Date) => {
+    const task = tasks.find(t => t.id === taskId)
+    if (!task || task.locked || !task.scheduled_start) return
+    
+    const startDate = new Date(task.scheduled_start)
+    
+    // Ensure end time is after start time
+    if (newEndTime <= startDate) return
+    
+    // Snap to 15-minute intervals
+    const totalMinutes = (newEndTime.getTime() - startDate.getTime()) / 60000
+    const snappedMinutes = Math.round(totalMinutes / 15) * 15
+    const finalEndTime = new Date(startDate.getTime() + snappedMinutes * 60000)
+    const duration = snappedMinutes
+    
+    try {
+      const response = await fetch(`/api/tasks/${taskId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          scheduled_end: finalEndTime.toISOString(),
+          duration: duration,
+        }),
+      })
+      
+      if (response.ok) {
+        const data = await response.json()
+        setTasks(prev => prev.map(t => t.id === taskId ? data.task : t))
+      }
+    } catch (error) {
+      console.error('Error resizing task:', error)
+    }
+  }
+
+  const handleScheduleTaskDrop = async (taskId: string, day: Date, time: number) => {
+    const task = tasks.find(t => t.id === taskId)
+    if (!task || task.locked) return
+    
+    // Snap to 15-minute intervals
+    const totalMinutes = time * 60
+    const snappedMinutes = Math.round(totalMinutes / 15) * 15
+    const hours = Math.floor(snappedMinutes / 60)
+    const minutes = snappedMinutes % 60
+    
+    const duration = task.duration || task.estimated_completion_time || 60 // Default to 60 minutes
+    const startDate = new Date(day)
+    startDate.setHours(hours, minutes, 0, 0)
+    const endDate = new Date(startDate.getTime() + duration * 60000)
+    
+    try {
+      const response = await fetch(`/api/tasks/${taskId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          scheduled_start: startDate.toISOString(),
+          scheduled_end: endDate.toISOString(),
+        }),
+      })
+      
+      if (response.ok) {
+        const data = await response.json()
+        setTasks(prev => prev.map(t => t.id === taskId ? data.task : t))
+      }
+    } catch (error) {
+      console.error('Error scheduling task:', error)
+    }
+  }
+
+  const handleRescheduleTaskDrop = async (taskId: string, day: Date, time: number) => {
+    const task = tasks.find(t => t.id === taskId)
+    if (!task || task.locked || !task.scheduled_start || !task.scheduled_end) return
+    
+    // Snap to 15-minute intervals
+    const totalMinutes = time * 60
+    const snappedMinutes = Math.round(totalMinutes / 15) * 15
+    const hours = Math.floor(snappedMinutes / 60)
+    const minutes = snappedMinutes % 60
+    
+    // Calculate duration from existing schedule
+    const oldStart = new Date(task.scheduled_start)
+    const oldEnd = new Date(task.scheduled_end)
+    const duration = (oldEnd.getTime() - oldStart.getTime()) / 60000 // in minutes
+    
+    const startDate = new Date(day)
+    startDate.setHours(hours, minutes, 0, 0)
+    const endDate = new Date(startDate.getTime() + duration * 60000)
+    
+    try {
+      const response = await fetch(`/api/tasks/${taskId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          scheduled_start: startDate.toISOString(),
+          scheduled_end: endDate.toISOString(),
+        }),
+      })
+      
+      if (response.ok) {
+        const data = await response.json()
+        setTasks(prev => prev.map(t => t.id === taskId ? data.task : t))
+      }
+    } catch (error) {
+      console.error('Error rescheduling task:', error)
+    }
+  }
+
   if (status === 'loading' || isLoading) {
     return (
       <div className="container mx-auto p-6">
@@ -234,28 +429,35 @@ export default function CalendarPage() {
   }
 
   return (
-    <div className="flex h-[calc(100vh-4rem)]">
-      {/* Left Sidebar */}
-      <div className="w-80 border-r overflow-y-auto bg-background">
-        <div className="p-4 space-y-4">
-          {/* Add Task Button */}
-          <Button 
-            className="w-full" 
-            onClick={() => setShowCreateForm(true)}
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            Add Task
-          </Button>
+    <DndContext
+      sensors={sensors}
+      collisionDetection={closestCenter}
+      onDragStart={handleDragStart}
+      onDragOver={handleDragOver}
+      onDragEnd={handleDragEnd}
+    >
+      <div className="flex h-[calc(100vh-4rem)]">
+        {/* Left Sidebar */}
+        <div className="w-80 border-r overflow-y-auto bg-background">
+          <div className="p-4 space-y-4">
+            {/* Add Task Button */}
+            <Button 
+              className="w-full" 
+              onClick={() => setShowCreateForm(true)}
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Add Task
+            </Button>
 
-          {/* Task Groups */}
-          <TaskGroupManager
-            onGroupSelect={setSelectedGroupId}
-            selectedGroupId={selectedGroupId}
-            tasks={filteredTasks}
-            onTaskClick={handleTaskClick}
-            showAllTasks={showAllTasks}
-            onShowAllTasksChange={setShowAllTasks}
-          />
+            {/* Task Groups */}
+            <TaskGroupManager
+              onGroupSelect={setSelectedGroupId}
+              selectedGroupId={selectedGroupId}
+              tasks={filteredTasks}
+              onTaskClick={handleTaskClick}
+              showAllTasks={showAllTasks}
+              onShowAllTasksChange={setShowAllTasks}
+            />
 
           {/* Quick Stats */}
           <Card>
@@ -332,6 +534,11 @@ export default function CalendarPage() {
         <WeeklyCalendar 
           tasks={calendarTasks} 
           onTaskClick={handleTaskClick}
+          onTaskSchedule={handleScheduleTaskDrop}
+          onTaskReschedule={handleRescheduleTaskDrop}
+          onTaskResize={handleTaskResize}
+          activeDragId={activeDragId}
+          resizingTaskId={resizingTaskId}
         />
       </div>
 
@@ -391,6 +598,7 @@ export default function CalendarPage() {
           )}
         </DialogContent>
       </Dialog>
-    </div>
+      </div>
+    </DndContext>
   )
 }

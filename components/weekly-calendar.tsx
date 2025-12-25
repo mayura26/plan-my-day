@@ -3,19 +3,176 @@
 import { useState, useEffect, useRef } from 'react'
 import { Task } from '@/lib/types'
 import { format, startOfWeek, addDays, addWeeks, subWeeks, isSameDay, parseISO, getHours, getMinutes, isToday } from 'date-fns'
-import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { ChevronLeft, ChevronRight, GripVertical } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
+import { useDroppable } from '@dnd-kit/core'
+import { useDraggable } from '@dnd-kit/core'
+import { CSS } from '@dnd-kit/utilities'
 
 interface WeeklyCalendarProps {
   tasks: Task[]
   onTaskClick?: (taskId: string) => void
+  onTaskSchedule?: (taskId: string, day: Date, time: number) => void
+  onTaskReschedule?: (taskId: string, day: Date, time: number) => void
+  onTaskResize?: (taskId: string, newEndTime: Date) => void
+  activeDragId?: string | null
+  resizingTaskId?: string | null
 }
 
 const HOURS = Array.from({ length: 24 }, (_, i) => i) // 0-23 hours
 const WEEK_DAYS = 7
 
-export function WeeklyCalendar({ tasks, onTaskClick }: WeeklyCalendarProps) {
+// Helper function to snap time to 15-minute intervals
+const snapToQuarterHour = (hours: number): number => {
+  const totalMinutes = hours * 60
+  const snappedMinutes = Math.round(totalMinutes / 15) * 15
+  return snappedMinutes / 60
+}
+
+// Helper function to calculate time from Y position
+const getTimeFromPosition = (y: number, dayHeight: number): number => {
+  const percentage = y / dayHeight
+  const hours = percentage * 24
+  return snapToQuarterHour(hours)
+}
+
+// Helper function to get task color
+const getTaskColor = (task: Task) => {
+  // Color based on priority
+  switch (task.priority) {
+    case 1: return 'bg-red-500/80 border-red-600'
+    case 2: return 'bg-orange-500/80 border-orange-600'
+    case 3: return 'bg-yellow-500/80 border-yellow-600'
+    case 4: return 'bg-green-500/80 border-green-600'
+    case 5: return 'bg-blue-500/80 border-blue-600'
+    default: return 'bg-gray-500/80 border-gray-600'
+  }
+}
+
+// Droppable calendar slot component
+function CalendarSlot({ day, hour, children }: { day: Date, hour: number, children?: React.ReactNode }) {
+  const time = hour + 0.5 // Center of the hour slot
+  const { setNodeRef, isOver } = useDroppable({
+    id: `calendar-slot-${day.getTime()}-${hour}`,
+    data: {
+      type: 'calendar-slot',
+      day,
+      time,
+    },
+  })
+
+  return (
+    <div
+      ref={setNodeRef}
+      className={cn(
+        "h-16 border-b transition-colors duration-150",
+        isOver && "bg-primary/20 ring-1 ring-primary/30",
+        !isOver && "hover:bg-accent/30"
+      )}
+    >
+      {children}
+    </div>
+  )
+}
+
+// Resizable task component (includes dragging and resizing functionality)
+function ResizableTask({ task, position, onTaskClick, onResize, activeDragId, resizingTaskId }: { 
+  task: Task, 
+  position: { top: string, height: string }, 
+  onTaskClick?: (taskId: string) => void,
+  onResize?: (taskId: string, newEndTime: Date) => void,
+  activeDragId?: string | null,
+  resizingTaskId?: string | null
+}) {
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+    id: task.id,
+    disabled: task.locked,
+    data: {
+      type: 'task',
+      task,
+    },
+  })
+
+  const resizeHandleId = `resize-${task.id}`
+  const { attributes: resizeAttributes, listeners: resizeListeners, setNodeRef: setResizeRef, isDragging: isResizing } = useDraggable({
+    id: resizeHandleId,
+    disabled: task.locked,
+    data: {
+      type: 'resize-handle',
+      task,
+    },
+  })
+
+  const isActiveDrag = activeDragId === task.id || activeDragId === resizeHandleId
+  const isTaskResizing = resizingTaskId === task.id || isResizing
+
+  const style = {
+    top: position.top,
+    height: position.height,
+    transform: CSS.Translate.toString(transform),
+    opacity: isDragging || isTaskResizing ? 0.7 : 1,
+    transition: isDragging || isTaskResizing ? 'none' : 'all 0.2s ease-in-out',
+    zIndex: isActiveDrag ? 50 : 10,
+  }
+
+  // Handle click on the task content (not the drag area)
+  const handleTaskClick = (e: React.MouseEvent) => {
+    // Stop propagation to prevent triggering on parent elements
+    e.stopPropagation()
+    // Only trigger if we're not currently dragging
+    if (!isDragging && !isResizing) {
+      onTaskClick?.(task.id)
+    }
+  }
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      {...(task.locked ? {} : listeners)}
+      {...attributes}
+      className={cn(
+        "absolute left-1 right-1 rounded-md border-l-4 p-2 cursor-pointer pointer-events-auto",
+        "hover:shadow-lg transition-shadow overflow-hidden group",
+        task.locked && "cursor-not-allowed opacity-75",
+        !task.locked && "cursor-grab active:cursor-grabbing",
+        isActiveDrag && "shadow-xl ring-2 ring-primary/50",
+        isTaskResizing && "ring-2 ring-primary/50",
+        getTaskColor(task)
+      )}
+      onClick={handleTaskClick}
+    >
+      <div className="text-xs font-medium text-white truncate pointer-events-none">
+        {task.title}
+      </div>
+      <div className="text-xs text-white/90 mt-1">
+        {format(parseISO(task.scheduled_start!), 'h:mm a')}
+      </div>
+      {task.locked && (
+        <div className="text-xs text-white/90 mt-1 flex items-center gap-1">
+          🔒 Locked
+        </div>
+      )}
+      {!task.locked && (
+        <div
+          ref={setResizeRef}
+          {...resizeListeners}
+          {...resizeAttributes}
+          className={cn(
+            "absolute bottom-0 left-0 right-0 h-2 cursor-ns-resize bg-white/20 hover:bg-white/30 transition-opacity flex items-center justify-center",
+            isTaskResizing ? "opacity-100 bg-white/40" : "opacity-0 group-hover:opacity-100"
+          )}
+          onMouseDown={(e) => e.stopPropagation()}
+        >
+          <GripVertical className="h-3 w-3 text-white" />
+        </div>
+      )}
+    </div>
+  )
+}
+
+export function WeeklyCalendar({ tasks, onTaskClick, onTaskSchedule, onTaskReschedule, onTaskResize, activeDragId, resizingTaskId }: WeeklyCalendarProps) {
   const [currentWeek, setCurrentWeek] = useState(new Date())
   const [currentTime, setCurrentTime] = useState(new Date())
   const calendarScrollRef = useRef<HTMLDivElement>(null)
@@ -98,17 +255,6 @@ export function WeeklyCalendar({ tasks, onTaskClick }: WeeklyCalendarProps) {
     }
   }
 
-  const getTaskColor = (task: Task) => {
-    // Color based on priority
-    switch (task.priority) {
-      case 1: return 'bg-red-500/80 border-red-600'
-      case 2: return 'bg-orange-500/80 border-orange-600'
-      case 3: return 'bg-yellow-500/80 border-yellow-600'
-      case 4: return 'bg-green-500/80 border-green-600'
-      case 5: return 'bg-blue-500/80 border-blue-600'
-      default: return 'bg-gray-500/80 border-gray-600'
-    }
-  }
 
   const formatTime = (hour: number) => {
     if (hour === 0) return '12 AM'
@@ -211,12 +357,9 @@ export function WeeklyCalendar({ tasks, onTaskClick }: WeeklyCalendarProps) {
             {/* Day columns */}
             {weekDays.map((day, dayIndex) => (
               <div key={dayIndex} className="relative border-l">
-                {/* Hour slots */}
+                {/* Hour slots with drop zones */}
                 {HOURS.map((hour) => (
-                  <div
-                    key={hour}
-                    className="h-16 border-b hover:bg-accent/50 transition-colors"
-                  />
+                  <CalendarSlot key={hour} day={day} hour={hour} />
                 ))}
 
                 {/* Current time indicator (red line) */}
@@ -246,32 +389,15 @@ export function WeeklyCalendar({ tasks, onTaskClick }: WeeklyCalendarProps) {
                       if (!position) return null
 
                       return (
-                        <div
+                        <ResizableTask
                           key={task.id}
-                          className={cn(
-                            "absolute left-1 right-1 rounded-md border-l-4 p-2 cursor-pointer pointer-events-auto",
-                            "hover:shadow-lg transition-shadow overflow-hidden",
-                            getTaskColor(task)
-                          )}
-                          style={{
-                            top: position.top,
-                            height: position.height,
-                            minHeight: '40px'
-                          }}
-                          onClick={() => onTaskClick?.(task.id)}
-                        >
-                          <div className="text-xs font-medium text-white truncate">
-                            {task.title}
-                          </div>
-                          <div className="text-xs text-white/90 mt-1">
-                            {format(parseISO(task.scheduled_start!), 'h:mm a')}
-                          </div>
-                          {task.locked && (
-                            <div className="text-xs text-white/90 mt-1 flex items-center gap-1">
-                              🔒 Locked
-                            </div>
-                          )}
-                        </div>
+                          task={task}
+                          position={position}
+                          onTaskClick={onTaskClick}
+                          onResize={onTaskResize}
+                          activeDragId={activeDragId}
+                          resizingTaskId={resizingTaskId}
+                        />
                       )
                     })}
                 </div>
