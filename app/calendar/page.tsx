@@ -17,6 +17,7 @@ import { Task, TaskGroup, CreateTaskRequest } from '@/lib/types'
 import { format, startOfWeek } from 'date-fns'
 import { useUserTimezone } from '@/hooks/use-user-timezone'
 import { createDateInTimezone } from '@/lib/timezone-utils'
+import { cn } from '@/lib/utils'
 
 export default function CalendarPage() {
   const { data: session, status } = useSession()
@@ -548,13 +549,10 @@ export default function CalendarPage() {
 
         {/* Left Sidebar */}
         <div
-          className={`
-            fixed md:static inset-y-0 left-0 z-50 md:z-auto
-            w-[85vw] max-w-sm md:w-80
-            border-r overflow-y-auto bg-background
-            transform transition-transform duration-300 ease-in-out
-            ${sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
-          `}
+          className={cn(
+            "fixed md:static inset-y-0 left-0 z-50 md:z-auto w-[85vw] max-w-sm md:w-80 border-r overflow-y-auto bg-background transform transition-transform duration-300 ease-in-out",
+            sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
+          )}
         >
           <div className="p-4 space-y-4">
             {/* Close button for mobile */}
@@ -654,23 +652,24 @@ export default function CalendarPage() {
               </CardContent>
             </Card>
           )}
+          </div>
         </div>
-      </div>
 
-      {/* Main Calendar Area */}
-      <div className="flex-1 overflow-hidden w-full">
-        <WeeklyCalendar 
-          tasks={calendarTasks} 
-          onTaskClick={handleTaskClick}
-          onTaskSchedule={handleScheduleTaskDrop}
-          onTaskReschedule={handleRescheduleTaskDrop}
-          onTaskResize={handleTaskResize}
-          activeDragId={activeDragId}
-          resizingTaskId={resizingTaskId}
-          selectedGroupId={selectedGroupId}
-          groups={groups}
-          onSidebarToggle={() => setSidebarOpen(!sidebarOpen)}
-        />
+        {/* Main Calendar Area */}
+        <div className="flex-1 overflow-hidden w-full">
+          <WeeklyCalendar 
+            tasks={calendarTasks} 
+            onTaskClick={handleTaskClick}
+            onTaskSchedule={handleScheduleTaskDrop}
+            onTaskReschedule={handleRescheduleTaskDrop}
+            onTaskResize={handleTaskResize}
+            activeDragId={activeDragId}
+            resizingTaskId={resizingTaskId}
+            selectedGroupId={selectedGroupId}
+            groups={groups}
+            onSidebarToggle={() => setSidebarOpen(!sidebarOpen)}
+          />
+        </div>
       </div>
 
       {/* Task Detail Dialog */}
