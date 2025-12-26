@@ -46,7 +46,7 @@ export function Navigation() {
           </div>
 
           {/* Desktop Navigation */}
-          <nav className="hidden md:flex items-center space-x-6">
+          <nav className="hidden md:flex items-center gap-1">
             {navigation.map((item) => {
               const isActive = pathname === item.href
               return (
@@ -54,9 +54,9 @@ export function Navigation() {
                   key={item.name}
                   href={item.href}
                   className={cn(
-                    "flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium transition-colors",
+                    "flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all",
                     isActive
-                      ? "bg-accent text-accent-foreground"
+                      ? "bg-primary text-primary-foreground"
                       : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
                   )}
                 >
@@ -68,7 +68,7 @@ export function Navigation() {
           </nav>
 
           {/* Right side actions */}
-          <div className="flex items-center space-x-4">
+          <div className="flex items-center gap-3">
             <ThemeToggle />
             <AuthButton />
             
@@ -91,7 +91,7 @@ export function Navigation() {
         {/* Mobile Navigation */}
         {isMobileMenuOpen && (
           <div className="md:hidden border-t">
-            <nav className="py-4 space-y-2">
+            <nav className="py-3 space-y-1">
               {navigation.map((item) => {
                 const isActive = pathname === item.href
                 return (
@@ -99,9 +99,9 @@ export function Navigation() {
                     key={item.name}
                     href={item.href}
                     className={cn(
-                      "flex items-center space-x-3 px-3 py-2 rounded-md text-sm font-medium transition-colors",
+                      "flex items-center gap-3 px-4 py-2.5 rounded-md text-sm font-medium transition-all",
                       isActive
-                        ? "bg-accent text-accent-foreground"
+                        ? "bg-primary text-primary-foreground"
                         : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
                     )}
                     onClick={() => setIsMobileMenuOpen(false)}

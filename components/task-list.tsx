@@ -119,25 +119,25 @@ export function TaskList({
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Card>
           <CardContent className="p-4">
-            <div className="text-2xl font-bold text-blue-600">{taskCounts.pending}</div>
+            <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">{taskCounts.pending}</div>
             <p className="text-sm text-muted-foreground">Pending</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
-            <div className="text-2xl font-bold text-yellow-600">{taskCounts.in_progress}</div>
+            <div className="text-2xl font-bold text-yellow-600 dark:text-yellow-400">{taskCounts.in_progress}</div>
             <p className="text-sm text-muted-foreground">In Progress</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
-            <div className="text-2xl font-bold text-green-600">{taskCounts.completed}</div>
+            <div className="text-2xl font-bold text-green-600 dark:text-green-400">{taskCounts.completed}</div>
             <p className="text-sm text-muted-foreground">Completed</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
-            <div className="text-2xl font-bold text-red-600">{taskCounts.cancelled}</div>
+            <div className="text-2xl font-bold text-red-600 dark:text-red-400">{taskCounts.cancelled}</div>
             <p className="text-sm text-muted-foreground">Cancelled</p>
           </CardContent>
         </Card>

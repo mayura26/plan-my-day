@@ -10,11 +10,11 @@ export const PRIORITY_LABELS = {
 } as const
 
 export const PRIORITY_COLORS = {
-  1: 'text-red-600 bg-red-50 border-red-200',
-  2: 'text-orange-600 bg-orange-50 border-orange-200',
-  3: 'text-yellow-600 bg-yellow-50 border-yellow-200',
-  4: 'text-blue-600 bg-blue-50 border-blue-200',
-  5: 'text-gray-600 bg-gray-50 border-gray-200'
+  1: 'text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-800',
+  2: 'text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/20 border-orange-200 dark:border-orange-800',
+  3: 'text-yellow-600 dark:text-yellow-400 bg-yellow-50 dark:bg-yellow-950/20 border-yellow-200 dark:border-yellow-800',
+  4: 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800',
+  5: 'text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-900/50 border-gray-200 dark:border-gray-700'
 } as const
 
 // Energy level helpers
@@ -35,10 +35,10 @@ export const STATUS_LABELS = {
 } as const
 
 export const STATUS_COLORS = {
-  pending: 'text-gray-600 bg-gray-50 border-gray-200',
-  in_progress: 'text-blue-600 bg-blue-50 border-blue-200',
-  completed: 'text-green-600 bg-green-50 border-green-200',
-  cancelled: 'text-red-600 bg-red-50 border-red-200'
+  pending: 'text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-900/50 border-gray-200 dark:border-gray-700',
+  in_progress: 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800',
+  completed: 'text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-800',
+  cancelled: 'text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-800'
 } as const
 
 // Task type helpers

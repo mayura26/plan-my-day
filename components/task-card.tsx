@@ -68,7 +68,7 @@ export function TaskCard({
 
   if (compact) {
     return (
-      <Card className={`transition-all hover:shadow-md ${isOverdue ? 'border-red-200 bg-red-50' : ''}`}>
+      <Card className={`transition-all hover:shadow-md ${isOverdue ? 'border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/20' : ''}`}>
         <CardContent className="p-3">
           <div className="flex items-center space-x-3">
             <Checkbox
@@ -105,7 +105,7 @@ export function TaskCard({
   }
 
   return (
-    <Card className={`transition-all hover:shadow-md ${isOverdue ? 'border-red-200 bg-red-50' : ''} ${isDueSoon ? 'border-yellow-200 bg-yellow-50' : ''}`}>
+    <Card className={`transition-all hover:shadow-md ${isOverdue ? 'border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/20' : ''} ${isDueSoon ? 'border-yellow-200 dark:border-yellow-800 bg-yellow-50 dark:bg-yellow-950/20' : ''}`}>
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between">
           <div className="flex items-start space-x-3 flex-1 min-w-0">
@@ -186,12 +186,12 @@ export function TaskCard({
 
           {/* Alerts */}
           {isOverdue && (
-            <div className="text-sm text-red-600 font-medium">
+            <div className="text-sm text-red-600 dark:text-red-400 font-medium">
               ⚠️ This task is overdue
             </div>
           )}
           {isDueSoon && !isOverdue && (
-            <div className="text-sm text-yellow-600 font-medium">
+            <div className="text-sm text-yellow-600 dark:text-yellow-400 font-medium">
               ⏰ This task is due soon
             </div>
           )}

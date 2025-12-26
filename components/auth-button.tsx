@@ -2,26 +2,29 @@
 
 import { useSession, signIn, signOut } from 'next-auth/react'
 import { Button } from '@/components/ui/button'
-import Link from 'next/link'
+import { LogOut } from 'lucide-react'
 
 export function AuthButton() {
   const { data: session, status } = useSession()
 
   if (status === 'loading') {
-    return <Button size="sm" disabled>Loading...</Button>
+    return <div className="h-9 w-20 animate-pulse rounded-md bg-muted" />
   }
 
   if (session) {
     return (
-      <div className="flex items-center space-x-2">
-        <span className="text-sm text-muted-foreground">
-          Welcome, {session.user?.name || session.user?.email}
+      <div className="flex items-center gap-3">
+        <span className="hidden sm:inline-block text-sm text-muted-foreground">
+          {session.user?.name || session.user?.email}
         </span>
-        <Link href="/tasks">
-          <Button size="sm">Go to Tasks</Button>
-        </Link>
-        <Button size="sm" variant="outline" onClick={() => signOut()}>
-          Sign Out
+        <Button 
+          size="sm" 
+          variant="ghost" 
+          onClick={() => signOut()}
+          className="gap-2"
+        >
+          <LogOut className="h-4 w-4" />
+          <span className="hidden sm:inline">Sign Out</span>
         </Button>
       </div>
     )

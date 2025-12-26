@@ -54,6 +54,8 @@
 
 ### 🔄 In Progress
 - [ ] User onboarding flow
+- [ ] Fix top bar so no double up
+- [ ] make group filtering clearer
 
 ### ⏳ Pending
 - [ ] PWA setup with service worker
