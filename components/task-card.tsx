@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Checkbox } from '@/components/ui/checkbox'
-import { Task, TaskStatus } from '@/lib/types'
+import { Task, TaskStatus, TaskGroup } from '@/lib/types'
 import { 
   PRIORITY_LABELS, 
   STATUS_LABELS, 
@@ -22,6 +22,7 @@ import {
 import { Clock, Calendar, Zap, Lock, MoreHorizontal, CalendarX } from 'lucide-react'
 import { useUserTimezone } from '@/hooks/use-user-timezone'
 import { formatDateShort, formatTimeRange } from '@/lib/timezone-utils'
+import { cn } from '@/lib/utils'
 
 interface TaskCardProps {
   task: Task
@@ -32,6 +33,7 @@ interface TaskCardProps {
   onUnschedule?: (taskId: string) => Promise<void>
   showGroup?: boolean
   compact?: boolean
+  groups?: TaskGroup[]
 }
 
 export function TaskCard({ 
@@ -43,7 +45,8 @@ export function TaskCard({
   onUnschedule,
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   showGroup = false,
-  compact = false 
+  compact = false,
+  groups = []
 }: TaskCardProps) {
   const [isUpdating, setIsUpdating] = useState(false)
   const [isUnscheduling, setIsUnscheduling] = useState(false)
@@ -82,10 +85,35 @@ export function TaskCard({
   const statusColor = getTaskStatusColor(task.status)
   const energyColor = getEnergyLevelColor(task.energy_level_required)
 
+  // Get group color for the task
+  const group = task.group_id ? groups.find(g => g.id === task.group_id) : null
+  const groupColor = group?.color || null
+
+  // Get priority color for top bar
+  const getPriorityBarColor = (priority: number) => {
+    switch (priority) {
+      case 1: return 'bg-red-500'
+      case 2: return 'bg-orange-500'
+      case 3: return 'bg-yellow-500'
+      case 4: return 'bg-green-500'
+      case 5: return 'bg-blue-500'
+      default: return 'bg-gray-500'
+    }
+  }
+
   if (compact) {
     return (
-      <Card className={`transition-all hover:shadow-md ${isOverdue ? 'border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/20' : ''}`}>
-        <CardContent className="p-3">
+      <Card 
+        className={cn(
+          "transition-all hover:shadow-md relative",
+          isOverdue && 'border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/20',
+          groupColor && 'border-l-4'
+        )}
+        style={groupColor ? { borderLeftColor: groupColor } : undefined}
+      >
+        {/* Priority top bar */}
+        <div className={cn("absolute top-0 left-0 right-0 h-1 rounded-t-lg", getPriorityBarColor(task.priority))} />
+        <CardContent className="p-3 pt-4">
           <div className="flex items-center space-x-3">
             <Checkbox
               checked={task.status === 'completed'}
@@ -121,8 +149,18 @@ export function TaskCard({
   }
 
   return (
-    <Card className={`transition-all hover:shadow-md ${isOverdue ? 'border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/20' : ''} ${isDueSoon ? 'border-yellow-200 dark:border-yellow-800 bg-yellow-50 dark:bg-yellow-950/20' : ''}`}>
-      <CardHeader className="pb-3">
+    <Card 
+      className={cn(
+        "transition-all hover:shadow-md relative",
+        isOverdue && 'border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/20',
+        isDueSoon && 'border-yellow-200 dark:border-yellow-800 bg-yellow-50 dark:bg-yellow-950/20',
+        groupColor && 'border-l-4'
+      )}
+      style={groupColor ? { borderLeftColor: groupColor } : undefined}
+    >
+      {/* Priority top bar */}
+      <div className={cn("absolute top-0 left-0 right-0 h-1 rounded-t-lg", getPriorityBarColor(task.priority))} />
+      <CardHeader className="pb-3 pt-4">
         <div className="flex items-start justify-between">
           <div className="flex items-start space-x-3 flex-1 min-w-0">
             <Checkbox

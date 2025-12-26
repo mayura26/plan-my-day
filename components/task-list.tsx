@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Task, TaskStatus, TaskType } from '@/lib/types'
+import { Task, TaskStatus, TaskType, TaskGroup } from '@/lib/types'
 import { TaskCard } from './task-card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -24,6 +24,7 @@ interface TaskListProps {
   onCreateTask?: () => void
   showGroup?: boolean
   compact?: boolean
+  groups?: TaskGroup[]
 }
 
 export function TaskList({
@@ -34,7 +35,8 @@ export function TaskList({
   onExtendTask,
   onCreateTask,
   showGroup = false,
-  compact = false
+  compact = false,
+  groups = []
 }: TaskListProps) {
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState<TaskStatus[]>([])
@@ -300,6 +302,7 @@ export function TaskList({
               onExtend={onExtendTask}
               showGroup={showGroup}
               compact={compact}
+              groups={groups}
             />
           ))}
         </div>

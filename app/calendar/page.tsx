@@ -635,6 +635,7 @@ export default function CalendarPage() {
           activeDragId={activeDragId}
           resizingTaskId={resizingTaskId}
           selectedGroupId={selectedGroupId}
+          groups={groups}
         />
       </div>
 

@@ -365,6 +365,7 @@ export function GroupedTaskList({
                             onEdit={onEditTask}
                             onExtend={onExtendTask}
                             onUnschedule={onUnscheduleTask}
+                            groups={groups}
                           />
                         ))
                       )}

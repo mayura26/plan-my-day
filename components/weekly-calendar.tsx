@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { Task } from '@/lib/types'
+import { Task, TaskGroup } from '@/lib/types'
 import { format, startOfWeek, addDays, addWeeks, subWeeks, isSameDay, parseISO, getHours, getMinutes, isToday } from 'date-fns'
 import { useUserTimezone } from '@/hooks/use-user-timezone'
 import { formatTimeShort, getHoursAndMinutesInTimezone, getDateInTimezone } from '@/lib/timezone-utils'
@@ -21,6 +21,7 @@ interface WeeklyCalendarProps {
   activeDragId?: string | null
   resizingTaskId?: string | null
   selectedGroupId?: string | null
+  groups?: TaskGroup[]
 }
 
 const HOURS = Array.from({ length: 24 }, (_, i) => i) // 0-23 hours
@@ -38,16 +39,26 @@ const timeToDecimal = (hour: number, minute: number): number => {
   return hour + minute / 60
 }
 
-// Helper function to get task color
-const getTaskColor = (task: Task) => {
-  // Color based on priority
-  switch (task.priority) {
-    case 1: return 'bg-red-500/80 border-red-600'
-    case 2: return 'bg-orange-500/80 border-orange-600'
-    case 3: return 'bg-yellow-500/80 border-yellow-600'
-    case 4: return 'bg-green-500/80 border-green-600'
-    case 5: return 'bg-blue-500/80 border-blue-600'
-    default: return 'bg-gray-500/80 border-gray-600'
+// Helper function to get task background color based on group
+const getTaskBackgroundColor = (task: Task, groups: TaskGroup[] = []) => {
+  const group = task.group_id ? groups.find(g => g.id === task.group_id) : null
+  if (group?.color) {
+    // Use group color with opacity
+    return `bg-[${group.color}]/20 border-[${group.color}]`
+  }
+  // Default gray if no group
+  return 'bg-gray-500/20 border-gray-500'
+}
+
+// Helper function to get priority bar color
+const getPriorityBarColor = (priority: number) => {
+  switch (priority) {
+    case 1: return 'bg-red-500'
+    case 2: return 'bg-orange-500'
+    case 3: return 'bg-yellow-500'
+    case 4: return 'bg-green-500'
+    case 5: return 'bg-blue-500'
+    default: return 'bg-gray-500'
   }
 }
 
@@ -79,14 +90,15 @@ function CalendarSlot({ day, hour, minute, children }: { day: Date, hour: number
 }
 
 // Resizable task component (includes dragging and resizing functionality)
-function ResizableTask({ task, position, onTaskClick, onResize, activeDragId, resizingTaskId, selectedGroupId }: { 
+function ResizableTask({ task, position, onTaskClick, onResize, activeDragId, resizingTaskId, selectedGroupId, groups = [] }: { 
   task: Task, 
   position: { top: string, height: string }, 
   onTaskClick?: (taskId: string) => void,
   onResize?: (taskId: string, newEndTime: Date) => void,
   activeDragId?: string | null,
   resizingTaskId?: string | null,
-  selectedGroupId?: string | null
+  selectedGroupId?: string | null,
+  groups?: TaskGroup[]
 }) {
   const { timezone } = useUserTimezone()
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
@@ -135,6 +147,18 @@ function ResizableTask({ task, position, onTaskClick, onResize, activeDragId, re
       : taskGroupId === selectedGroupId
   const shouldFade = selectedGroupId !== null && !belongsToSelectedGroup
 
+  // Get group color for the task
+  const group = task.group_id ? groups.find(g => g.id === task.group_id) : null
+  const groupColor = group?.color || null
+
+  // Convert hex color to rgba for background
+  const hexToRgba = (hex: string, alpha: number) => {
+    const r = parseInt(hex.slice(1, 3), 16)
+    const g = parseInt(hex.slice(3, 5), 16)
+    const b = parseInt(hex.slice(5, 7), 16)
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`
+  }
+
   const style = {
     top: position.top,
     height: position.height,
@@ -142,6 +166,10 @@ function ResizableTask({ task, position, onTaskClick, onResize, activeDragId, re
     opacity: isDragging || isTaskResizing ? 0.7 : shouldFade ? 0.3 : 1,
     transition: isDragging || isTaskResizing ? 'none' : 'all 0.2s ease-in-out',
     zIndex: isActiveDrag ? 50 : 10,
+    ...(groupColor && {
+      backgroundColor: hexToRgba(groupColor, 0.2),
+      borderColor: groupColor,
+    }),
   }
 
   // Handle click on the task content (not the drag area)
@@ -168,11 +196,13 @@ function ResizableTask({ task, position, onTaskClick, onResize, activeDragId, re
         isActiveDrag && "shadow-xl ring-2 ring-primary/50",
         isTaskResizing && "ring-2 ring-primary/50",
         belongsToSelectedGroup && selectedGroupId !== null && "ring-2 ring-primary ring-offset-1",
-        getTaskColor(task)
+        !groupColor && "bg-gray-500/20 border-gray-500"
       )}
       onClick={handleTaskClick}
     >
-      <div className="text-xs font-medium text-white truncate pointer-events-none">
+      {/* Priority top bar */}
+      <div className={cn("absolute top-0 left-0 right-0 h-1 rounded-t-md", getPriorityBarColor(task.priority))} />
+      <div className="text-xs font-medium text-white truncate pointer-events-none mt-1">
         {task.title}
       </div>
       <div className="text-xs text-white/90 mt-1">
@@ -217,7 +247,7 @@ function ResizableTask({ task, position, onTaskClick, onResize, activeDragId, re
   )
 }
 
-export function WeeklyCalendar({ tasks, onTaskClick, onTaskSchedule, onTaskReschedule, onTaskResize, activeDragId, resizingTaskId, selectedGroupId }: WeeklyCalendarProps) {
+export function WeeklyCalendar({ tasks, onTaskClick, onTaskSchedule, onTaskReschedule, onTaskResize, activeDragId, resizingTaskId, selectedGroupId, groups = [] }: WeeklyCalendarProps) {
   const { timezone } = useUserTimezone()
   const [currentWeek, setCurrentWeek] = useState(new Date())
   const [currentTime, setCurrentTime] = useState(new Date())
@@ -448,6 +478,7 @@ export function WeeklyCalendar({ tasks, onTaskClick, onTaskSchedule, onTaskResch
                           activeDragId={activeDragId}
                           resizingTaskId={resizingTaskId}
                           selectedGroupId={selectedGroupId}
+                          groups={groups}
                         />
                       )
                     })}
