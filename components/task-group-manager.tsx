@@ -34,7 +34,7 @@ const defaultColors = [
 ]
 
 // Draggable task item component for sidebar
-function DraggableTaskItem({ task, onTaskClick }: { task: Task, onTaskClick?: (taskId: string) => void }) {
+export function DraggableTaskItem({ task, onTaskClick }: { task: Task, onTaskClick?: (taskId: string) => void }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: task.id,
     disabled: task.locked,

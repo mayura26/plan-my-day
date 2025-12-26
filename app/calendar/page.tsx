@@ -3,9 +3,9 @@
 import { useState, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
-import { DndContext, DragEndEvent, DragOverEvent, DragStartEvent, PointerSensor, useSensor, useSensors, closestCenter } from '@dnd-kit/core'
+import { DndContext, DragEndEvent, DragOverEvent, DragStartEvent, PointerSensor, useSensor, useSensors, closestCenter, DragOverlay } from '@dnd-kit/core'
 import { WeeklyCalendar } from '@/components/weekly-calendar'
-import { TaskGroupManager } from '@/components/task-group-manager'
+import { TaskGroupManager, DraggableTaskItem } from '@/components/task-group-manager'
 import { TaskForm } from '@/components/task-form'
 import { TaskDetailDialog } from '@/components/task-detail-dialog'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -36,6 +36,7 @@ export default function CalendarPage() {
   const [showAllTasks, setShowAllTasks] = useState(false)
   const [activeDragId, setActiveDragId] = useState<string | null>(null)
   const [resizingTaskId, setResizingTaskId] = useState<string | null>(null)
+  const [draggedTask, setDraggedTask] = useState<Task | null>(null)
   
   // Configure drag sensors
   const sensors = useSensors(
@@ -270,6 +271,9 @@ export default function CalendarPage() {
     // Track if we're resizing
     if (activeData?.type === 'resize-handle') {
       setResizingTaskId(activeData.task?.id || null)
+    } else if (activeData?.type === 'sidebar-task' || activeData?.type === 'task') {
+      // Track the dragged task for the overlay
+      setDraggedTask(activeData.task as Task)
     }
   }
 
@@ -281,6 +285,7 @@ export default function CalendarPage() {
   const handleDragEnd = async (event: DragEndEvent) => {
     setActiveDragId(null)
     setResizingTaskId(null)
+    setDraggedTask(null)
     const { active, over } = event
     
     if (!over) return
@@ -538,16 +543,11 @@ export default function CalendarPage() {
               </CardHeader>
               <CardContent className="space-y-2">
                 {unscheduledTasks.slice(0, 5).map((task) => (
-                  <div
+                  <DraggableTaskItem
                     key={task.id}
-                    className="p-2 rounded border bg-card hover:bg-accent/50 transition-colors cursor-pointer text-sm"
-                    onClick={() => handleTaskClick(task.id)}
-                  >
-                    <div className="font-medium truncate">{task.title}</div>
-                    <Badge variant="outline" className="text-xs mt-1">
-                      Priority {task.priority}
-                    </Badge>
-                  </div>
+                    task={task}
+                    onTaskClick={handleTaskClick}
+                  />
                 ))}
                 {unscheduledTasks.length > 5 && (
                   <Button 
@@ -636,6 +636,18 @@ export default function CalendarPage() {
         </DialogContent>
       </Dialog>
       </div>
+
+      {/* Drag Overlay - renders dragged item in a portal to avoid overflow clipping */}
+      <DragOverlay>
+        {draggedTask && (
+          <div className="p-2 rounded border bg-card shadow-lg cursor-grabbing text-sm" style={{ opacity: 0.9 }}>
+            <div className="font-medium truncate">{draggedTask.title}</div>
+            <Badge variant="outline" className="text-xs mt-1">
+              Priority {draggedTask.priority}
+            </Badge>
+          </div>
+        )}
+      </DragOverlay>
     </DndContext>
   )
 }
