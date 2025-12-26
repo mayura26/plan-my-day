@@ -3,6 +3,7 @@
 - [ ] PWA setup with service worker
 - [ ] Basic offline functionality
 - [ ] User onboarding tutorial and help system
+- [ ] Create icon
 
 ---
 

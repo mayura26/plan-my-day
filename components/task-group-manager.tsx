@@ -175,10 +175,13 @@ export function TaskGroupManager({
         setNewGroupColor('#3B82F6')
         setIsCreateDialogOpen(false)
       } else {
-        console.error('Failed to create task group')
+        const errorData = await response.json().catch(() => ({ error: 'Failed to create task group' }))
+        console.error('Failed to create task group:', errorData.error || 'Unknown error')
+        alert(errorData.error || 'Failed to create task group. Please try again.')
       }
     } catch (error) {
       console.error('Error creating task group:', error)
+      alert('An error occurred while creating the task group. Please try again.')
     }
   }
 

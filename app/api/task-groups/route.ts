@@ -49,6 +49,30 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Group name is required' }, { status: 400 })
     }
 
+    // Verify user exists in database, create if missing (handles edge cases)
+    const userCheck = await db.execute(
+      'SELECT id FROM users WHERE id = ?',
+      [session.user.id]
+    )
+
+    if (userCheck.rows.length === 0) {
+      // User doesn't exist in database, create them
+      try {
+        await db.execute(`
+          INSERT INTO users (id, name, email, image, created_at, updated_at)
+          VALUES (?, ?, ?, ?, datetime('now'), datetime('now'))
+        `, [
+          session.user.id,
+          session.user.name || null,
+          session.user.email || null,
+          session.user.image || null
+        ])
+      } catch (userError) {
+        console.error('Error creating user:', userError)
+        // If user creation fails, still try to proceed (might be a race condition)
+      }
+    }
+
     const groupId = generateGroupId()
     const now = new Date().toISOString()
 
@@ -68,8 +92,18 @@ export async function POST(request: NextRequest) {
     `, [group.id, group.user_id, group.name, group.color, group.collapsed, group.created_at, group.updated_at])
 
     return NextResponse.json({ group }, { status: 201 })
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error creating task group:', error)
+    
+    // Provide more specific error messages
+    if (error?.code === 'SQLITE_CONSTRAINT' || error?.cause?.code === 'SQLITE_CONSTRAINT') {
+      if (error.message?.includes('FOREIGN KEY')) {
+        return NextResponse.json({ 
+          error: 'User not found in database. Please sign out and sign in again.' 
+        }, { status: 400 })
+      }
+    }
+    
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
