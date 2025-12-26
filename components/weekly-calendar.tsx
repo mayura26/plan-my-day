@@ -5,7 +5,7 @@ import { Task, TaskGroup } from '@/lib/types'
 import { format, startOfWeek, addDays, addWeeks, subWeeks, isSameDay, parseISO, getHours, getMinutes, isToday } from 'date-fns'
 import { useUserTimezone } from '@/hooks/use-user-timezone'
 import { formatTimeShort, getHoursAndMinutesInTimezone, getDateInTimezone } from '@/lib/timezone-utils'
-import { ChevronLeft, ChevronRight, GripVertical } from 'lucide-react'
+import { ChevronLeft, ChevronRight, GripVertical, Menu } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { useDroppable } from '@dnd-kit/core'
@@ -22,6 +22,7 @@ interface WeeklyCalendarProps {
   resizingTaskId?: string | null
   selectedGroupId?: string | null
   groups?: TaskGroup[]
+  onSidebarToggle?: () => void
 }
 
 const HOURS = Array.from({ length: 24 }, (_, i) => i) // 0-23 hours
@@ -167,7 +168,7 @@ function ResizableTask({ task, position, onTaskClick, onResize, activeDragId, re
     transition: isDragging || isTaskResizing ? 'none' : 'all 0.2s ease-in-out',
     zIndex: isActiveDrag ? 50 : 10,
     ...(groupColor && {
-      backgroundColor: hexToRgba(groupColor, 0.2),
+      backgroundColor: hexToRgba(groupColor, 0.4),
       borderColor: groupColor,
     }),
   }
@@ -189,14 +190,15 @@ function ResizableTask({ task, position, onTaskClick, onResize, activeDragId, re
       {...(task.locked ? {} : listeners)}
       {...attributes}
       className={cn(
-        "absolute left-1 right-1 rounded-md border-l-4 p-2 cursor-pointer pointer-events-auto",
+        "absolute left-1 right-1 rounded-md border-l-4 p-1.5 md:p-2 cursor-pointer pointer-events-auto",
+        "min-h-[44px] md:min-h-0", // Minimum touch target height on mobile
         "hover:shadow-lg transition-shadow overflow-hidden group",
         task.locked && "cursor-not-allowed opacity-75",
         !task.locked && "cursor-grab active:cursor-grabbing",
         isActiveDrag && "shadow-xl ring-2 ring-primary/50",
         isTaskResizing && "ring-2 ring-primary/50",
         belongsToSelectedGroup && selectedGroupId !== null && "ring-2 ring-primary ring-offset-1",
-        !groupColor && "bg-gray-500/20 border-gray-500"
+        !groupColor && "bg-gray-500/40 border-gray-500"
       )}
       onClick={handleTaskClick}
     >
@@ -221,8 +223,8 @@ function ResizableTask({ task, position, onTaskClick, onResize, activeDragId, re
             {...topResizeListeners}
             {...topResizeAttributes}
             className={cn(
-              "absolute top-0 left-0 right-0 h-2 cursor-ns-resize bg-white/20 hover:bg-white/30 transition-opacity flex items-center justify-center",
-              isTopResizing ? "opacity-100 bg-white/40" : "opacity-0 group-hover:opacity-100"
+              "absolute top-0 left-0 right-0 h-3 md:h-2 cursor-ns-resize bg-white/20 hover:bg-white/30 transition-opacity flex items-center justify-center touch-none",
+              isTopResizing ? "opacity-100 bg-white/40" : "opacity-50 md:opacity-0 md:group-hover:opacity-100"
             )}
             onMouseDown={(e) => e.stopPropagation()}
           >
@@ -234,8 +236,8 @@ function ResizableTask({ task, position, onTaskClick, onResize, activeDragId, re
             {...bottomResizeListeners}
             {...bottomResizeAttributes}
             className={cn(
-              "absolute bottom-0 left-0 right-0 h-2 cursor-ns-resize bg-white/20 hover:bg-white/30 transition-opacity flex items-center justify-center",
-              isBottomResizing ? "opacity-100 bg-white/40" : "opacity-0 group-hover:opacity-100"
+              "absolute bottom-0 left-0 right-0 h-3 md:h-2 cursor-ns-resize bg-white/20 hover:bg-white/30 transition-opacity flex items-center justify-center touch-none",
+              isBottomResizing ? "opacity-100 bg-white/40" : "opacity-50 md:opacity-0 md:group-hover:opacity-100"
             )}
             onMouseDown={(e) => e.stopPropagation()}
           >
@@ -247,7 +249,7 @@ function ResizableTask({ task, position, onTaskClick, onResize, activeDragId, re
   )
 }
 
-export function WeeklyCalendar({ tasks, onTaskClick, onTaskSchedule, onTaskReschedule, onTaskResize, activeDragId, resizingTaskId, selectedGroupId, groups = [] }: WeeklyCalendarProps) {
+export function WeeklyCalendar({ tasks, onTaskClick, onTaskSchedule, onTaskReschedule, onTaskResize, activeDragId, resizingTaskId, selectedGroupId, groups = [], onSidebarToggle }: WeeklyCalendarProps) {
   const { timezone } = useUserTimezone()
   const [currentWeek, setCurrentWeek] = useState(new Date())
   const [currentTime, setCurrentTime] = useState(new Date())
@@ -366,26 +368,37 @@ export function WeeklyCalendar({ tasks, onTaskClick, onTaskSchedule, onTaskResch
     <div className="flex flex-col h-full">
       {/* Calendar Header */}
       <div className="flex items-center justify-between p-4 border-b">
-        <div className="flex items-center gap-4">
-          <h2 className="text-2xl font-bold">
+        <div className="flex items-center gap-2 md:gap-4">
+          {/* Mobile sidebar toggle button */}
+          {onSidebarToggle && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={onSidebarToggle}
+              className="md:hidden h-10 w-10"
+            >
+              <Menu className="h-5 w-5" />
+            </Button>
+          )}
+          <h2 className="text-xl md:text-2xl font-bold">
             {format(weekStart, 'MMMM yyyy')}
           </h2>
-          <Button variant="outline" size="sm" onClick={goToToday}>
+          <Button variant="outline" size="sm" onClick={goToToday} className="hidden sm:inline-flex">
             Today
           </Button>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon" onClick={goToPreviousWeek}>
+          <Button variant="ghost" size="icon" onClick={goToPreviousWeek} className="h-10 w-10">
             <ChevronLeft className="h-4 w-4" />
           </Button>
-          <Button variant="ghost" size="icon" onClick={goToNextWeek}>
+          <Button variant="ghost" size="icon" onClick={goToNextWeek} className="h-10 w-10">
             <ChevronRight className="h-4 w-4" />
           </Button>
         </div>
       </div>
 
       {/* Days Header */}
-      <div className="grid grid-cols-[80px_repeat(7,1fr)] border-b bg-muted/30">
+      <div className="grid grid-cols-[60px_repeat(7,1fr)] md:grid-cols-[80px_repeat(7,1fr)] border-b bg-muted/30">
         <div className="p-2"></div>
         {weekDays.map((day, index) => {
           const isToday = isSameDay(day, new Date())
@@ -398,14 +411,14 @@ export function WeeklyCalendar({ tasks, onTaskClick, onTaskSchedule, onTaskResch
               )}
             >
               <div className={cn(
-                "text-sm font-medium",
+                "text-xs md:text-sm font-medium",
                 isToday && "text-primary"
               )}>
                 {format(day, 'EEE')}
               </div>
               <div className={cn(
-                "text-2xl font-bold mt-1",
-                isToday && "bg-primary text-primary-foreground rounded-full w-10 h-10 flex items-center justify-center mx-auto"
+                "text-lg md:text-2xl font-bold mt-1",
+                isToday && "bg-primary text-primary-foreground rounded-full w-8 h-8 md:w-10 md:h-10 flex items-center justify-center mx-auto"
               )}>
                 {format(day, 'd')}
               </div>
@@ -416,17 +429,18 @@ export function WeeklyCalendar({ tasks, onTaskClick, onTaskSchedule, onTaskResch
 
       {/* Calendar Grid */}
       <div ref={calendarScrollRef} className="flex-1 overflow-auto">
-        <div className="relative">
+        <div className="relative min-w-[600px] md:min-w-0">
           {/* Time column and day columns */}
-          <div className="grid grid-cols-[80px_repeat(7,1fr)]">
+          <div className="grid grid-cols-[60px_repeat(7,1fr)] md:grid-cols-[80px_repeat(7,1fr)]">
             {/* Time labels */}
-            <div className="border-r">
+            <div className="border-r sticky left-0 z-10 bg-background">
               {HOURS.map((hour) => (
                 <div
                   key={hour}
-                  className="h-16 border-b px-2 text-xs text-muted-foreground flex items-start pt-1"
+                  className="h-16 border-b px-1 md:px-2 text-xs text-muted-foreground flex items-start pt-1"
                 >
-                  {formatTime(hour)}
+                  <span className="hidden sm:inline">{formatTime(hour)}</span>
+                  <span className="sm:hidden">{hour === 0 ? '12' : hour > 12 ? hour - 12 : hour}{hour >= 12 ? 'p' : 'a'}</span>
                 </div>
               ))}
             </div>

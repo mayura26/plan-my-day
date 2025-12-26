@@ -12,7 +12,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Calendar as CalendarIcon, Plus, CheckSquare, Clock } from 'lucide-react'
+import { Calendar as CalendarIcon, Plus, CheckSquare, Clock, Menu, X } from 'lucide-react'
 import { Task, TaskGroup, CreateTaskRequest } from '@/lib/types'
 import { format, startOfWeek } from 'date-fns'
 import { useUserTimezone } from '@/hooks/use-user-timezone'
@@ -38,6 +38,7 @@ export default function CalendarPage() {
   const [resizingTaskId, setResizingTaskId] = useState<string | null>(null)
   const [draggedTask, setDraggedTask] = useState<Task | null>(null)
   const [hiddenGroups, setHiddenGroups] = useState<Set<string>>(new Set())
+  const [sidebarOpen, setSidebarOpen] = useState(false)
   
   // Configure drag sensors
   const sensors = useSensors(
@@ -99,6 +100,7 @@ export default function CalendarPage() {
     if (task) {
       setSelectedTask(task)
       setShowTaskDetail(true)
+      setSidebarOpen(false) // Close sidebar on mobile when viewing task details
     }
   }
 
@@ -535,14 +537,45 @@ export default function CalendarPage() {
       onDragOver={handleDragOver}
       onDragEnd={handleDragEnd}
     >
-      <div className="flex h-[calc(100vh-4rem)]">
+      <div className="flex h-[calc(100vh-4rem)] relative">
+        {/* Backdrop overlay for mobile */}
+        {sidebarOpen && (
+          <div
+            className="fixed inset-0 bg-black/50 z-40 md:hidden"
+            onClick={() => setSidebarOpen(false)}
+          />
+        )}
+
         {/* Left Sidebar */}
-        <div className="w-80 border-r overflow-y-auto bg-background">
+        <div
+          className={`
+            fixed md:static inset-y-0 left-0 z-50 md:z-auto
+            w-[85vw] max-w-sm md:w-80
+            border-r overflow-y-auto bg-background
+            transform transition-transform duration-300 ease-in-out
+            ${sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
+          `}
+        >
           <div className="p-4 space-y-4">
+            {/* Close button for mobile */}
+            <div className="flex items-center justify-between md:hidden pb-2 border-b">
+              <h3 className="font-semibold">Task Groups</h3>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setSidebarOpen(false)}
+                className="h-8 w-8"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
             {/* Add Task Button */}
             <Button 
-              className="w-full" 
-              onClick={() => setShowCreateForm(true)}
+              className="w-full h-11" 
+              onClick={() => {
+                setShowCreateForm(true)
+                setSidebarOpen(false) // Close sidebar on mobile when creating task
+              }}
             >
               <Plus className="h-4 w-4 mr-2" />
               Add Task
@@ -625,7 +658,7 @@ export default function CalendarPage() {
       </div>
 
       {/* Main Calendar Area */}
-      <div className="flex-1 overflow-hidden">
+      <div className="flex-1 overflow-hidden w-full">
         <WeeklyCalendar 
           tasks={calendarTasks} 
           onTaskClick={handleTaskClick}
@@ -636,6 +669,7 @@ export default function CalendarPage() {
           resizingTaskId={resizingTaskId}
           selectedGroupId={selectedGroupId}
           groups={groups}
+          onSidebarToggle={() => setSidebarOpen(!sidebarOpen)}
         />
       </div>
 
@@ -652,7 +686,7 @@ export default function CalendarPage() {
 
       {/* Create Task Dialog */}
       <Dialog open={showCreateForm} onOpenChange={setShowCreateForm}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto w-[95vw] md:w-full mx-2 md:mx-auto">
           <DialogHeader>
             <DialogTitle>Create New Task</DialogTitle>
           </DialogHeader>
@@ -666,7 +700,7 @@ export default function CalendarPage() {
 
       {/* Edit Task Dialog */}
       <Dialog open={isEditing} onOpenChange={setIsEditing}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto w-[95vw] md:w-full mx-2 md:mx-auto">
           <DialogHeader>
             <DialogTitle>Edit Task</DialogTitle>
           </DialogHeader>
@@ -696,7 +730,6 @@ export default function CalendarPage() {
           )}
         </DialogContent>
       </Dialog>
-      </div>
 
       {/* Drag Overlay - renders dragged item in a portal to avoid overflow clipping */}
       <DragOverlay>

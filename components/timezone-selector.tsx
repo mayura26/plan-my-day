@@ -53,7 +53,7 @@ export function TimezoneSelector({ onTimezoneChange, showLabel = true }: Timezon
   }
 
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex flex-col sm:flex-row sm:items-center gap-2">
       {showLabel && (
         <label htmlFor="timezone-select" className="text-sm font-medium">
           Timezone:
@@ -64,7 +64,7 @@ export function TimezoneSelector({ onTimezoneChange, showLabel = true }: Timezon
         onValueChange={handleTimezoneChange}
         disabled={isSaving}
       >
-        <SelectTrigger id="timezone-select" className="w-[280px]">
+        <SelectTrigger id="timezone-select" className="w-full sm:w-[280px] h-11 md:h-10">
           <SelectValue placeholder="Select timezone" />
         </SelectTrigger>
         <SelectContent>

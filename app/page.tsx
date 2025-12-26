@@ -37,8 +37,8 @@ export default function Home() {
       {/* Header */}
       <header className="border-b">
         <div className="container mx-auto px-4 py-4 flex justify-between items-center">
-          <h1 className="text-2xl font-bold">Plan My Day</h1>
-          <div className="flex items-center space-x-4">
+          <h1 className="text-xl md:text-2xl font-bold">Plan My Day</h1>
+          <div className="flex items-center space-x-2 md:space-x-4">
             <AuthButton />
             <ThemeToggle />
           </div>
@@ -46,34 +46,34 @@ export default function Home() {
       </header>
 
       {/* Main Content - Marketing Page for Non-Authenticated Users */}
-      <main className="container mx-auto px-4 py-8">
-        <div className="max-w-6xl mx-auto space-y-16">
+      <main className="container mx-auto px-4 py-6 md:py-8">
+        <div className="max-w-6xl mx-auto space-y-12 md:space-y-16">
             {/* Hero Section */}
-            <div className="text-center space-y-6">
-              <h1 className="text-5xl font-bold tracking-tight">
+            <div className="text-center space-y-4 md:space-y-6">
+              <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold tracking-tight">
                 Plan Your Day with
                 <span className="text-primary"> AI-Powered</span> Scheduling
               </h1>
-              <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
+              <p className="text-base md:text-lg lg:text-xl text-muted-foreground max-w-2xl mx-auto px-4">
                 Transform your productivity with intelligent task management, 
                 smart scheduling, and seamless calendar integration.
               </p>
-              <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              <div className="flex flex-col sm:flex-row gap-4 justify-center px-4">
                 <Link href="/api/auth/signin">
-                  <Button size="lg" className="w-full sm:w-auto">
+                  <Button size="lg" className="w-full sm:w-auto h-12 px-6">
                     Get Started Free
                   </Button>
                 </Link>
-                <Button variant="outline" size="lg" className="w-full sm:w-auto">
+                <Button variant="outline" size="lg" className="w-full sm:w-auto h-12 px-6">
                   Learn More
                 </Button>
               </div>
             </div>
 
             {/* Features Section */}
-            <div className="space-y-12">
-              <h2 className="text-3xl font-bold text-center">Why Choose Plan My Day?</h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            <div className="space-y-8 md:space-y-12">
+              <h2 className="text-2xl md:text-3xl font-bold text-center px-4">Why Choose Plan My Day?</h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8 px-4">
                 <Card className="text-center p-6 hover:shadow-lg transition-shadow">
                   <div className="text-4xl mb-4">🧠</div>
                   <h3 className="text-xl font-semibold mb-2">Smart Task Management</h3>
@@ -132,13 +132,13 @@ export default function Home() {
 
             {/* CTA Section */}
             <Card className="bg-primary/5 border-primary/20">
-              <CardContent className="text-center py-12">
-                <h2 className="text-3xl font-bold mb-4">Ready to Transform Your Productivity?</h2>
-                <p className="text-xl text-muted-foreground mb-8">
+              <CardContent className="text-center py-8 md:py-12 px-4">
+                <h2 className="text-2xl md:text-3xl font-bold mb-4">Ready to Transform Your Productivity?</h2>
+                <p className="text-base md:text-lg lg:text-xl text-muted-foreground mb-6 md:mb-8">
                   Join thousands of users who are already planning their days more effectively.
                 </p>
                 <Link href="/api/auth/signin">
-                  <Button size="lg" className="text-lg px-8 py-6">
+                  <Button size="lg" className="text-base md:text-lg px-6 md:px-8 h-12 md:h-14">
                     Start Planning Today
                   </Button>
                 </Link>

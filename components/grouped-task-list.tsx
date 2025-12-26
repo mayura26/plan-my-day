@@ -189,14 +189,14 @@ export function GroupedTaskList({
       {/* Header with controls */}
       <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold">Tasks</h2>
-          <p className="text-muted-foreground">
+          <h2 className="text-xl md:text-2xl font-bold">Tasks</h2>
+          <p className="text-sm md:text-base text-muted-foreground">
             {filteredTasks.length} of {tasks.length} tasks
             {searchQuery && ` matching "${searchQuery}"`}
           </p>
         </div>
         {onCreateTask && (
-          <Button onClick={onCreateTask}>
+          <Button onClick={onCreateTask} className="h-11 px-4 md:h-10 md:px-4">
             <Plus className="w-4 h-4 mr-2" />
             Add Task
           </Button>
@@ -224,6 +224,7 @@ export function GroupedTaskList({
                 variant={filter === 'all' ? 'default' : 'outline'}
                 size="sm"
                 onClick={() => setFilter('all')}
+                className="h-11 px-4 md:h-9 md:px-3 text-sm"
               >
                 All ({taskCounts.all})
               </Button>
@@ -231,6 +232,7 @@ export function GroupedTaskList({
                 variant={filter === 'pending' ? 'default' : 'outline'}
                 size="sm"
                 onClick={() => setFilter('pending')}
+                className="h-11 px-4 md:h-9 md:px-3 text-sm"
               >
                 Pending ({taskCounts.pending})
               </Button>
@@ -238,6 +240,7 @@ export function GroupedTaskList({
                 variant={filter === 'in_progress' ? 'default' : 'outline'}
                 size="sm"
                 onClick={() => setFilter('in_progress')}
+                className="h-11 px-4 md:h-9 md:px-3 text-sm"
               >
                 In Progress ({taskCounts.in_progress})
               </Button>
@@ -245,6 +248,7 @@ export function GroupedTaskList({
                 variant={filter === 'completed' ? 'default' : 'outline'}
                 size="sm"
                 onClick={() => setFilter('completed')}
+                className="h-11 px-4 md:h-9 md:px-3 text-sm"
               >
                 Completed ({taskCounts.completed})
               </Button>
@@ -252,71 +256,82 @@ export function GroupedTaskList({
                 variant={filter === 'cancelled' ? 'default' : 'outline'}
                 size="sm"
                 onClick={() => setFilter('cancelled')}
+                className="h-11 px-4 md:h-9 md:px-3 text-sm"
               >
                 Cancelled ({taskCounts.cancelled})
               </Button>
             </div>
 
             {/* Group by and other controls */}
-            <div className="flex flex-wrap items-center gap-4 pt-2 border-t">
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-medium">Group by:</span>
-                <Button
-                  variant={groupBy === 'status' ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setGroupBy('status')}
-                >
-                  Status
-                </Button>
-                <Button
-                  variant={groupBy === 'group' ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setGroupBy('group')}
-                >
-                  Group
-                </Button>
-                <Button
-                  variant={groupBy === 'none' ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setGroupBy('none')}
-                >
-                  None
-                </Button>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-medium">Sort by:</span>
-                <select
-                  value={sortBy}
-                  onChange={(e) => setSortBy(e.target.value as 'priority' | 'scheduled' | 'created')}
-                  className="px-3 py-1.5 text-sm border rounded-md bg-background"
-                >
-                  <option value="priority">Priority</option>
-                  <option value="scheduled">Scheduled</option>
-                  <option value="created">Created</option>
-                </select>
-              </div>
-
-              {onShowAllTasksChange && (
-                <Button
-                  variant={showAllTasks ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => onShowAllTasksChange(!showAllTasks)}
-                >
-                  {showAllTasks ? 'Show Unscheduled Only' : 'Show All'}
-                </Button>
-              )}
-
-              {groupBy !== 'none' && (
-                <div className="flex items-center gap-2 ml-auto">
-                  <Button variant="outline" size="sm" onClick={expandAll}>
-                    Expand All
-                  </Button>
-                  <Button variant="outline" size="sm" onClick={collapseAll}>
-                    Collapse All
-                  </Button>
+            <div className="flex flex-col md:flex-row md:items-center gap-4 pt-2 border-t">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-sm font-medium">Group by:</span>
+                  <div className="flex gap-2">
+                    <Button
+                      variant={groupBy === 'status' ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => setGroupBy('status')}
+                      className="h-11 px-4 md:h-9 md:px-3"
+                    >
+                      Status
+                    </Button>
+                    <Button
+                      variant={groupBy === 'group' ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => setGroupBy('group')}
+                      className="h-11 px-4 md:h-9 md:px-3"
+                    >
+                      Group
+                    </Button>
+                    <Button
+                      variant={groupBy === 'none' ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => setGroupBy('none')}
+                      className="h-11 px-4 md:h-9 md:px-3"
+                    >
+                      None
+                    </Button>
+                  </div>
                 </div>
-              )}
+
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-medium">Sort by:</span>
+                  <select
+                    value={sortBy}
+                    onChange={(e) => setSortBy(e.target.value as 'priority' | 'scheduled' | 'created')}
+                    className="px-3 py-2.5 md:py-1.5 text-sm border rounded-md bg-background h-11 md:h-9"
+                  >
+                    <option value="priority">Priority</option>
+                    <option value="scheduled">Scheduled</option>
+                    <option value="created">Created</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2 md:gap-4 md:ml-auto">
+                {onShowAllTasksChange && (
+                  <Button
+                    variant={showAllTasks ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => onShowAllTasksChange(!showAllTasks)}
+                    className="h-11 px-4 md:h-9 md:px-3 text-sm"
+                  >
+                    {showAllTasks ? 'Show Unscheduled Only' : 'Show All'}
+                  </Button>
+                )}
+
+                {groupBy !== 'none' && (
+                  <div className="flex items-center gap-2">
+                    <Button variant="outline" size="sm" onClick={expandAll} className="h-11 px-4 md:h-9 md:px-3">
+                      Expand All
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={collapseAll} className="h-11 px-4 md:h-9 md:px-3">
+                      Collapse All
+                    </Button>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </CardContent>

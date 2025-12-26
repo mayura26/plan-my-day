@@ -113,7 +113,7 @@ export function TaskDetailDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto w-[95vw] md:w-full mx-2 md:mx-auto">
         <DialogHeader>
           <DialogTitle className="text-2xl">{task.title}</DialogTitle>
         </DialogHeader>
@@ -214,7 +214,7 @@ export function TaskDetailDialog({
           <Card>
             <CardContent className="pt-6">
               <h3 className="text-sm font-semibold mb-3">Task Properties</h3>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {task.duration && (
                   <div className="flex items-center gap-2 text-sm">
                     <Clock className="h-4 w-4 text-muted-foreground" />
@@ -283,16 +283,17 @@ export function TaskDetailDialog({
           )}
 
           {/* Action Buttons */}
-          <div className="flex justify-between pt-4 border-t">
+          <div className="flex flex-col sm:flex-row justify-between gap-2 sm:gap-0 pt-4 border-t">
             <Button
               variant="destructive"
               onClick={handleDelete}
               disabled={isDeleting}
+              className="h-11 px-4 md:h-10 md:px-4 w-full sm:w-auto"
             >
               <Trash2 className="h-4 w-4 mr-2" />
               {isDeleting ? 'Deleting...' : 'Delete Task'}
             </Button>
-            <Button onClick={handleEdit}>
+            <Button onClick={handleEdit} className="h-11 px-4 md:h-10 md:px-4 w-full sm:w-auto">
               <Edit className="h-4 w-4 mr-2" />
               Edit Task
             </Button>

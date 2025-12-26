@@ -34,11 +34,11 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-4xl">
+    <div className="container mx-auto px-4 py-4 md:py-8 max-w-4xl">
       <div className="space-y-6">
         <div>
-          <h1 className="text-3xl font-bold">Settings</h1>
-          <p className="text-muted-foreground mt-2">
+          <h1 className="text-2xl md:text-3xl font-bold">Settings</h1>
+          <p className="text-sm md:text-base text-muted-foreground mt-2">
             Manage your account preferences and settings
           </p>
         </div>

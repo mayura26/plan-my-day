@@ -348,7 +348,7 @@ export function TaskGroupManager({
             <Button
               size="sm"
               variant="ghost"
-              className="h-8 w-8 p-0"
+              className="h-11 w-11 md:h-8 md:w-8 p-0"
               onClick={() => {
                 if (allGroupsExpanded()) {
                   collapseAllGroups()
@@ -366,7 +366,7 @@ export function TaskGroupManager({
             </Button>
             <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
               <DialogTrigger asChild>
-                <Button size="sm" variant="outline" className="h-8 px-2">
+                <Button size="sm" variant="outline" className="h-11 px-3 md:h-8 md:px-2">
                   <Plus className="h-4 w-4" />
                   <span className="hidden sm:inline ml-1.5 text-xs">New</span>
                 </Button>
@@ -436,7 +436,7 @@ export function TaskGroupManager({
           <Button
             variant={showAllTasks ? "default" : "outline"}
             size="sm"
-            className="h-7 px-2 text-xs flex-shrink-0"
+            className="h-11 px-3 md:h-7 md:px-2 text-xs flex-shrink-0"
             onClick={() => onShowAllTasksChange?.(!showAllTasks)}
           >
             {showAllTasks ? 'All' : 'Unscheduled'}
@@ -466,7 +466,7 @@ export function TaskGroupManager({
             >
               <div className="flex items-center gap-2 flex-1 min-w-0">
                 <div className="w-3 h-3 rounded-full bg-gray-500 flex-shrink-0" />
-                <CardTitle className="text-sm font-medium truncate">Ungrouped</CardTitle>
+                <CardTitle className="text-sm md:text-sm font-medium truncate">Ungrouped</CardTitle>
               </div>
               <div className="flex items-center gap-1 flex-shrink-0">
                 <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-4 min-w-[1.25rem]">
@@ -475,7 +475,7 @@ export function TaskGroupManager({
                 <Button
                   size="sm"
                   variant="ghost"
-                  className="h-6 w-6 p-0 flex-shrink-0"
+                  className="h-11 w-11 md:h-6 md:w-6 p-0 flex-shrink-0"
                   onClick={(e) => {
                     e.stopPropagation()
                     toggleGroupVisibility('ungrouped')
@@ -491,7 +491,7 @@ export function TaskGroupManager({
                 <Button
                   size="sm"
                   variant="ghost"
-                  className="h-6 w-6 p-0 flex-shrink-0"
+                  className="h-11 w-11 md:h-6 md:w-6 p-0 flex-shrink-0"
                   onClick={(e) => {
                     e.stopPropagation()
                     toggleGroupExpansion('ungrouped')
@@ -553,7 +553,7 @@ export function TaskGroupManager({
                     className="w-3 h-3 rounded-full border flex-shrink-0" 
                     style={{ backgroundColor: group.color }}
                   />
-                  <CardTitle className="text-sm font-medium truncate">{group.name}</CardTitle>
+                  <CardTitle className="text-sm md:text-sm font-medium truncate">{group.name}</CardTitle>
                 </div>
                 <div className="flex items-center gap-1 flex-shrink-0">
                   <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-4 min-w-[1.25rem]">
@@ -562,7 +562,7 @@ export function TaskGroupManager({
                   <Button
                     size="sm"
                     variant="ghost"
-                    className="h-6 w-6 p-0 flex-shrink-0"
+                    className="h-11 w-11 md:h-6 md:w-6 p-0 flex-shrink-0"
                     onClick={(e) => {
                       e.stopPropagation()
                       toggleGroupVisibility(group.id)
@@ -578,7 +578,7 @@ export function TaskGroupManager({
                   <Button
                     size="sm"
                     variant="ghost"
-                    className="h-6 w-6 p-0 flex-shrink-0"
+                    className="h-11 w-11 md:h-6 md:w-6 p-0 flex-shrink-0"
                     onClick={(e) => {
                       e.stopPropagation()
                       toggleGroupExpansion(group.id)
@@ -593,7 +593,7 @@ export function TaskGroupManager({
                   <Button
                     size="sm"
                     variant="ghost"
-                    className="h-6 w-6 p-0 flex-shrink-0"
+                    className="h-11 w-11 md:h-6 md:w-6 p-0 flex-shrink-0"
                     onClick={(e) => {
                       e.stopPropagation()
                       handleEditGroup(group)
@@ -605,7 +605,7 @@ export function TaskGroupManager({
                   <Button
                     size="sm"
                     variant="ghost"
-                    className="h-6 w-6 p-0 flex-shrink-0"
+                    className="h-11 w-11 md:h-6 md:w-6 p-0 flex-shrink-0"
                     onClick={(e) => {
                       e.stopPropagation()
                       deleteGroup(group.id)

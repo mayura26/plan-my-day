@@ -245,21 +245,21 @@ export default function TasksPage() {
       {/* Header */}
       <header className="border-b">
         <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
-              <h1 className="text-2xl font-bold">Task Management</h1>
-              <p className="text-muted-foreground">
+              <h1 className="text-xl md:text-2xl font-bold">Task Management</h1>
+              <p className="text-sm md:text-base text-muted-foreground">
                 Organize and manage your daily tasks
               </p>
             </div>
-            <div className="flex items-center space-x-2">
-              <Button variant="outline" size="sm" onClick={() => router.push('/calendar')}>
-                <Calendar className="w-4 h-4 mr-2" />
-                Calendar View
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" onClick={() => router.push('/calendar')} className="h-11 px-4 md:h-9 md:px-3">
+                <Calendar className="w-4 h-4 md:mr-2" />
+                <span className="hidden sm:inline">Calendar View</span>
               </Button>
-              <Button variant="outline" size="sm">
-                <BarChart3 className="w-4 h-4 mr-2" />
-                Analytics
+              <Button variant="outline" size="sm" className="h-11 px-4 md:h-9 md:px-3">
+                <BarChart3 className="w-4 h-4 md:mr-2" />
+                <span className="hidden sm:inline">Analytics</span>
               </Button>
             </div>
           </div>
@@ -267,7 +267,7 @@ export default function TasksPage() {
       </header>
 
       {/* Main Content */}
-      <main className="container mx-auto px-4 py-8">
+      <main className="container mx-auto px-4 py-4 md:py-8">
         <GroupedTaskList
           tasks={tasks}
           groups={groups}
@@ -284,7 +284,7 @@ export default function TasksPage() {
 
       {/* Create Task Dialog */}
       <Dialog open={showCreateForm} onOpenChange={setShowCreateForm}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto w-[95vw] md:w-full mx-2 md:mx-auto">
           <DialogHeader>
             <DialogTitle>Create New Task</DialogTitle>
           </DialogHeader>
@@ -298,7 +298,7 @@ export default function TasksPage() {
 
       {/* Edit Task Dialog */}
       <Dialog open={isEditing} onOpenChange={setIsEditing}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto w-[95vw] md:w-full mx-2 md:mx-auto">
           <DialogHeader>
             <DialogTitle>Edit Task</DialogTitle>
             <DialogDescription>

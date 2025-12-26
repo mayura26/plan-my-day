@@ -183,13 +183,13 @@ export function TaskForm({ onSubmit, onCancel, initialData, isLoading = false }:
 
   return (
     <Card className="w-full max-w-2xl mx-auto">
-      <CardHeader>
-        <CardTitle>{initialData ? 'Edit Task' : 'Create New Task'}</CardTitle>
-        <CardDescription>
+      <CardHeader className="px-4 md:px-6">
+        <CardTitle className="text-xl md:text-2xl">{initialData ? 'Edit Task' : 'Create New Task'}</CardTitle>
+        <CardDescription className="text-sm md:text-base">
           {initialData ? 'Update your task details' : 'Add a new task to your planning system'}
         </CardDescription>
       </CardHeader>
-      <CardContent>
+      <CardContent className="px-4 md:px-6">
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* Title */}
           <div className="space-y-2">
@@ -201,7 +201,7 @@ export function TaskForm({ onSubmit, onCancel, initialData, isLoading = false }:
               value={formData.title}
               onChange={(e) => handleInputChange('title', e.target.value)}
               placeholder="Enter task title"
-              className={errors.title ? 'border-red-500' : ''}
+              className={`h-11 md:h-10 ${errors.title ? 'border-red-500' : ''}`}
             />
             {errors.title && (
               <p className="text-sm text-red-500">{errors.title}</p>
@@ -219,6 +219,7 @@ export function TaskForm({ onSubmit, onCancel, initialData, isLoading = false }:
               onChange={(e) => handleInputChange('description', e.target.value)}
               placeholder="Enter task description"
               rows={3}
+              className="min-h-[100px] md:min-h-[80px]"
             />
           </div>
 
@@ -232,7 +233,7 @@ export function TaskForm({ onSubmit, onCancel, initialData, isLoading = false }:
                 value={formData.task_type}
                 onValueChange={(value) => handleInputChange('task_type', value as TaskType)}
               >
-                <SelectTrigger>
+                <SelectTrigger className="h-11 md:h-10">
                   <SelectValue placeholder="Select task type" />
                 </SelectTrigger>
                 <SelectContent>
@@ -250,7 +251,7 @@ export function TaskForm({ onSubmit, onCancel, initialData, isLoading = false }:
                 value={formData.priority?.toString()}
                 onValueChange={(value) => handleInputChange('priority', parseInt(value))}
               >
-                <SelectTrigger>
+                <SelectTrigger className="h-11 md:h-10">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -276,7 +277,7 @@ export function TaskForm({ onSubmit, onCancel, initialData, isLoading = false }:
               value={formData.group_id || 'no-group'}
               onValueChange={(value) => handleInputChange('group_id', value === 'no-group' ? undefined : value)}
             >
-              <SelectTrigger>
+              <SelectTrigger className="h-11 md:h-10">
                 <SelectValue placeholder="Select a group (optional)" />
               </SelectTrigger>
               <SelectContent>
@@ -309,6 +310,7 @@ export function TaskForm({ onSubmit, onCancel, initialData, isLoading = false }:
                 onChange={(e) => handleInputChange('duration', e.target.value ? parseInt(e.target.value) : undefined)}
                 placeholder="e.g., 60"
                 min="0"
+                className="h-11 md:h-10"
               />
               {formData.estimated_completion_time && formData.duration === formData.estimated_completion_time && (
                 <p className="text-xs text-muted-foreground">
@@ -328,7 +330,7 @@ export function TaskForm({ onSubmit, onCancel, initialData, isLoading = false }:
                 value={formData.energy_level_required?.toString()}
                 onValueChange={(value) => handleInputChange('energy_level_required', parseInt(value))}
               >
-                <SelectTrigger>
+                <SelectTrigger className="h-11 md:h-10">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -357,6 +359,7 @@ export function TaskForm({ onSubmit, onCancel, initialData, isLoading = false }:
               onChange={(e) => handleInputChange('estimated_completion_time', e.target.value ? parseInt(e.target.value) : undefined)}
               placeholder="e.g., 90"
               min="0"
+              className="h-11 md:h-10"
             />
           </div>
 
@@ -373,6 +376,7 @@ export function TaskForm({ onSubmit, onCancel, initialData, isLoading = false }:
                   type="datetime-local"
                   value={formData.scheduled_start || ''}
                   onChange={(e) => handleInputChange('scheduled_start', e.target.value)}
+                  className="h-11 md:h-10"
                 />
               </div>
               <div className="space-y-2">
@@ -384,6 +388,7 @@ export function TaskForm({ onSubmit, onCancel, initialData, isLoading = false }:
                   type="datetime-local"
                   value={formData.scheduled_end || ''}
                   onChange={(e) => handleInputChange('scheduled_end', e.target.value)}
+                  className="h-11 md:h-10"
                 />
               </div>
             </div>
@@ -393,18 +398,19 @@ export function TaskForm({ onSubmit, onCancel, initialData, isLoading = false }:
           </div>
 
           {/* Action Buttons */}
-          <div className="flex justify-end space-x-2 pt-4">
+          <div className="flex flex-col sm:flex-row justify-end gap-2 sm:space-x-2 pt-4">
             {onCancel && (
               <Button
                 type="button"
                 variant="outline"
                 onClick={onCancel}
                 disabled={isLoading}
+                className="h-11 px-4 md:h-10 md:px-4 w-full sm:w-auto"
               >
                 Cancel
               </Button>
             )}
-            <Button type="submit" disabled={isLoading}>
+            <Button type="submit" disabled={isLoading} className="h-11 px-4 md:h-10 md:px-4 w-full sm:w-auto">
               {isLoading 
                 ? (initialData ? 'Updating...' : 'Creating...') 
                 : (initialData ? 'Update Task' : 'Create Task')

@@ -119,12 +119,13 @@ export function TaskCard({
               checked={task.status === 'completed'}
               onCheckedChange={handleToggleComplete}
               disabled={isUpdating}
+              className="h-5 w-5 md:h-4 md:w-4"
             />
             <div className="flex-1 min-w-0">
               <h4 className={`text-sm font-medium truncate ${task.status === 'completed' ? 'line-through text-muted-foreground' : ''}`}>
                 {task.title}
               </h4>
-              <div className="flex items-center space-x-2 mt-1">
+              <div className="flex flex-wrap items-center gap-2 mt-1">
                 <Badge variant="outline" className={`text-xs ${priorityColor}`}>
                   {task.priority}. {PRIORITY_LABELS[task.priority as keyof typeof PRIORITY_LABELS]}
                 </Badge>
@@ -136,7 +137,7 @@ export function TaskCard({
                 )}
               </div>
             </div>
-            <div className="flex items-center space-x-1">
+            <div className="flex items-center space-x-1 flex-shrink-0">
               {task.locked && <Lock className="w-3 h-3 text-muted-foreground" />}
               <Badge variant="outline" className={`text-xs ${statusColor}`}>
                 {STATUS_LABELS[task.status]}
@@ -160,17 +161,17 @@ export function TaskCard({
     >
       {/* Priority top bar */}
       <div className={cn("absolute top-0 left-0 right-0 h-1 rounded-t-lg", getPriorityBarColor(task.priority))} />
-      <CardHeader className="pb-3 pt-4">
-        <div className="flex items-start justify-between">
+      <CardHeader className="pb-3 pt-4 px-4 md:px-6">
+        <div className="flex items-start justify-between gap-2">
           <div className="flex items-start space-x-3 flex-1 min-w-0">
             <Checkbox
               checked={task.status === 'completed'}
               onCheckedChange={handleToggleComplete}
               disabled={isUpdating}
-              className="mt-1"
+              className="mt-1 h-5 w-5 md:h-4 md:w-4"
             />
             <div className="flex-1 min-w-0">
-              <CardTitle className={`text-lg ${task.status === 'completed' ? 'line-through text-muted-foreground' : ''}`}>
+              <CardTitle className={`text-base md:text-lg ${task.status === 'completed' ? 'line-through text-muted-foreground' : ''}`}>
                 {task.title}
               </CardTitle>
               {task.description && (
@@ -180,7 +181,7 @@ export function TaskCard({
               )}
             </div>
           </div>
-          <div className="flex items-center space-x-2">
+          <div className="flex items-center space-x-2 flex-shrink-0">
             {task.locked && <Lock className="w-4 h-4 text-muted-foreground" />}
             {onEdit && (
               <Button 
@@ -188,6 +189,7 @@ export function TaskCard({
                 size="sm"
                 onClick={() => onEdit(task.id)}
                 title="Edit task"
+                className="h-11 w-11 md:h-9 md:w-9 p-0"
               >
                 <MoreHorizontal className="w-4 h-4" />
               </Button>
@@ -196,18 +198,18 @@ export function TaskCard({
         </div>
       </CardHeader>
 
-      <CardContent className="pt-0">
+      <CardContent className="pt-0 px-4 md:px-6 pb-4 md:pb-6">
         {/* Task Details */}
         <div className="space-y-3">
           {/* Priority and Status */}
-          <div className="flex items-center space-x-2">
-            <Badge variant="outline" className={priorityColor}>
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge variant="outline" className={`${priorityColor} text-xs`}>
               {task.priority}. {PRIORITY_LABELS[task.priority as keyof typeof PRIORITY_LABELS]}
             </Badge>
-            <Badge variant="outline" className={statusColor}>
+            <Badge variant="outline" className={`${statusColor} text-xs`}>
               {STATUS_LABELS[task.status]}
             </Badge>
-            <Badge variant="outline">
+            <Badge variant="outline" className="text-xs">
               {TASK_TYPE_LABELS[task.task_type]}
             </Badge>
           </div>
@@ -250,12 +252,13 @@ export function TaskCard({
           )}
 
           {/* Action Buttons */}
-          <div className="flex items-center space-x-2 pt-2">
+          <div className="flex flex-wrap items-center gap-2 pt-2">
             {onEdit && (
               <Button
                 size="sm"
                 variant="outline"
                 onClick={() => onEdit(task.id)}
+                className="h-11 px-4 md:h-9 md:px-3"
               >
                 Edit
               </Button>
@@ -266,6 +269,7 @@ export function TaskCard({
                 variant="outline"
                 onClick={handleUnschedule}
                 disabled={isUnscheduling}
+                className="h-11 px-4 md:h-9 md:px-3"
               >
                 <CalendarX className="w-4 h-4 mr-1" />
                 {isUnscheduling ? 'Unscheduling...' : 'Unschedule'}
@@ -276,6 +280,7 @@ export function TaskCard({
                 size="sm"
                 variant="outline"
                 onClick={() => onExtend(task.id)}
+                className="h-11 px-4 md:h-9 md:px-3"
               >
                 Extend
               </Button>
@@ -286,6 +291,7 @@ export function TaskCard({
                 variant="outline"
                 onClick={() => handleStatusChange('in_progress')}
                 disabled={isUpdating}
+                className="h-11 px-4 md:h-9 md:px-3"
               >
                 Start
               </Button>
@@ -296,6 +302,7 @@ export function TaskCard({
                 variant="outline"
                 onClick={() => handleStatusChange('completed')}
                 disabled={isUpdating}
+                className="h-11 px-4 md:h-9 md:px-3"
               >
                 Complete
               </Button>
@@ -304,7 +311,7 @@ export function TaskCard({
               size="sm"
               variant="outline"
               onClick={() => onDelete(task.id)}
-              className="text-red-600 hover:text-red-700"
+              className="text-red-600 hover:text-red-700 h-11 px-4 md:h-9 md:px-3"
             >
               Delete
             </Button>
