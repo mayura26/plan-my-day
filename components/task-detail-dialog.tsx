@@ -17,10 +17,13 @@ import {
   Lock,
   Edit,
   Trash2,
-  X
+  X,
+  CalendarX
 } from 'lucide-react'
-import { format, parseISO } from 'date-fns'
 import { PRIORITY_LABELS, ENERGY_LABELS, TASK_TYPE_LABELS } from '@/lib/task-utils'
+import { useUserTimezone } from '@/hooks/use-user-timezone'
+import { formatDateTimeFull } from '@/lib/timezone-utils'
+import { parseISO } from 'date-fns'
 
 interface TaskDetailDialogProps {
   task: Task | null
@@ -29,6 +32,7 @@ interface TaskDetailDialogProps {
   onEdit?: (taskId: string) => void
   onDelete?: (taskId: string) => void
   onStatusChange?: (taskId: string, status: Task['status']) => void
+  onUnschedule?: (taskId: string) => void
 }
 
 export function TaskDetailDialog({ 
@@ -36,10 +40,13 @@ export function TaskDetailDialog({
   open, 
   onOpenChange, 
   onEdit, 
-  onDelete,
-  onStatusChange 
+  onDelete, 
+  onStatusChange,
+  onUnschedule
 }: TaskDetailDialogProps) {
   const [isDeleting, setIsDeleting] = useState(false)
+  const [isUnscheduling, setIsUnscheduling] = useState(false)
+  const { timezone } = useUserTimezone()
 
   if (!task) return null
 
@@ -60,6 +67,19 @@ export function TaskDetailDialog({
   const handleEdit = () => {
     onEdit?.(task.id)
     onOpenChange(false)
+  }
+
+  const handleUnschedule = async () => {
+    if (!confirm('Are you sure you want to unschedule this task? It will be removed from the calendar.')) return
+    
+    setIsUnscheduling(true)
+    try {
+      await onUnschedule?.(task.id)
+    } catch (error) {
+      console.error('Error unscheduling task:', error)
+    } finally {
+      setIsUnscheduling(false)
+    }
   }
 
   const getStatusColor = (status: Task['status']) => {
@@ -141,16 +161,29 @@ export function TaskDetailDialog({
           {(task.scheduled_start || task.scheduled_end) && (
             <Card>
               <CardContent className="pt-6">
-                <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
-                  <Calendar className="h-4 w-4" />
-                  Schedule
-                </h3>
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-sm font-semibold flex items-center gap-2">
+                    <Calendar className="h-4 w-4" />
+                    Schedule
+                  </h3>
+                  {onUnschedule && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={handleUnschedule}
+                      disabled={isUnscheduling}
+                    >
+                      <CalendarX className="h-4 w-4 mr-2" />
+                      {isUnscheduling ? 'Unscheduling...' : 'Unschedule'}
+                    </Button>
+                  )}
+                </div>
                 <div className="space-y-2">
                   {task.scheduled_start && (
                     <div className="flex items-center gap-2 text-sm">
                       <span className="text-muted-foreground w-16">Start:</span>
                       <span className="font-medium">
-                        {format(parseISO(task.scheduled_start), 'PPP p')}
+                        {formatDateTimeFull(task.scheduled_start, timezone)}
                       </span>
                     </div>
                   )}
@@ -158,7 +191,7 @@ export function TaskDetailDialog({
                     <div className="flex items-center gap-2 text-sm">
                       <span className="text-muted-foreground w-16">End:</span>
                       <span className="font-medium">
-                        {format(parseISO(task.scheduled_end), 'PPP p')}
+                        {formatDateTimeFull(task.scheduled_end, timezone)}
                       </span>
                     </div>
                   )}
@@ -267,8 +300,8 @@ export function TaskDetailDialog({
 
           {/* Metadata */}
           <div className="text-xs text-muted-foreground space-y-1 pt-4 border-t">
-            <div>Created: {format(parseISO(task.created_at), 'PPP p')}</div>
-            <div>Updated: {format(parseISO(task.updated_at), 'PPP p')}</div>
+            <div>Created: {formatDateTimeFull(task.created_at, timezone)}</div>
+            <div>Updated: {formatDateTimeFull(task.updated_at, timezone)}</div>
             {task.id && <div className="font-mono">ID: {task.id}</div>}
           </div>
         </div>

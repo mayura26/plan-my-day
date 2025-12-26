@@ -3,10 +3,9 @@
 import { useState, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
-import { Task, CreateTaskRequest } from '@/lib/types'
-import { TaskList } from '@/components/task-list'
+import { Task, TaskGroup, CreateTaskRequest } from '@/lib/types'
+import { GroupedTaskList } from '@/components/grouped-task-list'
 import { TaskForm } from '@/components/task-form'
-import { TaskGroupManager } from '@/components/task-group-manager'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Calendar, BarChart3 } from 'lucide-react'
@@ -21,7 +20,8 @@ export default function TasksPage() {
   const [editingTask, setEditingTask] = useState<Task | null>(null)
   const [isEditing, setIsEditing] = useState(false)
   const [isUpdating, setIsUpdating] = useState(false)
-  const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null)
+  const [groups, setGroups] = useState<TaskGroup[]>([])
+  const [showAllTasks, setShowAllTasks] = useState(false)
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -47,9 +47,22 @@ export default function TasksPage() {
     }
   }
 
+  const fetchGroups = async () => {
+    try {
+      const response = await fetch('/api/task-groups')
+      if (response.ok) {
+        const data = await response.json()
+        setGroups(data.groups || [])
+      }
+    } catch (error) {
+      console.error('Error fetching groups:', error)
+    }
+  }
+
   useEffect(() => {
     if (session) {
       fetchTasks()
+      fetchGroups()
     }
   }, [session])
 
@@ -171,22 +184,42 @@ export default function TasksPage() {
     }
   }
 
-  // Schedule task (placeholder for future AI scheduling)
-  const handleScheduleTask = (taskId: string) => {
-    console.log('Schedule task:', taskId)
-    // TODO: Implement AI scheduling
-  }
-
   // Extend task (placeholder for future functionality)
   const handleExtendTask = (taskId: string) => {
     console.log('Extend task:', taskId)
     // TODO: Implement task extension
   }
 
-  // Filter tasks by selected group
-  const filteredTasks = selectedGroupId 
-    ? tasks.filter(task => task.group_id === selectedGroupId)
-    : tasks
+  // Unschedule task
+  const handleUnscheduleTask = async (taskId: string) => {
+    try {
+      const response = await fetch(`/api/tasks/${taskId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          scheduled_start: null,
+          scheduled_end: null,
+        }),
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        setTasks(prev => prev.map(task => 
+          task.id === taskId ? data.task : task
+        ))
+      } else {
+        const error = await response.json()
+        console.error('Failed to unschedule task:', error)
+        throw new Error(error.error || 'Failed to unschedule task')
+      }
+    } catch (error) {
+      console.error('Error unscheduling task:', error)
+      throw error
+    }
+  }
+
 
   if (status === 'loading' || isLoading) {
     return (
@@ -220,7 +253,7 @@ export default function TasksPage() {
               </p>
             </div>
             <div className="flex items-center space-x-2">
-              <Button variant="outline" size="sm">
+              <Button variant="outline" size="sm" onClick={() => router.push('/calendar')}>
                 <Calendar className="w-4 h-4 mr-2" />
                 Calendar View
               </Button>
@@ -235,28 +268,18 @@ export default function TasksPage() {
 
       {/* Main Content */}
       <main className="container mx-auto px-4 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-          {/* Sidebar - Task Groups */}
-          <div className="lg:col-span-1">
-            <TaskGroupManager
-              onGroupSelect={setSelectedGroupId}
-              selectedGroupId={selectedGroupId}
-            />
-          </div>
-
-          {/* Main Content - Task List */}
-          <div className="lg:col-span-3">
-            <TaskList
-              tasks={filteredTasks}
-              onUpdateTask={handleUpdateTaskStatus}
-              onDeleteTask={handleDeleteTask}
-              onEditTask={handleEditTask}
-              onScheduleTask={handleScheduleTask}
-              onExtendTask={handleExtendTask}
-              onCreateTask={() => setShowCreateForm(true)}
-            />
-          </div>
-        </div>
+        <GroupedTaskList
+          tasks={tasks}
+          groups={groups}
+          onUpdateTask={handleUpdateTaskStatus}
+          onDeleteTask={handleDeleteTask}
+          onEditTask={handleEditTask}
+          onExtendTask={handleExtendTask}
+          onUnscheduleTask={handleUnscheduleTask}
+          onCreateTask={() => setShowCreateForm(true)}
+          showAllTasks={showAllTasks}
+          onShowAllTasksChange={setShowAllTasks}
+        />
       </main>
 
       {/* Create Task Dialog */}

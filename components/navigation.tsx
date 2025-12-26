@@ -20,6 +20,7 @@ import { cn } from '@/lib/utils'
 const navigation = [
   { name: 'Calendar', href: '/calendar', icon: Calendar },
   { name: 'Tasks', href: '/tasks', icon: CheckSquare },
+  { name: 'Settings', href: '/settings', icon: Settings },
 ]
 
 export function Navigation() {

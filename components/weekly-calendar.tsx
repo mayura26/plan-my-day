@@ -3,6 +3,8 @@
 import { useState, useEffect, useRef } from 'react'
 import { Task } from '@/lib/types'
 import { format, startOfWeek, addDays, addWeeks, subWeeks, isSameDay, parseISO, getHours, getMinutes, isToday } from 'date-fns'
+import { useUserTimezone } from '@/hooks/use-user-timezone'
+import { formatTimeShort, getHoursAndMinutesInTimezone, getDateInTimezone } from '@/lib/timezone-utils'
 import { ChevronLeft, ChevronRight, GripVertical } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
@@ -85,6 +87,7 @@ function ResizableTask({ task, position, onTaskClick, onResize, activeDragId, re
   activeDragId?: string | null,
   resizingTaskId?: string | null
 }) {
+  const { timezone } = useUserTimezone()
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: task.id,
     disabled: task.locked,
@@ -147,7 +150,7 @@ function ResizableTask({ task, position, onTaskClick, onResize, activeDragId, re
         {task.title}
       </div>
       <div className="text-xs text-white/90 mt-1">
-        {format(parseISO(task.scheduled_start!), 'h:mm a')}
+        {formatTimeShort(task.scheduled_start!, timezone)}
       </div>
       {task.locked && (
         <div className="text-xs text-white/90 mt-1 flex items-center gap-1">
@@ -173,6 +176,7 @@ function ResizableTask({ task, position, onTaskClick, onResize, activeDragId, re
 }
 
 export function WeeklyCalendar({ tasks, onTaskClick, onTaskSchedule, onTaskReschedule, onTaskResize, activeDragId, resizingTaskId }: WeeklyCalendarProps) {
+  const { timezone } = useUserTimezone()
   const [currentWeek, setCurrentWeek] = useState(new Date())
   const [currentTime, setCurrentTime] = useState(new Date())
   const calendarScrollRef = useRef<HTMLDivElement>(null)
@@ -193,9 +197,8 @@ export function WeeklyCalendar({ tasks, onTaskClick, onTaskSchedule, onTaskResch
       if (!calendarScrollRef.current) return
 
       const now = new Date()
-      const hours = getHours(now)
-      const minutes = getMinutes(now)
-      const totalMinutes = hours * 60 + minutes
+      const { hour, minute } = getHoursAndMinutesInTimezone(now, timezone)
+      const totalMinutes = hour * 60 + minute
       
       // Each hour is 64px (h-16 = 4rem = 64px)
       const pixelsPerMinute = 64 / 60
@@ -211,9 +214,12 @@ export function WeeklyCalendar({ tasks, onTaskClick, onTaskSchedule, onTaskResch
     const timeoutId = setTimeout(scrollToCurrentTime, 100)
 
     return () => clearTimeout(timeoutId)
-  }, [])
+  }, [timezone])
 
   const getWeekDays = () => {
+    // Create days - these represent dates as the user sees them
+    // The createDateInTimezone function will extract the correct date components
+    // from these Date objects as they appear in the user's timezone
     return Array.from({ length: WEEK_DAYS }, (_, i) => addDays(weekStart, i))
   }
 
@@ -221,28 +227,28 @@ export function WeeklyCalendar({ tasks, onTaskClick, onTaskSchedule, onTaskResch
     return tasks.filter(task => {
       if (!task.scheduled_start || !task.scheduled_end) return false
       
-      const taskStart = parseISO(task.scheduled_start)
-      const taskEnd = parseISO(task.scheduled_end)
-      const taskStartHour = getHours(taskStart)
-      const taskEndHour = getHours(taskEnd)
+      const taskStartUTC = parseISO(task.scheduled_start)
+      const taskStartDate = getDateInTimezone(taskStartUTC, timezone)
+      const dayDate = getDateInTimezone(day, timezone)
       
-      return isSameDay(taskStart, day) && (
-        (taskStartHour <= hour && taskEndHour > hour) ||
-        (taskStartHour === hour)
-      )
+      // Check if task starts on the same day (comparing dates in user's timezone)
+      if (!isSameDay(taskStartDate, dayDate)) return false
+      
+      const { hour: taskStartHour } = getHoursAndMinutesInTimezone(taskStartUTC, timezone)
+      const { hour: taskEndHour } = getHoursAndMinutesInTimezone(parseISO(task.scheduled_end), timezone)
+      
+      return (taskStartHour <= hour && taskEndHour > hour) || (taskStartHour === hour)
     })
   }
 
   const getTaskPosition = (task: Task) => {
     if (!task.scheduled_start || !task.scheduled_end) return null
     
-    const taskStart = parseISO(task.scheduled_start)
-    const taskEnd = parseISO(task.scheduled_end)
+    const taskStartUTC = parseISO(task.scheduled_start)
+    const taskEndUTC = parseISO(task.scheduled_end)
     
-    const startHour = getHours(taskStart)
-    const startMinute = getMinutes(taskStart)
-    const endHour = getHours(taskEnd)
-    const endMinute = getMinutes(taskEnd)
+    const { hour: startHour, minute: startMinute } = getHoursAndMinutesInTimezone(taskStartUTC, timezone)
+    const { hour: endHour, minute: endMinute } = getHoursAndMinutesInTimezone(taskEndUTC, timezone)
     
     const startPosition = (startHour * 60 + startMinute) / 60 // in hours
     const duration = ((endHour * 60 + endMinute) - (startHour * 60 + startMinute)) / 60 // in hours
@@ -276,9 +282,8 @@ export function WeeklyCalendar({ tasks, onTaskClick, onTaskSchedule, onTaskResch
   }
 
   const getCurrentTimePosition = () => {
-    const hours = getHours(currentTime)
-    const minutes = getMinutes(currentTime)
-    const totalMinutes = hours * 60 + minutes
+    const { hour, minute } = getHoursAndMinutesInTimezone(currentTime, timezone)
+    const totalMinutes = hour * 60 + minute
     const percentage = (totalMinutes / (24 * 60)) * 100
     return `${percentage}%`
   }
@@ -382,7 +387,10 @@ export function WeeklyCalendar({ tasks, onTaskClick, onTaskSchedule, onTaskResch
                   {tasks
                     .filter(task => {
                       if (!task.scheduled_start) return false
-                      return isSameDay(parseISO(task.scheduled_start), day)
+                      const taskStartUTC = parseISO(task.scheduled_start)
+                      const taskStartDate = getDateInTimezone(taskStartUTC, timezone)
+                      const dayDate = getDateInTimezone(day, timezone)
+                      return isSameDay(taskStartDate, dayDate)
                     })
                     .map((task) => {
                       const position = getTaskPosition(task)

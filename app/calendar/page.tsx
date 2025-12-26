@@ -15,9 +15,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Calendar as CalendarIcon, Plus, CheckSquare, Clock } from 'lucide-react'
 import { Task, TaskGroup, CreateTaskRequest } from '@/lib/types'
 import { format, startOfWeek } from 'date-fns'
+import { useUserTimezone } from '@/hooks/use-user-timezone'
+import { createDateInTimezone } from '@/lib/timezone-utils'
 
 export default function CalendarPage() {
   const { data: session, status } = useSession()
+  const { timezone } = useUserTimezone()
   const router = useRouter()
   const [tasks, setTasks] = useState<Task[]>([])
   const [groups, setGroups] = useState<TaskGroup[]>([])
@@ -138,6 +141,39 @@ export default function CalendarPage() {
     }
   }
 
+  const handleUnscheduleTask = async (taskId: string) => {
+    try {
+      const response = await fetch(`/api/tasks/${taskId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          scheduled_start: null,
+          scheduled_end: null,
+        }),
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        setTasks(prev => prev.map(task => 
+          task.id === taskId ? data.task : task
+        ))
+        // Update selected task if it's the one being unscheduled
+        if (selectedTask?.id === taskId) {
+          setSelectedTask(data.task)
+        }
+      } else {
+        const error = await response.json()
+        console.error('Failed to unschedule task:', error)
+        throw new Error(error.error || 'Failed to unschedule task')
+      }
+    } catch (error) {
+      console.error('Error unscheduling task:', error)
+      throw error
+    }
+  }
+
   const handleDeleteTask = async (taskId: string) => {
     try {
       const response = await fetch(`/api/tasks/${taskId}`, {
@@ -215,9 +251,8 @@ export default function CalendarPage() {
     }
   }
 
-  const filteredTasks = selectedGroupId 
-    ? tasks.filter(task => task.group_id === selectedGroupId)
-    : tasks
+  // Show all tasks - selectedGroupId is now only used for visual highlighting in sidebar
+  const filteredTasks = tasks
 
   const scheduledTasks = showAllTasks 
     ? filteredTasks.filter(task => task.scheduled_start && task.scheduled_end)
@@ -259,13 +294,14 @@ export default function CalendarPage() {
       if (!task.locked && dropData?.type === 'calendar-slot' && task.scheduled_start) {
         // Calculate new end time based on drop position
         const { day, time } = dropData
-        const endDate = new Date(day)
         // Snap to 15-minute intervals
         const totalMinutes = time * 60
         const snappedMinutes = Math.round(totalMinutes / 15) * 15
         const hours = Math.floor(snappedMinutes / 60)
         const minutes = snappedMinutes % 60
-        endDate.setHours(hours, minutes, 0, 0)
+        
+        // Create the end date in the user's timezone, then convert to UTC
+        const endDate = createDateInTimezone(day, hours, minutes, timezone)
         
         // Ensure end time is after start time
         const startDate = new Date(task.scheduled_start)
@@ -346,8 +382,8 @@ export default function CalendarPage() {
     const minutes = snappedMinutes % 60
     
     const duration = task.duration || task.estimated_completion_time || 60 // Default to 60 minutes
-    const startDate = new Date(day)
-    startDate.setHours(hours, minutes, 0, 0)
+    // Create the start date in the user's timezone, then convert to UTC
+    const startDate = createDateInTimezone(day, hours, minutes, timezone)
     const endDate = new Date(startDate.getTime() + duration * 60000)
     
     try {
@@ -386,8 +422,8 @@ export default function CalendarPage() {
     const oldEnd = new Date(task.scheduled_end)
     const duration = (oldEnd.getTime() - oldStart.getTime()) / 60000 // in minutes
     
-    const startDate = new Date(day)
-    startDate.setHours(hours, minutes, 0, 0)
+    // Create the start date in the user's timezone, then convert to UTC
+    const startDate = createDateInTimezone(day, hours, minutes, timezone)
     const endDate = new Date(startDate.getTime() + duration * 60000)
     
     try {
@@ -550,6 +586,7 @@ export default function CalendarPage() {
         onEdit={handleEditTask}
         onDelete={handleDeleteTask}
         onStatusChange={handleStatusChange}
+        onUnschedule={handleUnscheduleTask}
       />
 
       {/* Create Task Dialog */}

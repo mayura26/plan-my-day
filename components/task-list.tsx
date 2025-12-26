@@ -20,7 +20,6 @@ interface TaskListProps {
   onUpdateTask: (taskId: string, updates: Partial<Task>) => Promise<void>
   onDeleteTask: (taskId: string) => Promise<void>
   onEditTask?: (taskId: string) => void
-  onScheduleTask?: (taskId: string) => void
   onExtendTask?: (taskId: string) => void
   onCreateTask?: () => void
   showGroup?: boolean
@@ -32,7 +31,6 @@ export function TaskList({
   onUpdateTask,
   onDeleteTask,
   onEditTask,
-  onScheduleTask,
   onExtendTask,
   onCreateTask,
   showGroup = false,
@@ -299,7 +297,6 @@ export function TaskList({
               onUpdate={onUpdateTask}
               onDelete={onDeleteTask}
               onEdit={onEditTask}
-              onSchedule={onScheduleTask}
               onExtend={onExtendTask}
               showGroup={showGroup}
               compact={compact}

@@ -19,6 +19,7 @@ async function initDatabase() {
         name TEXT,
         email TEXT UNIQUE NOT NULL,
         image TEXT,
+        timezone TEXT DEFAULT 'UTC',
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
       )

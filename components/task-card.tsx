@@ -19,15 +19,17 @@ import {
   canRescheduleTask,
   canExtendTask
 } from '@/lib/task-utils'
-import { Clock, Calendar, Zap, Lock, MoreHorizontal } from 'lucide-react'
+import { Clock, Calendar, Zap, Lock, MoreHorizontal, CalendarX } from 'lucide-react'
+import { useUserTimezone } from '@/hooks/use-user-timezone'
+import { formatDateShort, formatTimeRange } from '@/lib/timezone-utils'
 
 interface TaskCardProps {
   task: Task
   onUpdate: (taskId: string, updates: Partial<Task>) => Promise<void>
   onDelete: (taskId: string) => Promise<void>
   onEdit?: (taskId: string) => void
-  onSchedule?: (taskId: string) => void
   onExtend?: (taskId: string) => void
+  onUnschedule?: (taskId: string) => Promise<void>
   showGroup?: boolean
   compact?: boolean
 }
@@ -37,13 +39,15 @@ export function TaskCard({
   onUpdate, 
   onDelete, 
   onEdit,
-  onSchedule, 
   onExtend,
+  onUnschedule,
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   showGroup = false,
   compact = false 
 }: TaskCardProps) {
   const [isUpdating, setIsUpdating] = useState(false)
+  const [isUnscheduling, setIsUnscheduling] = useState(false)
+  const { timezone } = useUserTimezone()
 
   const handleStatusChange = async (newStatus: TaskStatus) => {
     setIsUpdating(true)
@@ -58,6 +62,18 @@ export function TaskCard({
 
   const handleToggleComplete = async (completed: boolean) => {
     await handleStatusChange(completed ? 'completed' : 'pending')
+  }
+
+  const handleUnschedule = async () => {
+    if (!onUnschedule) return
+    setIsUnscheduling(true)
+    try {
+      await onUnschedule(task.id)
+    } catch (error) {
+      console.error('Error unscheduling task:', error)
+    } finally {
+      setIsUnscheduling(false)
+    }
   }
 
   const isOverdue = isTaskOverdue(task)
@@ -169,11 +185,10 @@ export function TaskCard({
             {task.scheduled_start && (
               <div className="flex items-center">
                 <Calendar className="w-4 h-4 mr-1" />
-                {new Date(task.scheduled_start).toLocaleDateString()}
+                {formatDateShort(task.scheduled_start, timezone)}
                 {task.scheduled_start && task.scheduled_end && (
                   <span className="ml-1">
-                    {new Date(task.scheduled_start).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - 
-                    {new Date(task.scheduled_end).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    {formatTimeRange(task.scheduled_start, task.scheduled_end, timezone)}
                   </span>
                 )}
               </div>
@@ -207,13 +222,15 @@ export function TaskCard({
                 Edit
               </Button>
             )}
-            {task.status === 'pending' && onSchedule && canRescheduleTask(task) && (
+            {task.scheduled_start && onUnschedule && (
               <Button
                 size="sm"
                 variant="outline"
-                onClick={() => onSchedule(task.id)}
+                onClick={handleUnschedule}
+                disabled={isUnscheduling}
               >
-                Schedule
+                <CalendarX className="w-4 h-4 mr-1" />
+                {isUnscheduling ? 'Unscheduling...' : 'Unschedule'}
               </Button>
             )}
             {task.status === 'in_progress' && onExtend && canExtendTask(task) && (
