@@ -126,8 +126,13 @@ function ResizableTask({ task, position, onTaskClick, onResize, activeDragId, re
   const isTaskResizing = resizingTaskId === task.id || isResizing
 
   // Determine if task belongs to selected group
+  // Handle 'ungrouped' string for ungrouped tasks
   const taskGroupId = task.group_id || null
-  const belongsToSelectedGroup = selectedGroupId === null ? taskGroupId === null : taskGroupId === selectedGroupId
+  const belongsToSelectedGroup = selectedGroupId === null 
+    ? false 
+    : selectedGroupId === 'ungrouped' 
+      ? taskGroupId === null 
+      : taskGroupId === selectedGroupId
   const shouldFade = selectedGroupId !== null && !belongsToSelectedGroup
 
   const style = {

@@ -445,20 +445,22 @@ export function TaskGroupManager({
         {/* All Tasks (Ungrouped) */}
         <Card className={cn(
           "transition-opacity duration-200 overflow-hidden",
-          selectedGroupId !== null && "opacity-40"
+          selectedGroupId !== null && selectedGroupId !== 'ungrouped' && "opacity-40"
         )}>
           <CardHeader className="pb-2 px-3 pt-3">
             <div
               className={cn(
                 "flex items-center justify-between cursor-pointer gap-2",
-                selectedGroupId === null && "text-accent-foreground"
+                selectedGroupId === 'ungrouped' && "text-accent-foreground"
               )}
               onClick={() => {
-                // Toggle: if clicking the same group (ungrouped), deselect; otherwise select
-                if (selectedGroupId === null) {
+                // Toggle: if clicking the same group (ungrouped), deselect; otherwise select ungrouped
+                // Use 'ungrouped' string to represent ungrouped selection (instead of null)
+                // This allows us to distinguish between "nothing selected" (null) and "ungrouped selected" ('ungrouped')
+                if (selectedGroupId === 'ungrouped') {
                   onGroupSelect?.(null) // Deselect
                 } else {
-                  onGroupSelect?.(null) // Select ungrouped
+                  onGroupSelect?.('ungrouped') // Select ungrouped
                 }
               }}
             >
@@ -528,7 +530,7 @@ export function TaskGroupManager({
             key={group.id}
             className={cn(
               "transition-opacity duration-200 overflow-hidden",
-              (selectedGroupId !== group.id) && "opacity-40"
+              selectedGroupId !== null && selectedGroupId !== group.id && "opacity-40"
             )}
           >
             <CardHeader className="pb-2 px-3 pt-3">
