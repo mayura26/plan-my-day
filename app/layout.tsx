@@ -17,6 +17,13 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Plan My Day",
   description: "A modern day planning and task management app",
+  icons: {
+    icon: "/icon.png",
+    apple: "/icon.png",
+  },
+  appleWebApp: {
+    title: "Plan My Day",
+  },
 };
 
 export default function RootLayout({

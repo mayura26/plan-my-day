@@ -1,10 +1,19 @@
 ### ⏳ Pending
 - [ ] Toggle views between D/W/Month
-- [ ] PWA setup with service worker
-- [ ] Basic offline functionality
-- [ ] User onboarding tutorial and help system
 - [ ] Create icon
 - [ ] LLines not correct
+- [ ] Add due date for tasks, why do we need estimate time. lets streamline this whole popup
+- [ ] Task groups, buttons in row two, with header
+- [ ] Tasks should support subtasks. sub task can be pushed into new task for scheduling if needed
+- [ ] Make task groups collapsible
+- [ ] PWA setup with service worker
+- [ ] Basic offline functionality
+- [ ] Add toasts
+- [ ] Task view. tasks should be flatter more like a list
+- [ ] Group badge on both views
+- [ ] Ungrouped is bottom on list
+- [ ] Click on grid, create task in spot. quick tasks
+- [ ] Allow hiding of groups bar on left in desktop view
 
 ---
 
