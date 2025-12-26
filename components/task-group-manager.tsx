@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Plus, Edit, Trash2, ChevronDown, ChevronRight, ChevronsDown, ChevronsUp, Folder, CheckSquare } from 'lucide-react'
+import { Plus, Edit, Trash2, ChevronDown, ChevronRight, ChevronsDown, ChevronsUp, Folder, CheckSquare, Eye, EyeOff } from 'lucide-react'
 import { TaskGroup, CreateTaskGroupRequest, Task } from '@/lib/types'
 import { cn } from '@/lib/utils'
 import { useDraggable } from '@dnd-kit/core'
@@ -20,6 +20,7 @@ interface TaskGroupManagerProps {
   onTaskClick?: (taskId: string) => void
   showAllTasks?: boolean
   onShowAllTasksChange?: (show: boolean) => void
+  onHiddenGroupsChange?: (hiddenGroups: Set<string>) => void
 }
 
 const defaultColors = [
@@ -65,18 +66,20 @@ export function DraggableTaskItem({ task, onTaskClick }: { task: Task, onTaskCli
       {...listeners}
       {...attributes}
       className={cn(
-        "p-2 rounded border bg-card hover:bg-accent/50 transition-colors cursor-grab active:cursor-grabbing text-sm",
+        "p-1.5 rounded border bg-card hover:bg-accent/50 transition-colors cursor-grab active:cursor-grabbing text-xs overflow-hidden",
         task.locked && "cursor-not-allowed opacity-75"
       )}
       onClick={handleClick}
     >
-      <div className="font-medium truncate">{task.title}</div>
-      <Badge variant="outline" className="text-xs mt-1">
-        Priority {task.priority}
-      </Badge>
-      {task.locked && (
-        <div className="text-xs text-muted-foreground mt-1">🔒 Locked</div>
-      )}
+      <div className="font-medium truncate text-xs leading-tight">{task.title}</div>
+      <div className="flex items-center gap-1 mt-1">
+        <Badge variant="outline" className="text-[10px] px-1 py-0 h-4">
+          P{task.priority}
+        </Badge>
+        {task.locked && (
+          <span className="text-[10px] text-muted-foreground">🔒</span>
+        )}
+      </div>
     </div>
   )
 }
@@ -87,7 +90,8 @@ export function TaskGroupManager({
   tasks = [], 
   onTaskClick,
   showAllTasks = false,
-  onShowAllTasksChange 
+  onShowAllTasksChange,
+  onHiddenGroupsChange
 }: TaskGroupManagerProps) {
   const [groups, setGroups] = useState<TaskGroup[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -97,6 +101,7 @@ export function TaskGroupManager({
   const [newGroupName, setNewGroupName] = useState('')
   const [newGroupColor, setNewGroupColor] = useState('#3B82F6')
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set())
+  const [hiddenGroups, setHiddenGroups] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     fetchGroups()
@@ -251,6 +256,19 @@ export function TaskGroupManager({
     })
   }
 
+  const toggleGroupVisibility = (groupId: string) => {
+    setHiddenGroups(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(groupId)) {
+        newSet.delete(groupId)
+      } else {
+        newSet.add(groupId)
+      }
+      onHiddenGroupsChange?.(newSet)
+      return newSet
+    })
+  }
+
   const expandAllGroups = () => {
     const allGroupIds = new Set(['ungrouped', ...groups.map(g => g.id)])
     setExpandedGroups(allGroupIds)
@@ -319,17 +337,18 @@ export function TaskGroupManager({
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Folder className="h-5 w-5" />
-            Task Groups
+    <Card className="flex flex-col h-full max-h-full overflow-hidden w-full">
+      <CardHeader className="flex-shrink-0 pb-3 px-3 pt-3">
+        <div className="flex items-start justify-between gap-2 mb-2 min-w-0">
+          <div className="flex items-center gap-2 min-w-0 flex-1">
+            <Folder className="h-5 w-5 flex-shrink-0" />
+            <CardTitle className="truncate text-base">Task Groups</CardTitle>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1 flex-shrink-0">
             <Button
               size="sm"
-              variant="outline"
+              variant="ghost"
+              className="h-8 w-8 p-0"
               onClick={() => {
                 if (allGroupsExpanded()) {
                   collapseAllGroups()
@@ -347,9 +366,9 @@ export function TaskGroupManager({
             </Button>
             <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
               <DialogTrigger asChild>
-                <Button size="sm" variant="outline">
-                  <Plus className="h-4 w-4 mr-2" />
-                  New Group
+                <Button size="sm" variant="outline" className="h-8 px-2">
+                  <Plus className="h-4 w-4" />
+                  <span className="hidden sm:inline ml-1.5 text-xs">New</span>
                 </Button>
               </DialogTrigger>
             <DialogContent>
@@ -402,21 +421,22 @@ export function TaskGroupManager({
             </DialogContent>
           </Dialog>
           </div>
-        </CardTitle>
-        <CardDescription>
+        </div>
+        <CardDescription className="text-xs mt-1">
           Organize your tasks into groups for better management
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-3">
+      <CardContent className="space-y-2 overflow-y-auto overflow-x-hidden flex-1 min-h-0 px-3 pb-3">
         {/* Show All Tasks Toggle */}
-        <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
-          <div className="flex items-center gap-2">
-            <CheckSquare className="h-4 w-4 text-muted-foreground" />
-            <span className="text-sm font-medium">Show All Tasks</span>
+        <div className="flex items-center justify-between p-2.5 bg-muted/50 rounded-lg flex-shrink-0">
+          <div className="flex items-center gap-2 min-w-0">
+            <CheckSquare className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+            <span className="text-xs font-medium truncate">Show All Tasks</span>
           </div>
           <Button
             variant={showAllTasks ? "default" : "outline"}
             size="sm"
+            className="h-7 px-2 text-xs flex-shrink-0"
             onClick={() => onShowAllTasksChange?.(!showAllTasks)}
           >
             {showAllTasks ? 'All' : 'Unscheduled'}
@@ -424,29 +444,52 @@ export function TaskGroupManager({
         </div>
         {/* All Tasks (Ungrouped) */}
         <Card className={cn(
-          "transition-opacity duration-200",
+          "transition-opacity duration-200 overflow-hidden",
           selectedGroupId !== null && "opacity-40"
         )}>
-          <CardHeader className="pb-3">
+          <CardHeader className="pb-2 px-3 pt-3">
             <div
               className={cn(
-                "flex items-center justify-between cursor-pointer",
+                "flex items-center justify-between cursor-pointer gap-2",
                 selectedGroupId === null && "text-accent-foreground"
               )}
-              onClick={() => onGroupSelect?.(null)}
+              onClick={() => {
+                // Toggle: if clicking the same group (ungrouped), deselect; otherwise select
+                if (selectedGroupId === null) {
+                  onGroupSelect?.(null) // Deselect
+                } else {
+                  onGroupSelect?.(null) // Select ungrouped
+                }
+              }}
             >
-              <div className="flex items-center gap-3">
-                <div className="w-4 h-4 rounded-full bg-gray-500" />
-                <CardTitle className="text-base font-medium">Ungrouped</CardTitle>
+              <div className="flex items-center gap-2 flex-1 min-w-0">
+                <div className="w-3 h-3 rounded-full bg-gray-500 flex-shrink-0" />
+                <CardTitle className="text-sm font-medium truncate">Ungrouped</CardTitle>
               </div>
-              <div className="flex items-center gap-2">
-                <Badge variant="secondary" className="text-xs">
+              <div className="flex items-center gap-1 flex-shrink-0">
+                <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-4 min-w-[1.25rem]">
                   {getTaskCountForGroup(null)}
                 </Badge>
                 <Button
                   size="sm"
                   variant="ghost"
-                  className="h-6 w-6 p-0"
+                  className="h-6 w-6 p-0 flex-shrink-0"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    toggleGroupVisibility('ungrouped')
+                  }}
+                  title={hiddenGroups.has('ungrouped') ? "Show group" : "Hide group"}
+                >
+                  {hiddenGroups.has('ungrouped') ? (
+                    <EyeOff className="h-3 w-3" />
+                  ) : (
+                    <Eye className="h-3 w-3" />
+                  )}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-6 w-6 p-0 flex-shrink-0"
                   onClick={(e) => {
                     e.stopPropagation()
                     toggleGroupExpansion('ungrouped')
@@ -464,7 +507,7 @@ export function TaskGroupManager({
           
           {/* Ungrouped Tasks */}
           {expandedGroups.has('ungrouped') && (
-            <CardContent className="pt-0 space-y-2" style={{ pointerEvents: 'auto' }}>
+            <CardContent className="pt-0 pb-2 px-3 space-y-1.5 overflow-y-auto max-h-64" style={{ pointerEvents: 'auto' }}>
               {getTasksForGroup(null).map((task) => (
                 <DraggableTaskItem
                   key={task.id}
@@ -473,7 +516,7 @@ export function TaskGroupManager({
                 />
               ))}
               {getTasksForGroup(null).length === 0 && (
-                <p className="text-xs text-muted-foreground p-2">No {showAllTasks ? 'tasks' : 'unscheduled tasks'}</p>
+                <p className="text-xs text-muted-foreground p-2 text-center">No {showAllTasks ? 'tasks' : 'unscheduled tasks'}</p>
               )}
             </CardContent>
           )}
@@ -484,33 +527,56 @@ export function TaskGroupManager({
           <Card 
             key={group.id}
             className={cn(
-              "transition-opacity duration-200",
+              "transition-opacity duration-200 overflow-hidden",
               (selectedGroupId !== group.id) && "opacity-40"
             )}
           >
-            <CardHeader className="pb-3">
+            <CardHeader className="pb-2 px-3 pt-3">
               <div
                 className={cn(
-                  "flex items-center justify-between cursor-pointer",
+                  "flex items-center justify-between cursor-pointer gap-2",
                   selectedGroupId === group.id && "text-accent-foreground"
                 )}
-                onClick={() => onGroupSelect?.(group.id)}
+                onClick={() => {
+                  // Toggle: if clicking the same group, deselect; otherwise select
+                  if (selectedGroupId === group.id) {
+                    onGroupSelect?.(null)
+                  } else {
+                    onGroupSelect?.(group.id)
+                  }
+                }}
               >
-                <div className="flex items-center gap-3 flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-1 min-w-0">
                   <div 
-                    className="w-4 h-4 rounded-full border flex-shrink-0" 
+                    className="w-3 h-3 rounded-full border flex-shrink-0" 
                     style={{ backgroundColor: group.color }}
                   />
-                  <CardTitle className="text-base font-medium truncate">{group.name}</CardTitle>
+                  <CardTitle className="text-sm font-medium truncate">{group.name}</CardTitle>
                 </div>
-                <div className="flex items-center gap-2 flex-shrink-0">
-                  <Badge variant="secondary" className="text-xs">
+                <div className="flex items-center gap-1 flex-shrink-0">
+                  <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-4 min-w-[1.25rem]">
                     {getTaskCountForGroup(group.id)}
                   </Badge>
                   <Button
                     size="sm"
                     variant="ghost"
-                    className="h-6 w-6 p-0"
+                    className="h-6 w-6 p-0 flex-shrink-0"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      toggleGroupVisibility(group.id)
+                    }}
+                    title={hiddenGroups.has(group.id) ? "Show group" : "Hide group"}
+                  >
+                    {hiddenGroups.has(group.id) ? (
+                      <EyeOff className="h-3 w-3" />
+                    ) : (
+                      <Eye className="h-3 w-3" />
+                    )}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-6 w-6 p-0 flex-shrink-0"
                     onClick={(e) => {
                       e.stopPropagation()
                       toggleGroupExpansion(group.id)
@@ -525,22 +591,24 @@ export function TaskGroupManager({
                   <Button
                     size="sm"
                     variant="ghost"
-                    className="h-6 w-6 p-0"
+                    className="h-6 w-6 p-0 flex-shrink-0"
                     onClick={(e) => {
                       e.stopPropagation()
                       handleEditGroup(group)
                     }}
+                    title="Edit group"
                   >
                     <Edit className="h-3 w-3" />
                   </Button>
                   <Button
                     size="sm"
                     variant="ghost"
-                    className="h-6 w-6 p-0"
+                    className="h-6 w-6 p-0 flex-shrink-0"
                     onClick={(e) => {
                       e.stopPropagation()
                       deleteGroup(group.id)
                     }}
+                    title="Delete group"
                   >
                     <Trash2 className="h-3 w-3" />
                   </Button>
@@ -550,7 +618,7 @@ export function TaskGroupManager({
 
             {/* Group Tasks */}
             {expandedGroups.has(group.id) && (
-              <CardContent className="pt-0 space-y-2" style={{ pointerEvents: 'auto' }}>
+              <CardContent className="pt-0 pb-2 px-3 space-y-1.5 overflow-y-auto max-h-64" style={{ pointerEvents: 'auto' }}>
                 {getTasksForGroup(group.id).map((task) => (
                   <DraggableTaskItem
                     key={task.id}
@@ -559,7 +627,7 @@ export function TaskGroupManager({
                   />
                 ))}
                 {getTasksForGroup(group.id).length === 0 && (
-                  <p className="text-xs text-muted-foreground p-2">No {showAllTasks ? 'tasks' : 'unscheduled tasks'}</p>
+                  <p className="text-xs text-muted-foreground p-2 text-center">No {showAllTasks ? 'tasks' : 'unscheduled tasks'}</p>
                 )}
               </CardContent>
             )}
@@ -567,10 +635,10 @@ export function TaskGroupManager({
         ))}
 
         {groups.length === 0 && (
-          <div className="text-center py-6 text-muted-foreground">
-            <Folder className="h-8 w-8 mx-auto mb-2 opacity-50" />
-            <p className="text-sm">No task groups yet</p>
-            <p className="text-xs">Create your first group to organize tasks</p>
+          <div className="text-center py-4 text-muted-foreground">
+            <Folder className="h-6 w-6 mx-auto mb-2 opacity-50" />
+            <p className="text-xs">No task groups yet</p>
+            <p className="text-[10px]">Create your first group to organize tasks</p>
           </div>
         )}
       </CardContent>

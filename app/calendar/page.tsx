@@ -37,6 +37,7 @@ export default function CalendarPage() {
   const [activeDragId, setActiveDragId] = useState<string | null>(null)
   const [resizingTaskId, setResizingTaskId] = useState<string | null>(null)
   const [draggedTask, setDraggedTask] = useState<Task | null>(null)
+  const [hiddenGroups, setHiddenGroups] = useState<Set<string>>(new Set())
   
   // Configure drag sensors
   const sensors = useSensors(
@@ -253,7 +254,15 @@ export default function CalendarPage() {
   }
 
   // Show all tasks - selectedGroupId is now only used for visual highlighting in sidebar
-  const filteredTasks = tasks
+  // Filter out tasks from hidden groups
+  const filteredTasks = tasks.filter(task => {
+    if (!task.group_id) {
+      // Ungrouped tasks
+      return !hiddenGroups.has('ungrouped')
+    }
+    // Grouped tasks
+    return !hiddenGroups.has(task.group_id)
+  })
 
   const scheduledTasks = showAllTasks 
     ? filteredTasks.filter(task => task.scheduled_start && task.scheduled_end)
@@ -266,7 +275,8 @@ export default function CalendarPage() {
 
   const handleDragStart = (event: DragStartEvent) => {
     const activeData = event.active.data.current
-    setActiveDragId(event.active.id as string)
+    const activeId = event.active.id as string
+    setActiveDragId(activeId)
     
     // Track if we're resizing
     if (activeData?.type === 'resize-handle') {
@@ -296,8 +306,10 @@ export default function CalendarPage() {
     // Handle resize handle drag
     if (activeData?.type === 'resize-handle') {
       const task = activeData.task as Task
-      if (!task.locked && dropData?.type === 'calendar-slot' && task.scheduled_start) {
-        // Calculate new end time based on drop position
+      const resizeDirection = activeData.resizeDirection as 'top' | 'bottom'
+      
+      if (!task.locked && dropData?.type === 'calendar-slot' && task.scheduled_start && task.scheduled_end) {
+        // Calculate new time based on drop position
         const { day, time } = dropData
         // Snap to 15-minute intervals
         const totalMinutes = time * 60
@@ -305,13 +317,24 @@ export default function CalendarPage() {
         const hours = Math.floor(snappedMinutes / 60)
         const minutes = snappedMinutes % 60
         
-        // Create the end date in the user's timezone, then convert to UTC
-        const endDate = createDateInTimezone(day, hours, minutes, timezone)
-        
-        // Ensure end time is after start time
-        const startDate = new Date(task.scheduled_start)
-        if (endDate > startDate) {
-          await handleTaskResize(task.id, endDate)
+        if (resizeDirection === 'bottom') {
+          // Resize from bottom - change end time
+          const newEndDate = createDateInTimezone(day, hours, minutes, timezone)
+          const startDate = new Date(task.scheduled_start)
+          
+          // Ensure end time is after start time
+          if (newEndDate > startDate) {
+            await handleTaskResize(task.id, newEndDate)
+          }
+        } else if (resizeDirection === 'top') {
+          // Resize from top - change start time
+          const newStartDate = createDateInTimezone(day, hours, minutes, timezone)
+          const endDate = new Date(task.scheduled_end)
+          
+          // Ensure start time is before end time
+          if (newStartDate < endDate) {
+            await handleTaskResizeStart(task.id, newStartDate)
+          }
         }
       }
       return
@@ -349,11 +372,10 @@ export default function CalendarPage() {
     // Ensure end time is after start time
     if (newEndTime <= startDate) return
     
-    // Snap to 15-minute intervals
+    // newEndTime is already snapped to 15-minute intervals from the drop position
+    // Calculate duration based on the new end time
     const totalMinutes = (newEndTime.getTime() - startDate.getTime()) / 60000
-    const snappedMinutes = Math.round(totalMinutes / 15) * 15
-    const finalEndTime = new Date(startDate.getTime() + snappedMinutes * 60000)
-    const duration = snappedMinutes
+    const duration = Math.max(15, Math.round(totalMinutes / 15) * 15) // Minimum 15 minutes
     
     try {
       const response = await fetch(`/api/tasks/${taskId}`, {
@@ -362,7 +384,7 @@ export default function CalendarPage() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          scheduled_end: finalEndTime.toISOString(),
+          scheduled_end: newEndTime.toISOString(),
           duration: duration,
         }),
       })
@@ -373,6 +395,42 @@ export default function CalendarPage() {
       }
     } catch (error) {
       console.error('Error resizing task:', error)
+    }
+  }
+
+  const handleTaskResizeStart = async (taskId: string, newStartTime: Date) => {
+    const task = tasks.find(t => t.id === taskId)
+    if (!task || task.locked || !task.scheduled_start || !task.scheduled_end) return
+    
+    const endDate = new Date(task.scheduled_end)
+    
+    // Ensure start time is before end time
+    if (newStartTime >= endDate) return
+    
+    // The newStartTime is already snapped to 15-minute intervals from the drop position
+    // Calculate new duration based on the new start time and existing end time
+    const totalMinutes = (endDate.getTime() - newStartTime.getTime()) / 60000
+    const snappedMinutes = Math.max(15, Math.round(totalMinutes / 15) * 15) // Minimum 15 minutes
+    const duration = snappedMinutes
+    
+    try {
+      const response = await fetch(`/api/tasks/${taskId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          scheduled_start: newStartTime.toISOString(),
+          duration: duration,
+        }),
+      })
+      
+      if (response.ok) {
+        const data = await response.json()
+        setTasks(prev => prev.map(t => t.id === taskId ? data.task : t))
+      }
+    } catch (error) {
+      console.error('Error resizing task start:', error)
     }
   }
 
@@ -494,10 +552,11 @@ export default function CalendarPage() {
             <TaskGroupManager
               onGroupSelect={setSelectedGroupId}
               selectedGroupId={selectedGroupId}
-              tasks={filteredTasks}
+              tasks={tasks}
               onTaskClick={handleTaskClick}
               showAllTasks={showAllTasks}
               onShowAllTasksChange={setShowAllTasks}
+              onHiddenGroupsChange={setHiddenGroups}
             />
 
           {/* Quick Stats */}
@@ -575,6 +634,7 @@ export default function CalendarPage() {
           onTaskResize={handleTaskResize}
           activeDragId={activeDragId}
           resizingTaskId={resizingTaskId}
+          selectedGroupId={selectedGroupId}
         />
       </div>
 

@@ -53,9 +53,7 @@
 - [x] Task counts per group with dynamic updates
 
 ### 🔄 In Progress
-- [ ] User onboarding flow
-- [ ] Fix top bar so no double up
-- [ ] make group filtering clearer
+- [ ] mobile friendly
 
 ### ⏳ Pending
 - [ ] PWA setup with service worker

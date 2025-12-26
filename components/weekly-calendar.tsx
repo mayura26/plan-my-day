@@ -20,23 +20,22 @@ interface WeeklyCalendarProps {
   onTaskResize?: (taskId: string, newEndTime: Date) => void
   activeDragId?: string | null
   resizingTaskId?: string | null
+  selectedGroupId?: string | null
 }
 
 const HOURS = Array.from({ length: 24 }, (_, i) => i) // 0-23 hours
 const WEEK_DAYS = 7
 
-// Helper function to snap time to 15-minute intervals
-const snapToQuarterHour = (hours: number): number => {
-  const totalMinutes = hours * 60
-  const snappedMinutes = Math.round(totalMinutes / 15) * 15
-  return snappedMinutes / 60
-}
+// Create 15-minute interval slots (4 slots per hour: 0, 15, 30, 45 minutes)
+const TIME_SLOTS = Array.from({ length: 24 * 4 }, (_, i) => {
+  const hour = Math.floor(i / 4)
+  const minute = (i % 4) * 15
+  return { hour, minute, slotIndex: i }
+})
 
-// Helper function to calculate time from Y position
-const getTimeFromPosition = (y: number, dayHeight: number): number => {
-  const percentage = y / dayHeight
-  const hours = percentage * 24
-  return snapToQuarterHour(hours)
+// Helper function to convert hour and minute to decimal hours
+const timeToDecimal = (hour: number, minute: number): number => {
+  return hour + minute / 60
 }
 
 // Helper function to get task color
@@ -52,11 +51,11 @@ const getTaskColor = (task: Task) => {
   }
 }
 
-// Droppable calendar slot component
-function CalendarSlot({ day, hour, children }: { day: Date, hour: number, children?: React.ReactNode }) {
-  const time = hour + 0.5 // Center of the hour slot
+// Droppable calendar slot component (15-minute intervals)
+function CalendarSlot({ day, hour, minute, children }: { day: Date, hour: number, minute: number, children?: React.ReactNode }) {
+  const time = timeToDecimal(hour, minute) // Convert to decimal hours (e.g., 1.25 for 1:15)
   const { setNodeRef, isOver } = useDroppable({
-    id: `calendar-slot-${day.getTime()}-${hour}`,
+    id: `calendar-slot-${day.getTime()}-${hour}-${minute}`,
     data: {
       type: 'calendar-slot',
       day,
@@ -68,7 +67,8 @@ function CalendarSlot({ day, hour, children }: { day: Date, hour: number, childr
     <div
       ref={setNodeRef}
       className={cn(
-        "h-16 border-b transition-colors duration-150",
+        "h-4 border-b border-border/50 transition-colors duration-150",
+        minute === 0 && "border-b-2 border-border", // Thicker border for hour marks
         isOver && "bg-primary/20 ring-1 ring-primary/30",
         !isOver && "hover:bg-accent/30"
       )}
@@ -79,13 +79,14 @@ function CalendarSlot({ day, hour, children }: { day: Date, hour: number, childr
 }
 
 // Resizable task component (includes dragging and resizing functionality)
-function ResizableTask({ task, position, onTaskClick, onResize, activeDragId, resizingTaskId }: { 
+function ResizableTask({ task, position, onTaskClick, onResize, activeDragId, resizingTaskId, selectedGroupId }: { 
   task: Task, 
   position: { top: string, height: string }, 
   onTaskClick?: (taskId: string) => void,
   onResize?: (taskId: string, newEndTime: Date) => void,
   activeDragId?: string | null,
-  resizingTaskId?: string | null
+  resizingTaskId?: string | null,
+  selectedGroupId?: string | null
 }) {
   const { timezone } = useUserTimezone()
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
@@ -97,24 +98,43 @@ function ResizableTask({ task, position, onTaskClick, onResize, activeDragId, re
     },
   })
 
-  const resizeHandleId = `resize-${task.id}`
-  const { attributes: resizeAttributes, listeners: resizeListeners, setNodeRef: setResizeRef, isDragging: isResizing } = useDraggable({
-    id: resizeHandleId,
+  const bottomResizeHandleId = `resize-bottom-${task.id}`
+  const topResizeHandleId = `resize-top-${task.id}`
+  
+  const { attributes: bottomResizeAttributes, listeners: bottomResizeListeners, setNodeRef: setBottomResizeRef, isDragging: isBottomResizing } = useDraggable({
+    id: bottomResizeHandleId,
     disabled: task.locked,
     data: {
       type: 'resize-handle',
       task,
+      resizeDirection: 'bottom',
     },
   })
 
-  const isActiveDrag = activeDragId === task.id || activeDragId === resizeHandleId
+  const { attributes: topResizeAttributes, listeners: topResizeListeners, setNodeRef: setTopResizeRef, isDragging: isTopResizing } = useDraggable({
+    id: topResizeHandleId,
+    disabled: task.locked,
+    data: {
+      type: 'resize-handle',
+      task,
+      resizeDirection: 'top',
+    },
+  })
+
+  const isResizing = isTopResizing || isBottomResizing
+  const isActiveDrag = activeDragId === task.id || activeDragId === bottomResizeHandleId || activeDragId === topResizeHandleId
   const isTaskResizing = resizingTaskId === task.id || isResizing
+
+  // Determine if task belongs to selected group
+  const taskGroupId = task.group_id || null
+  const belongsToSelectedGroup = selectedGroupId === null ? taskGroupId === null : taskGroupId === selectedGroupId
+  const shouldFade = selectedGroupId !== null && !belongsToSelectedGroup
 
   const style = {
     top: position.top,
     height: position.height,
     transform: CSS.Translate.toString(transform),
-    opacity: isDragging || isTaskResizing ? 0.7 : 1,
+    opacity: isDragging || isTaskResizing ? 0.7 : shouldFade ? 0.3 : 1,
     transition: isDragging || isTaskResizing ? 'none' : 'all 0.2s ease-in-out',
     zIndex: isActiveDrag ? 50 : 10,
   }
@@ -142,6 +162,7 @@ function ResizableTask({ task, position, onTaskClick, onResize, activeDragId, re
         !task.locked && "cursor-grab active:cursor-grabbing",
         isActiveDrag && "shadow-xl ring-2 ring-primary/50",
         isTaskResizing && "ring-2 ring-primary/50",
+        belongsToSelectedGroup && selectedGroupId !== null && "ring-2 ring-primary ring-offset-1",
         getTaskColor(task)
       )}
       onClick={handleTaskClick}
@@ -158,24 +179,40 @@ function ResizableTask({ task, position, onTaskClick, onResize, activeDragId, re
         </div>
       )}
       {!task.locked && (
-        <div
-          ref={setResizeRef}
-          {...resizeListeners}
-          {...resizeAttributes}
-          className={cn(
-            "absolute bottom-0 left-0 right-0 h-2 cursor-ns-resize bg-white/20 hover:bg-white/30 transition-opacity flex items-center justify-center",
-            isTaskResizing ? "opacity-100 bg-white/40" : "opacity-0 group-hover:opacity-100"
-          )}
-          onMouseDown={(e) => e.stopPropagation()}
-        >
-          <GripVertical className="h-3 w-3 text-white" />
-        </div>
+        <>
+          {/* Top resize handle */}
+          <div
+            ref={setTopResizeRef}
+            {...topResizeListeners}
+            {...topResizeAttributes}
+            className={cn(
+              "absolute top-0 left-0 right-0 h-2 cursor-ns-resize bg-white/20 hover:bg-white/30 transition-opacity flex items-center justify-center",
+              isTopResizing ? "opacity-100 bg-white/40" : "opacity-0 group-hover:opacity-100"
+            )}
+            onMouseDown={(e) => e.stopPropagation()}
+          >
+            <GripVertical className="h-3 w-3 text-white" />
+          </div>
+          {/* Bottom resize handle */}
+          <div
+            ref={setBottomResizeRef}
+            {...bottomResizeListeners}
+            {...bottomResizeAttributes}
+            className={cn(
+              "absolute bottom-0 left-0 right-0 h-2 cursor-ns-resize bg-white/20 hover:bg-white/30 transition-opacity flex items-center justify-center",
+              isBottomResizing ? "opacity-100 bg-white/40" : "opacity-0 group-hover:opacity-100"
+            )}
+            onMouseDown={(e) => e.stopPropagation()}
+          >
+            <GripVertical className="h-3 w-3 text-white" />
+          </div>
+        </>
       )}
     </div>
   )
 }
 
-export function WeeklyCalendar({ tasks, onTaskClick, onTaskSchedule, onTaskReschedule, onTaskResize, activeDragId, resizingTaskId }: WeeklyCalendarProps) {
+export function WeeklyCalendar({ tasks, onTaskClick, onTaskSchedule, onTaskReschedule, onTaskResize, activeDragId, resizingTaskId, selectedGroupId }: WeeklyCalendarProps) {
   const { timezone } = useUserTimezone()
   const [currentWeek, setCurrentWeek] = useState(new Date())
   const [currentTime, setCurrentTime] = useState(new Date())
@@ -362,9 +399,9 @@ export function WeeklyCalendar({ tasks, onTaskClick, onTaskSchedule, onTaskResch
             {/* Day columns */}
             {weekDays.map((day, dayIndex) => (
               <div key={dayIndex} className="relative border-l">
-                {/* Hour slots with drop zones */}
-                {HOURS.map((hour) => (
-                  <CalendarSlot key={hour} day={day} hour={hour} />
+                {/* 15-minute interval slots with drop zones */}
+                {TIME_SLOTS.map(({ hour, minute, slotIndex }) => (
+                  <CalendarSlot key={slotIndex} day={day} hour={hour} minute={minute} />
                 ))}
 
                 {/* Current time indicator (red line) */}
@@ -405,6 +442,7 @@ export function WeeklyCalendar({ tasks, onTaskClick, onTaskSchedule, onTaskResch
                           onResize={onTaskResize}
                           activeDragId={activeDragId}
                           resizingTaskId={resizingTaskId}
+                          selectedGroupId={selectedGroupId}
                         />
                       )
                     })}
