@@ -4,7 +4,6 @@ import GitHub from "next-auth/providers/github"
 import { db } from "@/lib/turso"
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
-  trustHost: true, // Trust the host automatically (or set AUTH_URL env var in production)
   providers: [
     Google({
       clientId: process.env.GOOGLE_CLIENT_ID!,
