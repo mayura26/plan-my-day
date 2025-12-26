@@ -1,11 +1,9 @@
 ### ⏳ Pending
 - [ ] Toggle views between D/W/Month
-- [ ] Create icon
 - [ ] LLines not correct
 - [ ] Add due date for tasks, why do we need estimate time. lets streamline this whole popup
 - [ ] Task groups, buttons in row two, with header
-- [ ] Tasks should support subtasks. sub task can be pushed into new task for scheduling if needed
-- [ ] Make task groups collapsible
+- [ ] Tasks should support subtasks. sub task can be pushed into new task for scheduling if neededW
 - [ ] PWA setup with service worker
 - [ ] Basic offline functionality
 - [ ] Add toasts

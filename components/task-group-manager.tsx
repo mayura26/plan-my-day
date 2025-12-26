@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Plus, Edit, Trash2, ChevronDown, ChevronRight, ChevronsDown, ChevronsUp, Folder, CheckSquare, Eye, EyeOff } from 'lucide-react'
+import { Plus, Edit, Trash2, ChevronDown, ChevronRight, ChevronsDown, ChevronsUp, Folder, Eye, EyeOff } from 'lucide-react'
 import { TaskGroup, CreateTaskGroupRequest, Task } from '@/lib/types'
 import { cn } from '@/lib/utils'
 import { useDraggable } from '@dnd-kit/core'
@@ -322,129 +322,106 @@ export function TaskGroupManager({
 
   if (isLoading) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Folder className="h-5 w-5" />
-            Task Groups
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="text-center py-4">
-            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary mx-auto mb-2"></div>
-            <p className="text-sm text-muted-foreground">Loading groups...</p>
-          </div>
-        </CardContent>
-      </Card>
+      <div className="flex flex-col h-full max-h-full overflow-hidden w-full">
+        <div className="text-center py-4">
+          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary mx-auto mb-2"></div>
+          <p className="text-sm text-muted-foreground">Loading groups...</p>
+        </div>
+      </div>
     )
   }
 
   return (
-    <Card className="flex flex-col h-full max-h-full overflow-hidden w-full">
-      <CardHeader className="flex-shrink-0 pb-3 px-3 pt-3">
-        <div className="flex items-start justify-between gap-2 mb-2 min-w-0">
-          <div className="flex items-center gap-2 min-w-0 flex-1">
-            <Folder className="h-5 w-5 flex-shrink-0" />
-            <CardTitle className="truncate text-base">Task Groups</CardTitle>
-          </div>
-          <div className="flex items-center gap-1 flex-shrink-0">
-            <Button
-              size="sm"
-              variant="ghost"
-              className="h-11 w-11 md:h-8 md:w-8 p-0"
-              onClick={() => {
-                if (allGroupsExpanded()) {
-                  collapseAllGroups()
-                } else {
-                  expandAllGroups()
-                }
-              }}
-              title={allGroupsExpanded() ? "Collapse All" : "Expand All"}
-            >
-              {allGroupsExpanded() ? (
-                <ChevronsUp className="h-4 w-4" />
-              ) : (
-                <ChevronsDown className="h-4 w-4" />
-              )}
+    <div className="flex flex-col h-full max-h-full overflow-hidden w-full">
+      {/* Control buttons row */}
+      <div className="flex-shrink-0 pb-2 px-3 pt-3 flex items-center gap-2 flex-wrap">
+        <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+          <DialogTrigger asChild>
+            <Button size="sm" variant="outline" className="h-8 px-3">
+              <Plus className="h-4 w-4 mr-1.5" />
+              <span className="text-xs">New</span>
             </Button>
-            <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-              <DialogTrigger asChild>
-                <Button size="sm" variant="outline" className="h-11 px-3 md:h-8 md:px-2">
-                  <Plus className="h-4 w-4" />
-                  <span className="hidden sm:inline ml-1.5 text-xs">New</span>
-                </Button>
-              </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Create New Group</DialogTitle>
-                <DialogDescription>
-                  Create a new task group to organize your tasks.
-                </DialogDescription>
-              </DialogHeader>
-              <div className="space-y-4">
-                <div>
-                  <label className="text-sm font-medium">Group Name</label>
-                  <Input
-                    value={newGroupName}
-                    onChange={(e) => setNewGroupName(e.target.value)}
-                    placeholder="Enter group name"
-                    className="mt-1"
-                  />
-                </div>
-                <div>
-                  <label className="text-sm font-medium">Color</label>
-                  <Select value={newGroupColor} onValueChange={setNewGroupColor}>
-                    <SelectTrigger className="mt-1">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {defaultColors.map((color) => (
-                        <SelectItem key={color.value} value={color.value}>
-                          <div className="flex items-center gap-2">
-                            <div 
-                              className="w-4 h-4 rounded-full border" 
-                              style={{ backgroundColor: color.value }}
-                            />
-                            {color.name}
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="flex justify-end gap-2">
-                  <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
-                    Cancel
-                  </Button>
-                  <Button onClick={createGroup} disabled={!newGroupName.trim()}>
-                    Create Group
-                  </Button>
-                </div>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Create New Group</DialogTitle>
+              <DialogDescription>
+                Create a new task group to organize your tasks.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <label className="text-sm font-medium">Group Name</label>
+                <Input
+                  value={newGroupName}
+                  onChange={(e) => setNewGroupName(e.target.value)}
+                  placeholder="Enter group name"
+                  className="mt-1"
+                />
               </div>
-            </DialogContent>
-          </Dialog>
-          </div>
-        </div>
-        <CardDescription className="text-xs mt-1">
-          Organize your tasks into groups for better management
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-2 overflow-y-auto overflow-x-hidden flex-1 min-h-0 px-3 pb-3">
-        {/* Show All Tasks Toggle */}
-        <div className="flex items-center justify-between p-2.5 bg-muted/50 rounded-lg flex-shrink-0">
-          <div className="flex items-center gap-2 min-w-0">
-            <CheckSquare className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
-            <span className="text-xs font-medium truncate">Show All Tasks</span>
-          </div>
-          <Button
-            variant={showAllTasks ? "default" : "outline"}
-            size="sm"
-            className="h-11 px-3 md:h-7 md:px-2 text-xs flex-shrink-0"
-            onClick={() => onShowAllTasksChange?.(!showAllTasks)}
-          >
-            {showAllTasks ? 'All' : 'Unscheduled'}
-          </Button>
-        </div>
+              <div>
+                <label className="text-sm font-medium">Color</label>
+                <Select value={newGroupColor} onValueChange={setNewGroupColor}>
+                  <SelectTrigger className="mt-1">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {defaultColors.map((color) => (
+                      <SelectItem key={color.value} value={color.value}>
+                        <div className="flex items-center gap-2">
+                          <div 
+                            className="w-4 h-4 rounded-full border" 
+                            style={{ backgroundColor: color.value }}
+                          />
+                          {color.name}
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
+                  Cancel
+                </Button>
+                <Button onClick={createGroup} disabled={!newGroupName.trim()}>
+                  Create Group
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+        <Button
+          size="sm"
+          variant="ghost"
+          className="h-8 w-8 p-0"
+          onClick={() => {
+            if (allGroupsExpanded()) {
+              collapseAllGroups()
+            } else {
+              expandAllGroups()
+            }
+          }}
+          title={allGroupsExpanded() ? "Collapse All" : "Expand All"}
+        >
+          {allGroupsExpanded() ? (
+            <ChevronsUp className="h-4 w-4" />
+          ) : (
+            <ChevronsDown className="h-4 w-4" />
+          )}
+        </Button>
+        <Button
+          variant={showAllTasks ? "default" : "outline"}
+          size="sm"
+          className="h-8 px-3 text-xs"
+          onClick={() => onShowAllTasksChange?.(!showAllTasks)}
+        >
+          {showAllTasks ? 'All' : 'Unscheduled'}
+        </Button>
+      </div>
+
+      {/* Content */}
+      <div className="space-y-2 overflow-y-auto overflow-x-hidden flex-1 min-h-0 px-3 pb-3">
         {/* All Tasks (Ungrouped) */}
         <Card className={cn(
           "transition-opacity duration-200 overflow-hidden",
@@ -646,7 +623,7 @@ export function TaskGroupManager({
             <p className="text-[10px]">Create your first group to organize tasks</p>
           </div>
         )}
-      </CardContent>
+      </div>
 
       {/* Edit Group Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
@@ -705,6 +682,6 @@ export function TaskGroupManager({
           </div>
         </DialogContent>
       </Dialog>
-    </Card>
+    </div>
   )
 }

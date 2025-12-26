@@ -12,7 +12,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Calendar as CalendarIcon, Plus, CheckSquare, Clock, Menu, X } from 'lucide-react'
+import { Calendar as CalendarIcon, Plus, CheckSquare, Clock, Menu, X, ChevronDown, ChevronRight } from 'lucide-react'
 import { Task, TaskGroup, CreateTaskRequest } from '@/lib/types'
 import { format, startOfWeek } from 'date-fns'
 import { useUserTimezone } from '@/hooks/use-user-timezone'
@@ -40,6 +40,7 @@ export default function CalendarPage() {
   const [draggedTask, setDraggedTask] = useState<Task | null>(null)
   const [hiddenGroups, setHiddenGroups] = useState<Set<string>>(new Set())
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['task-groups', 'quick-stats', 'unscheduled-tasks']))
   
   // Configure drag sensors
   const sensors = useSensors(
@@ -580,76 +581,147 @@ export default function CalendarPage() {
             </Button>
 
             {/* Task Groups */}
-            <TaskGroupManager
-              onGroupSelect={setSelectedGroupId}
-              selectedGroupId={selectedGroupId}
-              tasks={tasks}
-              onTaskClick={handleTaskClick}
-              showAllTasks={showAllTasks}
-              onShowAllTasksChange={setShowAllTasks}
-              onHiddenGroupsChange={setHiddenGroups}
-            />
+            <div className="border rounded-lg overflow-hidden">
+              <div 
+                className="px-4 py-3 border-b cursor-pointer hover:bg-accent/50 transition-colors flex items-center justify-between bg-card"
+                onClick={() => {
+                  const newSet = new Set(expandedSections)
+                  if (newSet.has('task-groups')) {
+                    newSet.delete('task-groups')
+                  } else {
+                    newSet.add('task-groups')
+                  }
+                  setExpandedSections(newSet)
+                }}
+              >
+                <div className="flex items-center gap-2">
+                  {expandedSections.has('task-groups') ? (
+                    <ChevronDown className="h-4 w-4" />
+                  ) : (
+                    <ChevronRight className="h-4 w-4" />
+                  )}
+                  <h3 className="text-sm font-semibold">Task Groups</h3>
+                </div>
+              </div>
+              {expandedSections.has('task-groups') && (
+                <div>
+                  <TaskGroupManager
+                    onGroupSelect={setSelectedGroupId}
+                    selectedGroupId={selectedGroupId}
+                    tasks={tasks}
+                    onTaskClick={handleTaskClick}
+                    showAllTasks={showAllTasks}
+                    onShowAllTasksChange={setShowAllTasks}
+                    onHiddenGroupsChange={setHiddenGroups}
+                  />
+                </div>
+              )}
+            </div>
 
           {/* Quick Stats */}
           <Card>
-            <CardHeader>
-              <CardTitle className="text-sm flex items-center gap-2">
-                <Clock className="h-4 w-4" />
-                Scheduled Tasks
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span>Scheduled:</span>
-                  <span className="font-medium text-green-600">
-                    {scheduledTasks.length}
-                  </span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span>Unscheduled:</span>
-                  <span className="font-medium text-orange-600">
-                    {unscheduledTasks.length}
-                  </span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span>High Priority:</span>
-                  <span className="font-medium text-red-600">
-                    {filteredTasks.filter(t => t.priority <= 2).length}
-                  </span>
+            <CardHeader 
+              className="cursor-pointer hover:bg-accent/50 transition-colors"
+              onClick={() => {
+                const newSet = new Set(expandedSections)
+                if (newSet.has('quick-stats')) {
+                  newSet.delete('quick-stats')
+                } else {
+                  newSet.add('quick-stats')
+                }
+                setExpandedSections(newSet)
+              }}
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  {expandedSections.has('quick-stats') ? (
+                    <ChevronDown className="h-4 w-4" />
+                  ) : (
+                    <ChevronRight className="h-4 w-4" />
+                  )}
+                  <CardTitle className="text-sm flex items-center gap-2">
+                    <Clock className="h-4 w-4" />
+                    Scheduled Tasks
+                  </CardTitle>
                 </div>
               </div>
-            </CardContent>
+            </CardHeader>
+            {expandedSections.has('quick-stats') && (
+              <CardContent>
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span>Scheduled:</span>
+                    <span className="font-medium text-green-600">
+                      {scheduledTasks.length}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span>Unscheduled:</span>
+                    <span className="font-medium text-orange-600">
+                      {unscheduledTasks.length}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span>High Priority:</span>
+                    <span className="font-medium text-red-600">
+                      {filteredTasks.filter(t => t.priority <= 2).length}
+                    </span>
+                  </div>
+                </div>
+              </CardContent>
+            )}
           </Card>
 
           {/* Unscheduled Tasks */}
           {unscheduledTasks.length > 0 && (
             <Card>
-              <CardHeader>
-                <CardTitle className="text-sm flex items-center gap-2">
-                  <CheckSquare className="h-4 w-4" />
-                  Unscheduled ({unscheduledTasks.length})
-                </CardTitle>
+              <CardHeader 
+                className="cursor-pointer hover:bg-accent/50 transition-colors"
+                onClick={() => {
+                  const newSet = new Set(expandedSections)
+                  if (newSet.has('unscheduled-tasks')) {
+                    newSet.delete('unscheduled-tasks')
+                  } else {
+                    newSet.add('unscheduled-tasks')
+                  }
+                  setExpandedSections(newSet)
+                }}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    {expandedSections.has('unscheduled-tasks') ? (
+                      <ChevronDown className="h-4 w-4" />
+                    ) : (
+                      <ChevronRight className="h-4 w-4" />
+                    )}
+                    <CardTitle className="text-sm flex items-center gap-2">
+                      <CheckSquare className="h-4 w-4" />
+                      Unscheduled ({unscheduledTasks.length})
+                    </CardTitle>
+                  </div>
+                </div>
               </CardHeader>
-              <CardContent className="space-y-2">
-                {unscheduledTasks.slice(0, 5).map((task) => (
-                  <DraggableTaskItem
-                    key={task.id}
-                    task={task}
-                    onTaskClick={handleTaskClick}
-                  />
-                ))}
-                {unscheduledTasks.length > 5 && (
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    className="w-full"
-                    onClick={() => router.push('/tasks')}
-                  >
-                    View all {unscheduledTasks.length} tasks
-                  </Button>
-                )}
-              </CardContent>
+              {expandedSections.has('unscheduled-tasks') && (
+                <CardContent className="space-y-2">
+                  {unscheduledTasks.slice(0, 5).map((task) => (
+                    <DraggableTaskItem
+                      key={task.id}
+                      task={task}
+                      onTaskClick={handleTaskClick}
+                    />
+                  ))}
+                  {unscheduledTasks.length > 5 && (
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="w-full"
+                      onClick={() => router.push('/tasks')}
+                    >
+                      View all {unscheduledTasks.length} tasks
+                    </Button>
+                  )}
+                </CardContent>
+              )}
             </Card>
           )}
           </div>
