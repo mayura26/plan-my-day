@@ -4,6 +4,7 @@
 - [ ] Basic offline functionality
 - [ ] User onboarding tutorial and help system
 - [ ] Create icon
+- [ ] LLines not correct
 
 ---
 

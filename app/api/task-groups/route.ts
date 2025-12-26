@@ -50,26 +50,37 @@ export async function POST(request: NextRequest) {
     }
 
     // Verify user exists in database, create if missing (handles edge cases)
+    // Use INSERT OR IGNORE to avoid UNIQUE constraint errors if user exists by email
     const userCheck = await db.execute(
       'SELECT id FROM users WHERE id = ?',
       [session.user.id]
     )
 
     if (userCheck.rows.length === 0) {
-      // User doesn't exist in database, create them
-      try {
-        await db.execute(`
-          INSERT INTO users (id, name, email, image, created_at, updated_at)
-          VALUES (?, ?, ?, ?, datetime('now'), datetime('now'))
-        `, [
-          session.user.id,
-          session.user.name || null,
-          session.user.email || null,
-          session.user.image || null
-        ])
-      } catch (userError) {
-        console.error('Error creating user:', userError)
-        // If user creation fails, still try to proceed (might be a race condition)
+      // User doesn't exist by ID, try to create them
+      // Use INSERT OR IGNORE to handle case where user exists by email but not by ID
+      await db.execute(`
+        INSERT OR IGNORE INTO users (id, name, email, image, created_at, updated_at)
+        VALUES (?, ?, ?, ?, datetime('now'), datetime('now'))
+      `, [
+        session.user.id,
+        session.user.name || null,
+        session.user.email || null,
+        session.user.image || null
+      ])
+      
+      // Verify user was created (or already existed)
+      const finalCheck = await db.execute(
+        'SELECT id FROM users WHERE id = ?',
+        [session.user.id]
+      )
+      
+      if (finalCheck.rows.length === 0) {
+        // User still doesn't exist - this means they exist by email with different ID
+        // This is a data inconsistency that requires user to re-authenticate
+        return NextResponse.json({ 
+          error: 'Account data inconsistency detected. Please sign out and sign in again.' 
+        }, { status: 400 })
       }
     }
 
