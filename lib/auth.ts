@@ -23,6 +23,9 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           return false
         }
 
+        // Determine the actual user ID to use (may differ from session ID if user exists by email)
+        let actualUserId = user.id
+
         // Check if user exists by ID first
         const existingUserById = await db.execute(
           'SELECT id FROM users WHERE id = ?',
@@ -36,43 +39,47 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             SET name = ?, email = ?, image = ?, updated_at = datetime('now')
             WHERE id = ?
           `, [user.name || null, user.email || null, user.image || null, user.id])
-        } else {
-          // User doesn't exist by ID, try to create them
-          // Use INSERT OR IGNORE to handle case where user exists by email but not by ID
-          if (user.email) {
+        } else if (user.email) {
+          // User doesn't exist by ID, check if they exist by email
+          const existingUserByEmail = await db.execute(
+            'SELECT id FROM users WHERE email = ?',
+            [user.email]
+          )
+
+          if (existingUserByEmail.rows.length > 0) {
+            // User exists by email with different ID - use the existing ID
+            actualUserId = existingUserByEmail.rows[0].id as string
+            console.warn(`User with email ${user.email} exists with ID ${actualUserId}, but session has ID ${user.id}. Using existing ID.`)
+            
+            // Update the existing user's info
             await db.execute(`
-              INSERT OR IGNORE INTO users (id, name, email, image, created_at, updated_at)
-              VALUES (?, ?, ?, ?, datetime('now'), datetime('now'))
-            `, [user.id, user.name || null, user.email || null, user.image || null])
-            
-            // Verify user was created
-            const verifyUser = await db.execute(
-              'SELECT id FROM users WHERE id = ?',
-              [user.id]
-            )
-            
-            if (verifyUser.rows.length === 0) {
-              // User exists by email with different ID - this is a data inconsistency
-              // Log it but don't fail auth - API endpoints will handle this gracefully
-              console.warn(`User with email ${user.email} exists but with different ID. Session ID: ${user.id}`)
-            }
+              UPDATE users 
+              SET name = ?, image = ?, updated_at = datetime('now')
+              WHERE id = ?
+            `, [user.name || null, user.image || null, actualUserId])
           } else {
-            // No email, create user with just ID
+            // User doesn't exist at all, create them
             await db.execute(`
               INSERT INTO users (id, name, email, image, created_at, updated_at)
               VALUES (?, ?, ?, ?, datetime('now'), datetime('now'))
-            `, [user.id, user.name || null, null, user.image || null])
+            `, [user.id, user.name || null, user.email || null, user.image || null])
           }
+        } else {
+          // No email, create user with just ID
+          await db.execute(`
+            INSERT INTO users (id, name, email, image, created_at, updated_at)
+            VALUES (?, ?, ?, ?, datetime('now'), datetime('now'))
+          `, [user.id, user.name || null, null, user.image || null])
         }
 
-        // Store account information
+        // Store account information using the actual user ID
         if (account) {
           await db.execute(`
             INSERT OR REPLACE INTO accounts (id, user_id, type, provider, provider_account_id, access_token, refresh_token, expires_at, token_type, scope, id_token, session_state)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
           `, [
             `${account.provider}-${account.providerAccountId}`,
-            user.id,
+            actualUserId, // Use actual user ID, not session ID
             account.type,
             account.provider,
             account.providerAccountId,
@@ -84,6 +91,11 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             account.id_token || null,
             typeof account.session_state === 'string' ? account.session_state : null,
           ])
+        }
+
+        // Update the user.id to match the actual user ID for the session
+        if (actualUserId !== user.id) {
+          user.id = actualUserId
         }
       } catch (error) {
         console.error("Error storing user data:", error)
