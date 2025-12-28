@@ -1,63 +1,93 @@
-'use client'
+"use client";
 
-import { useState, useEffect } from 'react'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
-import { Badge } from '@/components/ui/badge'
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Plus, Edit, Trash2, ChevronDown, ChevronRight, ChevronsDown, ChevronsUp, Folder, Eye, EyeOff } from 'lucide-react'
-import { TaskGroup, CreateTaskGroupRequest, Task } from '@/lib/types'
-import { cn } from '@/lib/utils'
-import { useDraggable } from '@dnd-kit/core'
-import { CSS } from '@dnd-kit/utilities'
+import { useDraggable } from "@dnd-kit/core";
+import { CSS } from "@dnd-kit/utilities";
+import {
+  ChevronDown,
+  ChevronRight,
+  ChevronsDown,
+  ChevronsUp,
+  Edit,
+  Eye,
+  EyeOff,
+  Folder,
+  Plus,
+  Trash2,
+} from "lucide-react";
+import { useEffect, useState } from "react";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import type { CreateTaskGroupRequest, Task, TaskGroup } from "@/lib/types";
+import { cn } from "@/lib/utils";
 
 interface TaskGroupManagerProps {
-  onGroupSelect?: (groupId: string | null) => void
-  selectedGroupId?: string | null
-  tasks?: Task[]
-  onTaskClick?: (taskId: string) => void
-  showAllTasks?: boolean
-  onShowAllTasksChange?: (show: boolean) => void
-  onHiddenGroupsChange?: (hiddenGroups: Set<string>) => void
+  onGroupSelect?: (groupId: string | null) => void;
+  selectedGroupId?: string | null;
+  tasks?: Task[];
+  onTaskClick?: (taskId: string) => void;
+  showAllTasks?: boolean;
+  onShowAllTasksChange?: (show: boolean) => void;
+  onHiddenGroupsChange?: (hiddenGroups: Set<string>) => void;
 }
 
 const defaultColors = [
-  { name: 'Blue', value: '#3B82F6' },
-  { name: 'Green', value: '#10B981' },
-  { name: 'Yellow', value: '#F59E0B' },
-  { name: 'Red', value: '#EF4444' },
-  { name: 'Purple', value: '#8B5CF6' },
-  { name: 'Pink', value: '#EC4899' },
-  { name: 'Indigo', value: '#6366F1' },
-  { name: 'Gray', value: '#6B7280' },
-]
+  { name: "Blue", value: "#3B82F6" },
+  { name: "Green", value: "#10B981" },
+  { name: "Yellow", value: "#F59E0B" },
+  { name: "Red", value: "#EF4444" },
+  { name: "Purple", value: "#8B5CF6" },
+  { name: "Pink", value: "#EC4899" },
+  { name: "Indigo", value: "#6366F1" },
+  { name: "Gray", value: "#6B7280" },
+];
 
 // Draggable task item component for sidebar
-export function DraggableTaskItem({ task, onTaskClick }: { task: Task, onTaskClick?: (taskId: string) => void }) {
+export function DraggableTaskItem({
+  task,
+  onTaskClick,
+}: {
+  task: Task;
+  onTaskClick?: (taskId: string) => void;
+}) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: task.id,
     disabled: task.locked,
     data: {
-      type: 'sidebar-task',
+      type: "sidebar-task",
       task,
     },
-  })
+  });
 
   const style = {
     transform: CSS.Translate.toString(transform),
     opacity: isDragging ? 0.5 : 1,
-    touchAction: 'none' as const, // Prevent touch scrolling from interfering with drag
-  }
+    touchAction: "none" as const, // Prevent touch scrolling from interfering with drag
+  };
 
   // Track if we're dragging to prevent onClick from firing
   const handleClick = (e: React.MouseEvent) => {
     // Only trigger onClick if we're not dragging
     if (!isDragging) {
-      onTaskClick?.(task.id)
+      onTaskClick?.(task.id);
     }
-  }
+  };
 
   return (
     <div
@@ -76,249 +106,249 @@ export function DraggableTaskItem({ task, onTaskClick }: { task: Task, onTaskCli
         <Badge variant="outline" className="text-[10px] px-1 py-0 h-4">
           P{task.priority}
         </Badge>
-        {task.locked && (
-          <span className="text-[10px] text-muted-foreground">🔒</span>
-        )}
+        {task.locked && <span className="text-[10px] text-muted-foreground">🔒</span>}
       </div>
     </div>
-  )
+  );
 }
 
-export function TaskGroupManager({ 
-  onGroupSelect, 
-  selectedGroupId, 
-  tasks = [], 
+export function TaskGroupManager({
+  onGroupSelect,
+  selectedGroupId,
+  tasks = [],
   onTaskClick,
   showAllTasks = false,
   onShowAllTasksChange,
-  onHiddenGroupsChange
+  onHiddenGroupsChange,
 }: TaskGroupManagerProps) {
-  const [groups, setGroups] = useState<TaskGroup[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
-  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false)
-  const [editingGroup, setEditingGroup] = useState<TaskGroup | null>(null)
-  const [newGroupName, setNewGroupName] = useState('')
-  const [newGroupColor, setNewGroupColor] = useState('#3B82F6')
-  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set())
-  const [hiddenGroups, setHiddenGroups] = useState<Set<string>>(new Set())
+  const [groups, setGroups] = useState<TaskGroup[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [editingGroup, setEditingGroup] = useState<TaskGroup | null>(null);
+  const [newGroupName, setNewGroupName] = useState("");
+  const [newGroupColor, setNewGroupColor] = useState("#3B82F6");
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+  const [hiddenGroups, setHiddenGroups] = useState<Set<string>>(new Set());
 
   useEffect(() => {
-    fetchGroups()
-  }, [])
+    fetchGroups();
+  }, []);
 
   // Auto-rotate color when create dialog opens
   useEffect(() => {
     if (isCreateDialogOpen) {
       const getNextColor = () => {
-        const usedColors = new Set(groups.map(g => g.color))
-        
+        const usedColors = new Set(groups.map((g) => g.color));
+
         // Find first unused color
         for (const color of defaultColors) {
           if (!usedColors.has(color.value)) {
-            return color.value
+            return color.value;
           }
         }
-        
+
         // All colors used, cycle to next color after last created group
         if (groups.length > 0) {
-          const lastGroup = groups[groups.length - 1]
-          const lastColorIndex = defaultColors.findIndex(c => c.value === lastGroup.color)
-          const nextColorIndex = (lastColorIndex + 1) % defaultColors.length
-          return defaultColors[nextColorIndex].value
+          const lastGroup = groups[groups.length - 1];
+          const lastColorIndex = defaultColors.findIndex((c) => c.value === lastGroup.color);
+          const nextColorIndex = (lastColorIndex + 1) % defaultColors.length;
+          return defaultColors[nextColorIndex].value;
         }
-        
+
         // No groups exist, start with first color
-        return defaultColors[0].value
-      }
-      
-      setNewGroupColor(getNextColor())
+        return defaultColors[0].value;
+      };
+
+      setNewGroupColor(getNextColor());
     }
-  }, [isCreateDialogOpen, groups])
+  }, [isCreateDialogOpen, groups]);
 
   const fetchGroups = async () => {
     try {
-      setIsLoading(true)
-      const response = await fetch('/api/task-groups')
+      setIsLoading(true);
+      const response = await fetch("/api/task-groups");
       if (response.ok) {
-        const data = await response.json()
-        setGroups(data.groups || [])
+        const data = await response.json();
+        setGroups(data.groups || []);
       } else {
-        console.error('Failed to fetch task groups')
+        console.error("Failed to fetch task groups");
       }
     } catch (error) {
-      console.error('Error fetching task groups:', error)
+      console.error("Error fetching task groups:", error);
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }
+  };
 
   const createGroup = async () => {
-    if (!newGroupName.trim()) return
+    if (!newGroupName.trim()) return;
 
     try {
-      const response = await fetch('/api/task-groups', {
-        method: 'POST',
+      const response = await fetch("/api/task-groups", {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({
           name: newGroupName.trim(),
           color: newGroupColor,
         } as CreateTaskGroupRequest),
-      })
+      });
 
       if (response.ok) {
-        const data = await response.json()
-        setGroups(prev => [...prev, data.group])
-        setNewGroupName('')
-        setNewGroupColor('#3B82F6')
-        setIsCreateDialogOpen(false)
+        const data = await response.json();
+        setGroups((prev) => [...prev, data.group]);
+        setNewGroupName("");
+        setNewGroupColor("#3B82F6");
+        setIsCreateDialogOpen(false);
       } else {
-        const errorData = await response.json().catch(() => ({ error: 'Failed to create task group' }))
-        console.error('Failed to create task group:', errorData.error || 'Unknown error')
-        alert(errorData.error || 'Failed to create task group. Please try again.')
+        const errorData = await response
+          .json()
+          .catch(() => ({ error: "Failed to create task group" }));
+        console.error("Failed to create task group:", errorData.error || "Unknown error");
+        alert(errorData.error || "Failed to create task group. Please try again.");
       }
     } catch (error) {
-      console.error('Error creating task group:', error)
-      alert('An error occurred while creating the task group. Please try again.')
+      console.error("Error creating task group:", error);
+      alert("An error occurred while creating the task group. Please try again.");
     }
-  }
+  };
 
   const updateGroup = async (groupId: string, updates: Partial<TaskGroup>) => {
     try {
       const response = await fetch(`/api/task-groups/${groupId}`, {
-        method: 'PUT',
+        method: "PUT",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify(updates),
-      })
+      });
 
       if (response.ok) {
-        const data = await response.json()
-        setGroups(prev => prev.map(group => 
-          group.id === groupId ? data.group : group
-        ))
-        setIsEditDialogOpen(false)
-        setEditingGroup(null)
+        const data = await response.json();
+        setGroups((prev) => prev.map((group) => (group.id === groupId ? data.group : group)));
+        setIsEditDialogOpen(false);
+        setEditingGroup(null);
       } else {
-        console.error('Failed to update task group')
+        console.error("Failed to update task group");
       }
     } catch (error) {
-      console.error('Error updating task group:', error)
+      console.error("Error updating task group:", error);
     }
-  }
+  };
 
   const deleteGroup = async (groupId: string) => {
-    if (!confirm('Are you sure you want to delete this group? This action cannot be undone.')) {
-      return
+    if (!confirm("Are you sure you want to delete this group? This action cannot be undone.")) {
+      return;
     }
 
     try {
       const response = await fetch(`/api/task-groups/${groupId}`, {
-        method: 'DELETE',
-      })
+        method: "DELETE",
+      });
 
       if (response.ok) {
-        setGroups(prev => prev.filter(group => group.id !== groupId))
+        setGroups((prev) => prev.filter((group) => group.id !== groupId));
         if (selectedGroupId === groupId) {
-          onGroupSelect?.(null)
+          onGroupSelect?.(null);
         }
       } else {
-        console.error('Failed to delete task group')
+        console.error("Failed to delete task group");
       }
     } catch (error) {
-      console.error('Error deleting task group:', error)
+      console.error("Error deleting task group:", error);
     }
-  }
+  };
 
   const toggleGroupCollapse = (groupId: string) => {
-    const group = groups.find(g => g.id === groupId)
+    const group = groups.find((g) => g.id === groupId);
     if (group) {
-      updateGroup(groupId, { collapsed: !group.collapsed })
+      updateGroup(groupId, { collapsed: !group.collapsed });
     }
-  }
+  };
 
   const handleEditGroup = (group: TaskGroup) => {
-    setEditingGroup(group)
-    setNewGroupName(group.name)
-    setNewGroupColor(group.color)
-    setIsEditDialogOpen(true)
-  }
+    setEditingGroup(group);
+    setNewGroupName(group.name);
+    setNewGroupColor(group.color);
+    setIsEditDialogOpen(true);
+  };
 
   const toggleGroupExpansion = (groupId: string) => {
-    setExpandedGroups(prev => {
-      const newSet = new Set(prev)
+    setExpandedGroups((prev) => {
+      const newSet = new Set(prev);
       if (newSet.has(groupId)) {
-        newSet.delete(groupId)
+        newSet.delete(groupId);
       } else {
-        newSet.add(groupId)
+        newSet.add(groupId);
       }
-      return newSet
-    })
-  }
+      return newSet;
+    });
+  };
 
   const toggleGroupVisibility = (groupId: string) => {
-    setHiddenGroups(prev => {
-      const newSet = new Set(prev)
+    setHiddenGroups((prev) => {
+      const newSet = new Set(prev);
       if (newSet.has(groupId)) {
-        newSet.delete(groupId)
+        newSet.delete(groupId);
       } else {
-        newSet.add(groupId)
+        newSet.add(groupId);
       }
-      onHiddenGroupsChange?.(newSet)
-      return newSet
-    })
-  }
+      onHiddenGroupsChange?.(newSet);
+      return newSet;
+    });
+  };
 
   const expandAllGroups = () => {
-    const allGroupIds = new Set(['ungrouped', ...groups.map(g => g.id)])
-    setExpandedGroups(allGroupIds)
-  }
+    const allGroupIds = new Set(["ungrouped", ...groups.map((g) => g.id)]);
+    setExpandedGroups(allGroupIds);
+  };
 
   const collapseAllGroups = () => {
-    setExpandedGroups(new Set())
-  }
+    setExpandedGroups(new Set());
+  };
 
   const allGroupsExpanded = () => {
-    const allGroupIds = new Set(['ungrouped', ...groups.map(g => g.id)])
-    return allGroupIds.size === expandedGroups.size && 
-           Array.from(allGroupIds).every(id => expandedGroups.has(id))
-  }
+    const allGroupIds = new Set(["ungrouped", ...groups.map((g) => g.id)]);
+    return (
+      allGroupIds.size === expandedGroups.size &&
+      Array.from(allGroupIds).every((id) => expandedGroups.has(id))
+    );
+  };
 
   const getUnscheduledTasksForGroup = (groupId: string | null) => {
-    return tasks.filter(task => {
-      const isUnscheduled = !task.scheduled_start || !task.scheduled_end
+    return tasks.filter((task) => {
+      const isUnscheduled = !task.scheduled_start || !task.scheduled_end;
       if (groupId === null) {
-        return isUnscheduled && !task.group_id
+        return isUnscheduled && !task.group_id;
       }
-      return isUnscheduled && task.group_id === groupId
-    })
-  }
+      return isUnscheduled && task.group_id === groupId;
+    });
+  };
 
   const getAllTasksForGroup = (groupId: string | null) => {
-    return tasks.filter(task => {
+    return tasks.filter((task) => {
       if (groupId === null) {
-        return !task.group_id
+        return !task.group_id;
       }
-      return task.group_id === groupId
-    })
-  }
+      return task.group_id === groupId;
+    });
+  };
 
   const getTasksForGroup = (groupId: string | null) => {
-    return showAllTasks ? getAllTasksForGroup(groupId) : getUnscheduledTasksForGroup(groupId)
-  }
+    return showAllTasks ? getAllTasksForGroup(groupId) : getUnscheduledTasksForGroup(groupId);
+  };
 
   const getTaskCountForGroup = (groupId: string | null) => {
     if (showAllTasks) {
       if (groupId === null) {
-        return tasks.filter(t => !t.group_id).length
+        return tasks.filter((t) => !t.group_id).length;
       }
-      return tasks.filter(t => t.group_id === groupId).length
+      return tasks.filter((t) => t.group_id === groupId).length;
     }
-    return getUnscheduledTasksForGroup(groupId).length
-  }
+    return getUnscheduledTasksForGroup(groupId).length;
+  };
 
   if (isLoading) {
     return (
@@ -328,7 +358,7 @@ export function TaskGroupManager({
           <p className="text-sm text-muted-foreground">Loading groups...</p>
         </div>
       </div>
-    )
+    );
   }
 
   return (
@@ -345,9 +375,7 @@ export function TaskGroupManager({
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Create New Group</DialogTitle>
-              <DialogDescription>
-                Create a new task group to organize your tasks.
-              </DialogDescription>
+              <DialogDescription>Create a new task group to organize your tasks.</DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
               <div>
@@ -369,8 +397,8 @@ export function TaskGroupManager({
                     {defaultColors.map((color) => (
                       <SelectItem key={color.value} value={color.value}>
                         <div className="flex items-center gap-2">
-                          <div 
-                            className="w-4 h-4 rounded-full border" 
+                          <div
+                            className="w-4 h-4 rounded-full border"
                             style={{ backgroundColor: color.value }}
                           />
                           {color.name}
@@ -397,9 +425,9 @@ export function TaskGroupManager({
           className="h-8 w-8 p-0"
           onClick={() => {
             if (allGroupsExpanded()) {
-              collapseAllGroups()
+              collapseAllGroups();
             } else {
-              expandAllGroups()
+              expandAllGroups();
             }
           }}
           title={allGroupsExpanded() ? "Collapse All" : "Expand All"}
@@ -416,31 +444,33 @@ export function TaskGroupManager({
           className="h-8 px-3 text-xs"
           onClick={() => onShowAllTasksChange?.(!showAllTasks)}
         >
-          {showAllTasks ? 'All' : 'Unscheduled'}
+          {showAllTasks ? "All" : "Unscheduled"}
         </Button>
       </div>
 
       {/* Content */}
       <div className="space-y-2 overflow-y-auto overflow-x-hidden flex-1 min-h-0 px-3 pb-3">
         {/* All Tasks (Ungrouped) */}
-        <Card className={cn(
-          "transition-opacity duration-200 overflow-hidden",
-          selectedGroupId !== null && selectedGroupId !== 'ungrouped' && "opacity-40"
-        )}>
+        <Card
+          className={cn(
+            "transition-opacity duration-200 overflow-hidden",
+            selectedGroupId !== null && selectedGroupId !== "ungrouped" && "opacity-40"
+          )}
+        >
           <CardHeader className="pb-2 px-3 pt-3">
             <div
               className={cn(
                 "flex items-center justify-between cursor-pointer gap-2",
-                selectedGroupId === 'ungrouped' && "text-accent-foreground"
+                selectedGroupId === "ungrouped" && "text-accent-foreground"
               )}
               onClick={() => {
                 // Toggle: if clicking the same group (ungrouped), deselect; otherwise select ungrouped
                 // Use 'ungrouped' string to represent ungrouped selection (instead of null)
                 // This allows us to distinguish between "nothing selected" (null) and "ungrouped selected" ('ungrouped')
-                if (selectedGroupId === 'ungrouped') {
-                  onGroupSelect?.(null) // Deselect
+                if (selectedGroupId === "ungrouped") {
+                  onGroupSelect?.(null); // Deselect
                 } else {
-                  onGroupSelect?.('ungrouped') // Select ungrouped
+                  onGroupSelect?.("ungrouped"); // Select ungrouped
                 }
               }}
             >
@@ -457,12 +487,12 @@ export function TaskGroupManager({
                   variant="ghost"
                   className="h-11 w-11 md:h-6 md:w-6 p-0 flex-shrink-0"
                   onClick={(e) => {
-                    e.stopPropagation()
-                    toggleGroupVisibility('ungrouped')
+                    e.stopPropagation();
+                    toggleGroupVisibility("ungrouped");
                   }}
-                  title={hiddenGroups.has('ungrouped') ? "Show group" : "Hide group"}
+                  title={hiddenGroups.has("ungrouped") ? "Show group" : "Hide group"}
                 >
-                  {hiddenGroups.has('ungrouped') ? (
+                  {hiddenGroups.has("ungrouped") ? (
                     <EyeOff className="h-3 w-3" />
                   ) : (
                     <Eye className="h-3 w-3" />
@@ -473,11 +503,11 @@ export function TaskGroupManager({
                   variant="ghost"
                   className="h-11 w-11 md:h-6 md:w-6 p-0 flex-shrink-0"
                   onClick={(e) => {
-                    e.stopPropagation()
-                    toggleGroupExpansion('ungrouped')
+                    e.stopPropagation();
+                    toggleGroupExpansion("ungrouped");
                   }}
                 >
-                  {expandedGroups.has('ungrouped') ? (
+                  {expandedGroups.has("ungrouped") ? (
                     <ChevronDown className="h-3 w-3" />
                   ) : (
                     <ChevronRight className="h-3 w-3" />
@@ -486,19 +516,20 @@ export function TaskGroupManager({
               </div>
             </div>
           </CardHeader>
-          
+
           {/* Ungrouped Tasks */}
-          {expandedGroups.has('ungrouped') && (
-            <CardContent className="pt-0 pb-2 px-3 space-y-1.5 overflow-y-auto max-h-64" style={{ pointerEvents: 'auto' }}>
+          {expandedGroups.has("ungrouped") && (
+            <CardContent
+              className="pt-0 pb-2 px-3 space-y-1.5 overflow-y-auto max-h-64"
+              style={{ pointerEvents: "auto" }}
+            >
               {getTasksForGroup(null).map((task) => (
-                <DraggableTaskItem
-                  key={task.id}
-                  task={task}
-                  onTaskClick={onTaskClick}
-                />
+                <DraggableTaskItem key={task.id} task={task} onTaskClick={onTaskClick} />
               ))}
               {getTasksForGroup(null).length === 0 && (
-                <p className="text-xs text-muted-foreground p-2 text-center">No {showAllTasks ? 'tasks' : 'unscheduled tasks'}</p>
+                <p className="text-xs text-muted-foreground p-2 text-center">
+                  No {showAllTasks ? "tasks" : "unscheduled tasks"}
+                </p>
               )}
             </CardContent>
           )}
@@ -506,7 +537,7 @@ export function TaskGroupManager({
 
         {/* Task Groups */}
         {groups.map((group) => (
-          <Card 
+          <Card
             key={group.id}
             className={cn(
               "transition-opacity duration-200 overflow-hidden",
@@ -522,21 +553,26 @@ export function TaskGroupManager({
                 onClick={() => {
                   // Toggle: if clicking the same group, deselect; otherwise select
                   if (selectedGroupId === group.id) {
-                    onGroupSelect?.(null)
+                    onGroupSelect?.(null);
                   } else {
-                    onGroupSelect?.(group.id)
+                    onGroupSelect?.(group.id);
                   }
                 }}
               >
                 <div className="flex items-center gap-2 flex-1 min-w-0">
-                  <div 
-                    className="w-3 h-3 rounded-full border flex-shrink-0" 
+                  <div
+                    className="w-3 h-3 rounded-full border flex-shrink-0"
                     style={{ backgroundColor: group.color }}
                   />
-                  <CardTitle className="text-sm md:text-sm font-medium truncate">{group.name}</CardTitle>
+                  <CardTitle className="text-sm md:text-sm font-medium truncate">
+                    {group.name}
+                  </CardTitle>
                 </div>
                 <div className="flex items-center gap-1 flex-shrink-0">
-                  <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-4 min-w-[1.25rem]">
+                  <Badge
+                    variant="secondary"
+                    className="text-[10px] px-1.5 py-0 h-4 min-w-[1.25rem]"
+                  >
                     {getTaskCountForGroup(group.id)}
                   </Badge>
                   <Button
@@ -544,8 +580,8 @@ export function TaskGroupManager({
                     variant="ghost"
                     className="h-11 w-11 md:h-6 md:w-6 p-0 flex-shrink-0"
                     onClick={(e) => {
-                      e.stopPropagation()
-                      toggleGroupVisibility(group.id)
+                      e.stopPropagation();
+                      toggleGroupVisibility(group.id);
                     }}
                     title={hiddenGroups.has(group.id) ? "Show group" : "Hide group"}
                   >
@@ -560,8 +596,8 @@ export function TaskGroupManager({
                     variant="ghost"
                     className="h-11 w-11 md:h-6 md:w-6 p-0 flex-shrink-0"
                     onClick={(e) => {
-                      e.stopPropagation()
-                      toggleGroupExpansion(group.id)
+                      e.stopPropagation();
+                      toggleGroupExpansion(group.id);
                     }}
                   >
                     {expandedGroups.has(group.id) ? (
@@ -575,8 +611,8 @@ export function TaskGroupManager({
                     variant="ghost"
                     className="h-11 w-11 md:h-6 md:w-6 p-0 flex-shrink-0"
                     onClick={(e) => {
-                      e.stopPropagation()
-                      handleEditGroup(group)
+                      e.stopPropagation();
+                      handleEditGroup(group);
                     }}
                     title="Edit group"
                   >
@@ -587,8 +623,8 @@ export function TaskGroupManager({
                     variant="ghost"
                     className="h-11 w-11 md:h-6 md:w-6 p-0 flex-shrink-0"
                     onClick={(e) => {
-                      e.stopPropagation()
-                      deleteGroup(group.id)
+                      e.stopPropagation();
+                      deleteGroup(group.id);
                     }}
                     title="Delete group"
                   >
@@ -600,16 +636,17 @@ export function TaskGroupManager({
 
             {/* Group Tasks */}
             {expandedGroups.has(group.id) && (
-              <CardContent className="pt-0 pb-2 px-3 space-y-1.5 overflow-y-auto max-h-64" style={{ pointerEvents: 'auto' }}>
+              <CardContent
+                className="pt-0 pb-2 px-3 space-y-1.5 overflow-y-auto max-h-64"
+                style={{ pointerEvents: "auto" }}
+              >
                 {getTasksForGroup(group.id).map((task) => (
-                  <DraggableTaskItem
-                    key={task.id}
-                    task={task}
-                    onTaskClick={onTaskClick}
-                  />
+                  <DraggableTaskItem key={task.id} task={task} onTaskClick={onTaskClick} />
                 ))}
                 {getTasksForGroup(group.id).length === 0 && (
-                  <p className="text-xs text-muted-foreground p-2 text-center">No {showAllTasks ? 'tasks' : 'unscheduled tasks'}</p>
+                  <p className="text-xs text-muted-foreground p-2 text-center">
+                    No {showAllTasks ? "tasks" : "unscheduled tasks"}
+                  </p>
                 )}
               </CardContent>
             )}
@@ -630,9 +667,7 @@ export function TaskGroupManager({
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Edit Group</DialogTitle>
-            <DialogDescription>
-              Update the group name and color.
-            </DialogDescription>
+            <DialogDescription>Update the group name and color.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div>
@@ -654,8 +689,8 @@ export function TaskGroupManager({
                   {defaultColors.map((color) => (
                     <SelectItem key={color.value} value={color.value}>
                       <div className="flex items-center gap-2">
-                        <div 
-                          className="w-4 h-4 rounded-full border" 
+                        <div
+                          className="w-4 h-4 rounded-full border"
                           style={{ backgroundColor: color.value }}
                         />
                         {color.name}
@@ -669,11 +704,14 @@ export function TaskGroupManager({
               <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
                 Cancel
               </Button>
-              <Button 
-                onClick={() => editingGroup && updateGroup(editingGroup.id, { 
-                  name: newGroupName.trim(), 
-                  color: newGroupColor 
-                })}
+              <Button
+                onClick={() =>
+                  editingGroup &&
+                  updateGroup(editingGroup.id, {
+                    name: newGroupName.trim(),
+                    color: newGroupColor,
+                  })
+                }
                 disabled={!newGroupName.trim()}
               >
                 Update Group
@@ -683,5 +721,5 @@ export function TaskGroupManager({
         </DialogContent>
       </Dialog>
     </div>
-  )
+  );
 }

@@ -1,7 +1,7 @@
-'use client'
+"use client";
 
-import { Skeleton } from '@/components/ui/skeleton'
-import { Card, CardContent, CardHeader } from '@/components/ui/card'
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 
 export function CalendarSkeleton() {
   return (
@@ -14,7 +14,7 @@ export function CalendarSkeleton() {
             <Skeleton className="h-5 w-24" />
             <Skeleton className="h-8 w-8" />
           </div>
-          
+
           {/* Add Task Button Skeleton */}
           <Skeleton className="w-full h-11" />
 
@@ -122,6 +122,5 @@ export function CalendarSkeleton() {
         </div>
       </div>
     </div>
-  )
+  );
 }
-

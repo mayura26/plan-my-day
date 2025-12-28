@@ -1,115 +1,134 @@
-'use client'
+"use client";
 
-import { useState } from 'react'
-import { Task } from '@/lib/types'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
-import { Card, CardContent } from '@/components/ui/card'
-import { 
-  Calendar, 
-  Clock, 
-  Flag, 
-  Tag, 
-  Zap, 
-  CheckCircle2, 
+import { parseISO } from "date-fns";
+import {
+  Calendar,
+  CalendarX,
+  CheckCircle2,
   Circle,
-  Lock,
+  Clock,
   Edit,
+  Flag,
+  Lock,
+  Tag,
   Trash2,
   X,
-  CalendarX
-} from 'lucide-react'
-import { PRIORITY_LABELS, ENERGY_LABELS, TASK_TYPE_LABELS } from '@/lib/task-utils'
-import { useUserTimezone } from '@/hooks/use-user-timezone'
-import { formatDateTimeFull } from '@/lib/timezone-utils'
-import { parseISO } from 'date-fns'
+  Zap,
+} from "lucide-react";
+import { useState } from "react";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { useUserTimezone } from "@/hooks/use-user-timezone";
+import { ENERGY_LABELS, PRIORITY_LABELS, TASK_TYPE_LABELS } from "@/lib/task-utils";
+import { formatDateTimeFull } from "@/lib/timezone-utils";
+import type { Task } from "@/lib/types";
 
 interface TaskDetailDialogProps {
-  task: Task | null
-  open: boolean
-  onOpenChange: (open: boolean) => void
-  onEdit?: (taskId: string) => void
-  onDelete?: (taskId: string) => void
-  onStatusChange?: (taskId: string, status: Task['status']) => void
-  onUnschedule?: (taskId: string) => void
+  task: Task | null;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onEdit?: (taskId: string) => void;
+  onDelete?: (taskId: string) => void;
+  onStatusChange?: (taskId: string, status: Task["status"]) => void;
+  onUnschedule?: (taskId: string) => void;
 }
 
-export function TaskDetailDialog({ 
-  task, 
-  open, 
-  onOpenChange, 
-  onEdit, 
-  onDelete, 
+export function TaskDetailDialog({
+  task,
+  open,
+  onOpenChange,
+  onEdit,
+  onDelete,
   onStatusChange,
-  onUnschedule
+  onUnschedule,
 }: TaskDetailDialogProps) {
-  const [isDeleting, setIsDeleting] = useState(false)
-  const [isUnscheduling, setIsUnscheduling] = useState(false)
-  const { timezone } = useUserTimezone()
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [isUnscheduling, setIsUnscheduling] = useState(false);
+  const { timezone } = useUserTimezone();
 
-  if (!task) return null
+  if (!task) return null;
 
   const handleDelete = async () => {
-    if (!confirm('Are you sure you want to delete this task?')) return
-    
-    setIsDeleting(true)
+    if (!confirm("Are you sure you want to delete this task?")) return;
+
+    setIsDeleting(true);
     try {
-      await onDelete?.(task.id)
-      onOpenChange(false)
+      await onDelete?.(task.id);
+      onOpenChange(false);
     } catch (error) {
-      console.error('Error deleting task:', error)
+      console.error("Error deleting task:", error);
     } finally {
-      setIsDeleting(false)
+      setIsDeleting(false);
     }
-  }
+  };
 
   const handleEdit = () => {
-    onEdit?.(task.id)
-    onOpenChange(false)
-  }
+    onEdit?.(task.id);
+    onOpenChange(false);
+  };
 
   const handleUnschedule = async () => {
-    if (!confirm('Are you sure you want to unschedule this task? It will be removed from the calendar.')) return
-    
-    setIsUnscheduling(true)
+    if (
+      !confirm(
+        "Are you sure you want to unschedule this task? It will be removed from the calendar."
+      )
+    )
+      return;
+
+    setIsUnscheduling(true);
     try {
-      await onUnschedule?.(task.id)
+      await onUnschedule?.(task.id);
     } catch (error) {
-      console.error('Error unscheduling task:', error)
+      console.error("Error unscheduling task:", error);
     } finally {
-      setIsUnscheduling(false)
+      setIsUnscheduling(false);
     }
-  }
+  };
 
-  const getStatusColor = (status: Task['status']) => {
+  const getStatusColor = (status: Task["status"]) => {
     switch (status) {
-      case 'completed': return 'bg-green-500'
-      case 'in_progress': return 'bg-blue-500'
-      case 'cancelled': return 'bg-red-500'
-      default: return 'bg-gray-500'
+      case "completed":
+        return "bg-green-500";
+      case "in_progress":
+        return "bg-blue-500";
+      case "cancelled":
+        return "bg-red-500";
+      default:
+        return "bg-gray-500";
     }
-  }
+  };
 
-  const getStatusLabel = (status: Task['status']) => {
+  const getStatusLabel = (status: Task["status"]) => {
     switch (status) {
-      case 'completed': return 'Completed'
-      case 'in_progress': return 'In Progress'
-      case 'cancelled': return 'Cancelled'
-      default: return 'Pending'
+      case "completed":
+        return "Completed";
+      case "in_progress":
+        return "In Progress";
+      case "cancelled":
+        return "Cancelled";
+      default:
+        return "Pending";
     }
-  }
+  };
 
   const getPriorityColor = (priority: number) => {
     switch (priority) {
-      case 1: return 'bg-red-500 text-white'
-      case 2: return 'bg-orange-500 text-white'
-      case 3: return 'bg-yellow-500 text-white'
-      case 4: return 'bg-green-500 text-white'
-      case 5: return 'bg-blue-500 text-white'
-      default: return 'bg-gray-500 text-white'
+      case 1:
+        return "bg-red-500 text-white";
+      case 2:
+        return "bg-orange-500 text-white";
+      case 3:
+        return "bg-yellow-500 text-white";
+      case 4:
+        return "bg-green-500 text-white";
+      case 5:
+        return "bg-blue-500 text-white";
+      default:
+        return "bg-gray-500 text-white";
     }
-  }
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -122,7 +141,7 @@ export function TaskDetailDialog({
           {/* Status and Type Badges */}
           <div className="flex flex-wrap gap-2">
             <Badge className={getStatusColor(task.status)}>
-              {task.status === 'completed' ? (
+              {task.status === "completed" ? (
                 <CheckCircle2 className="h-3 w-3 mr-1" />
               ) : (
                 <Circle className="h-3 w-3 mr-1" />
@@ -135,7 +154,8 @@ export function TaskDetailDialog({
             </Badge>
             <Badge className={getPriorityColor(task.priority)}>
               <Flag className="h-3 w-3 mr-1" />
-              Priority {task.priority} - {PRIORITY_LABELS[task.priority as keyof typeof PRIORITY_LABELS]}
+              Priority {task.priority} -{" "}
+              {PRIORITY_LABELS[task.priority as keyof typeof PRIORITY_LABELS]}
             </Badge>
             {task.locked && (
               <Badge variant="destructive">
@@ -174,7 +194,7 @@ export function TaskDetailDialog({
                       disabled={isUnscheduling}
                     >
                       <CalendarX className="h-4 w-4 mr-2" />
-                      {isUnscheduling ? 'Unscheduling...' : 'Unschedule'}
+                      {isUnscheduling ? "Unscheduling..." : "Unschedule"}
                     </Button>
                   )}
                 </div>
@@ -200,8 +220,11 @@ export function TaskDetailDialog({
                       <span className="text-muted-foreground w-16">Duration:</span>
                       <span className="font-medium">
                         {Math.round(
-                          (parseISO(task.scheduled_end).getTime() - parseISO(task.scheduled_start).getTime()) / 60000
-                        )} minutes
+                          (parseISO(task.scheduled_end).getTime() -
+                            parseISO(task.scheduled_start).getTime()) /
+                            60000
+                        )}{" "}
+                        minutes
                       </span>
                     </div>
                   )}
@@ -243,35 +266,35 @@ export function TaskDetailDialog({
           </Card>
 
           {/* Quick Status Change */}
-          {task.status !== 'completed' && (
+          {task.status !== "completed" && (
             <Card>
               <CardContent className="pt-6">
                 <h3 className="text-sm font-semibold mb-3">Quick Actions</h3>
                 <div className="flex flex-wrap gap-2">
-                  {task.status === 'pending' && (
+                  {task.status === "pending" && (
                     <Button
                       size="sm"
                       variant="outline"
-                      onClick={() => onStatusChange?.(task.id, 'in_progress')}
+                      onClick={() => onStatusChange?.(task.id, "in_progress")}
                     >
                       Start Task
                     </Button>
                   )}
-                  {task.status === 'in_progress' && (
+                  {task.status === "in_progress" && (
                     <Button
                       size="sm"
                       variant="default"
-                      onClick={() => onStatusChange?.(task.id, 'completed')}
+                      onClick={() => onStatusChange?.(task.id, "completed")}
                     >
                       <CheckCircle2 className="h-4 w-4 mr-1" />
                       Mark Complete
                     </Button>
                   )}
-                  {task.status === 'pending' && (
+                  {task.status === "pending" && (
                     <Button
                       size="sm"
                       variant="default"
-                      onClick={() => onStatusChange?.(task.id, 'completed')}
+                      onClick={() => onStatusChange?.(task.id, "completed")}
                     >
                       <CheckCircle2 className="h-4 w-4 mr-1" />
                       Mark Complete
@@ -291,7 +314,7 @@ export function TaskDetailDialog({
               className="h-11 px-4 md:h-10 md:px-4 w-full sm:w-auto"
             >
               <Trash2 className="h-4 w-4 mr-2" />
-              {isDeleting ? 'Deleting...' : 'Delete Task'}
+              {isDeleting ? "Deleting..." : "Delete Task"}
             </Button>
             <Button onClick={handleEdit} className="h-11 px-4 md:h-10 md:px-4 w-full sm:w-auto">
               <Edit className="h-4 w-4 mr-2" />
@@ -308,5 +331,5 @@ export function TaskDetailDialog({
         </div>
       </DialogContent>
     </Dialog>
-  )
+  );
 }

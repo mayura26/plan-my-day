@@ -1,151 +1,158 @@
-'use client'
+"use client";
 
-import { useState, useEffect, useLayoutEffect, useRef } from 'react'
-import { Task, TaskGroup } from '@/lib/types'
-import { format, addDays, subDays, isSameDay, parseISO, isToday } from 'date-fns'
-import { getHoursAndMinutesInTimezone, getDateInTimezone, formatDateInTimezone } from '@/lib/timezone-utils'
-import { ChevronLeft, ChevronRight, Menu } from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import { cn } from '@/lib/utils'
-import { ResizableTask } from '@/components/calendar-task'
-import { CalendarSlot } from '@/components/calendar-slot'
+import { addDays, format, isSameDay, isToday, parseISO, subDays } from "date-fns";
+import { ChevronLeft, ChevronRight, Menu } from "lucide-react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { CalendarSlot } from "@/components/calendar-slot";
+import { ResizableTask } from "@/components/calendar-task";
+import { Button } from "@/components/ui/button";
+import {
+  formatDateInTimezone,
+  getDateInTimezone,
+  getHoursAndMinutesInTimezone,
+} from "@/lib/timezone-utils";
+import type { Task, TaskGroup } from "@/lib/types";
+import { cn } from "@/lib/utils";
 
 interface DayCalendarProps {
-  tasks: Task[]
-  timezone: string
-  onTaskClick?: (taskId: string) => void
-  onTaskSchedule?: (taskId: string, day: Date, time: number) => void
-  onTaskReschedule?: (taskId: string, day: Date, time: number) => void
-  onTaskResize?: (taskId: string, newEndTime: Date) => void
-  activeDragId?: string | null
-  resizingTaskId?: string | null
-  selectedGroupId?: string | null
-  groups?: TaskGroup[]
-  onSidebarToggle?: () => void
-  currentDate?: Date
-  onDateChange?: (date: Date) => void
-  mobileViewToggleButtons?: React.ReactNode
-  desktopViewToggleButtons?: React.ReactNode
+  tasks: Task[];
+  timezone: string;
+  onTaskClick?: (taskId: string) => void;
+  onTaskSchedule?: (taskId: string, day: Date, time: number) => void;
+  onTaskReschedule?: (taskId: string, day: Date, time: number) => void;
+  onTaskResize?: (taskId: string, newEndTime: Date) => void;
+  activeDragId?: string | null;
+  resizingTaskId?: string | null;
+  selectedGroupId?: string | null;
+  groups?: TaskGroup[];
+  onSidebarToggle?: () => void;
+  currentDate?: Date;
+  onDateChange?: (date: Date) => void;
+  mobileViewToggleButtons?: React.ReactNode;
+  desktopViewToggleButtons?: React.ReactNode;
 }
 
-const HOURS = Array.from({ length: 24 }, (_, i) => i) // 0-23 hours
+const HOURS = Array.from({ length: 24 }, (_, i) => i); // 0-23 hours
 
 // Create 15-minute interval slots (4 slots per hour: 0, 15, 30, 45 minutes)
 const TIME_SLOTS = Array.from({ length: 24 * 4 }, (_, i) => {
-  const hour = Math.floor(i / 4)
-  const minute = (i % 4) * 15
-  return { hour, minute, slotIndex: i }
-})
+  const hour = Math.floor(i / 4);
+  const minute = (i % 4) * 15;
+  return { hour, minute, slotIndex: i };
+});
 
-export function DayCalendar({ 
+export function DayCalendar({
   tasks,
   timezone,
-  onTaskClick, 
-  onTaskSchedule, 
-  onTaskReschedule, 
-  onTaskResize, 
-  activeDragId, 
-  resizingTaskId, 
-  selectedGroupId, 
-  groups = [], 
+  onTaskClick,
+  onTaskSchedule,
+  onTaskReschedule,
+  onTaskResize,
+  activeDragId,
+  resizingTaskId,
+  selectedGroupId,
+  groups = [],
   onSidebarToggle,
   currentDate: externalCurrentDate,
   onDateChange,
   mobileViewToggleButtons,
-  desktopViewToggleButtons
+  desktopViewToggleButtons,
 }: DayCalendarProps) {
-  const [currentDate, setCurrentDate] = useState(externalCurrentDate || new Date())
-  const [currentTime, setCurrentTime] = useState(new Date())
-  const calendarScrollRef = useRef<HTMLDivElement>(null)
+  const [currentDate, setCurrentDate] = useState(externalCurrentDate || new Date());
+  const [currentTime, setCurrentTime] = useState(new Date());
+  const calendarScrollRef = useRef<HTMLDivElement>(null);
 
   // Sync with external currentDate if provided
   useEffect(() => {
     if (externalCurrentDate) {
-      setCurrentDate(externalCurrentDate)
+      setCurrentDate(externalCurrentDate);
     }
-  }, [externalCurrentDate])
+  }, [externalCurrentDate]);
 
   // Update current time every minute
   useEffect(() => {
     const timer = setInterval(() => {
-      setCurrentTime(new Date())
-    }, 60000) // Update every minute
+      setCurrentTime(new Date());
+    }, 60000); // Update every minute
 
-    return () => clearInterval(timer)
-  }, [])
+    return () => clearInterval(timer);
+  }, []);
 
   // Auto-scroll to current time on mount - use useLayoutEffect to set scroll before paint
   useLayoutEffect(() => {
-    if (!calendarScrollRef.current) return
+    if (!calendarScrollRef.current) return;
 
-    const now = new Date()
-    const { hour, minute } = getHoursAndMinutesInTimezone(now, timezone)
-    const totalMinutes = hour * 60 + minute
-    
+    const now = new Date();
+    const { hour, minute } = getHoursAndMinutesInTimezone(now, timezone);
+    const totalMinutes = hour * 60 + minute;
+
     // Each hour is 64px (h-16 = 4rem = 64px)
-    const pixelsPerMinute = 64 / 60
-    const scrollPosition = totalMinutes * pixelsPerMinute
-    
+    const pixelsPerMinute = 64 / 60;
+    const scrollPosition = totalMinutes * pixelsPerMinute;
+
     // Offset to center the current time in view (subtract half viewport height)
-    const offset = calendarScrollRef.current.clientHeight / 2
-    
-    calendarScrollRef.current.scrollTop = scrollPosition - offset
-  }, [timezone, currentDate])
+    const offset = calendarScrollRef.current.clientHeight / 2;
+
+    calendarScrollRef.current.scrollTop = scrollPosition - offset;
+  }, [timezone, currentDate]);
 
   const getTaskPosition = (task: Task) => {
-    if (!task.scheduled_start || !task.scheduled_end) return null
-    
-    const taskStartUTC = parseISO(task.scheduled_start)
-    const taskEndUTC = parseISO(task.scheduled_end)
-    
-    const { hour: startHour, minute: startMinute } = getHoursAndMinutesInTimezone(taskStartUTC, timezone)
-    const { hour: endHour, minute: endMinute } = getHoursAndMinutesInTimezone(taskEndUTC, timezone)
-    
-    const startPosition = (startHour * 60 + startMinute) / 60 // in hours
-    const duration = ((endHour * 60 + endMinute) - (startHour * 60 + startMinute)) / 60 // in hours
-    
+    if (!task.scheduled_start || !task.scheduled_end) return null;
+
+    const taskStartUTC = parseISO(task.scheduled_start);
+    const taskEndUTC = parseISO(task.scheduled_end);
+
+    const { hour: startHour, minute: startMinute } = getHoursAndMinutesInTimezone(
+      taskStartUTC,
+      timezone
+    );
+    const { hour: endHour, minute: endMinute } = getHoursAndMinutesInTimezone(taskEndUTC, timezone);
+
+    const startPosition = (startHour * 60 + startMinute) / 60; // in hours
+    const duration = (endHour * 60 + endMinute - (startHour * 60 + startMinute)) / 60; // in hours
+
     return {
       top: `${(startPosition / 24) * 100}%`,
       height: `${(duration / 24) * 100}%`,
       startHour,
-      endHour
-    }
-  }
+      endHour,
+    };
+  };
 
   const formatTime = (hour: number) => {
-    if (hour === 0) return '12 AM'
-    if (hour === 12) return '12 PM'
-    if (hour < 12) return `${hour} AM`
-    return `${hour - 12} PM`
-  }
+    if (hour === 0) return "12 AM";
+    if (hour === 12) return "12 PM";
+    if (hour < 12) return `${hour} AM`;
+    return `${hour - 12} PM`;
+  };
 
   const goToPreviousDay = () => {
-    const newDate = subDays(currentDate, 1)
-    setCurrentDate(newDate)
-    onDateChange?.(newDate)
-  }
+    const newDate = subDays(currentDate, 1);
+    setCurrentDate(newDate);
+    onDateChange?.(newDate);
+  };
 
   const goToNextDay = () => {
-    const newDate = addDays(currentDate, 1)
-    setCurrentDate(newDate)
-    onDateChange?.(newDate)
-  }
+    const newDate = addDays(currentDate, 1);
+    setCurrentDate(newDate);
+    onDateChange?.(newDate);
+  };
 
   const goToToday = () => {
-    const today = new Date()
-    setCurrentDate(today)
-    onDateChange?.(today)
-  }
+    const today = new Date();
+    setCurrentDate(today);
+    onDateChange?.(today);
+  };
 
   const getCurrentTimePosition = () => {
-    const { hour, minute } = getHoursAndMinutesInTimezone(currentTime, timezone)
-    const totalMinutes = hour * 60 + minute
-    const percentage = (totalMinutes / (24 * 60)) * 100
-    return `${percentage}%`
-  }
+    const { hour, minute } = getHoursAndMinutesInTimezone(currentTime, timezone);
+    const totalMinutes = hour * 60 + minute;
+    const percentage = (totalMinutes / (24 * 60)) * 100;
+    return `${percentage}%`;
+  };
 
-  const dayDate = getDateInTimezone(currentDate, timezone)
-  const todayDate = getDateInTimezone(new Date(), timezone)
+  const dayDate = getDateInTimezone(currentDate, timezone);
+  const todayDate = getDateInTimezone(new Date(), timezone);
 
   return (
     <div className="flex flex-col h-full">
@@ -164,20 +171,23 @@ export function DayCalendar({
             </Button>
           )}
           <h2 className="text-xl md:text-2xl font-bold truncate">
-            {formatDateInTimezone(currentDate, timezone, { weekday: 'short' })}
-            {' '}
-            {formatDateInTimezone(currentDate, timezone, { day: 'numeric' })}
-            {' '}
+            {formatDateInTimezone(currentDate, timezone, { weekday: "short" })}{" "}
+            {formatDateInTimezone(currentDate, timezone, { day: "numeric" })}{" "}
             {/* Mobile: short month */}
             <span className="md:hidden">
-              {formatDateInTimezone(currentDate, timezone, { month: 'short' })}
+              {formatDateInTimezone(currentDate, timezone, { month: "short" })}
             </span>
             {/* Desktop: long month */}
             <span className="hidden md:inline">
-              {formatDateInTimezone(currentDate, timezone, { month: 'long' })}
+              {formatDateInTimezone(currentDate, timezone, { month: "long" })}
             </span>
           </h2>
-          <Button variant="outline" size="sm" onClick={goToToday} className="hidden sm:inline-flex flex-shrink-0">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={goToToday}
+            className="hidden sm:inline-flex flex-shrink-0"
+          >
             Today
           </Button>
           {/* View toggle buttons - mobile (abbreviated) */}
@@ -216,7 +226,10 @@ export function DayCalendar({
                   className="h-16 border-b-2 border-border px-1 md:px-2 text-xs text-muted-foreground flex items-center"
                 >
                   <span className="hidden sm:inline">{formatTime(hour)}</span>
-                  <span className="sm:hidden">{hour === 0 ? '12' : hour > 12 ? hour - 12 : hour}{hour >= 12 ? 'p' : 'a'}</span>
+                  <span className="sm:hidden">
+                    {hour === 0 ? "12" : hour > 12 ? hour - 12 : hour}
+                    {hour >= 12 ? "p" : "a"}
+                  </span>
                 </div>
               ))}
             </div>
@@ -231,15 +244,15 @@ export function DayCalendar({
               {/* Tasks overlay */}
               <div className="absolute inset-0 pointer-events-none">
                 {tasks
-                  .filter(task => {
-                    if (!task.scheduled_start) return false
-                    const taskStartUTC = parseISO(task.scheduled_start)
-                    const taskStartDate = getDateInTimezone(taskStartUTC, timezone)
-                    return isSameDay(taskStartDate, dayDate)
+                  .filter((task) => {
+                    if (!task.scheduled_start) return false;
+                    const taskStartUTC = parseISO(task.scheduled_start);
+                    const taskStartDate = getDateInTimezone(taskStartUTC, timezone);
+                    return isSameDay(taskStartDate, dayDate);
                   })
                   .map((task) => {
-                    const position = getTaskPosition(task)
-                    if (!position) return null
+                    const position = getTaskPosition(task);
+                    if (!position) return null;
 
                     return (
                       <ResizableTask
@@ -253,13 +266,13 @@ export function DayCalendar({
                         selectedGroupId={selectedGroupId}
                         groups={groups}
                       />
-                    )
+                    );
                   })}
               </div>
 
               {/* Current time indicator (red line) - rendered after tasks to ensure it appears on top */}
               {isSameDay(dayDate, todayDate) && (
-                <div 
+                <div
                   className="absolute left-0 right-0 pointer-events-none z-20"
                   style={{ top: getCurrentTimePosition() }}
                 >
@@ -276,6 +289,5 @@ export function DayCalendar({
         </div>
       </div>
     </div>
-  )
+  );
 }
-

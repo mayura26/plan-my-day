@@ -1,227 +1,226 @@
-'use client'
+"use client";
 
-import { useState, useEffect } from 'react'
-import { useSession } from 'next-auth/react'
-import { useRouter } from 'next/navigation'
-import { Task, TaskGroup, CreateTaskRequest } from '@/lib/types'
-import { GroupedTaskList } from '@/components/grouped-task-list'
-import { TaskForm } from '@/components/task-form'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
-import { Button } from '@/components/ui/button'
-import { Calendar, BarChart3 } from 'lucide-react'
+import { BarChart3, Calendar } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
+import { useEffect, useState } from "react";
+import { GroupedTaskList } from "@/components/grouped-task-list";
+import { TaskForm } from "@/components/task-form";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import type { CreateTaskRequest, Task, TaskGroup } from "@/lib/types";
 
 export default function TasksPage() {
-  const { data: session, status } = useSession()
-  const router = useRouter()
-  const [tasks, setTasks] = useState<Task[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [showCreateForm, setShowCreateForm] = useState(false)
-  const [isCreating, setIsCreating] = useState(false)
-  const [editingTask, setEditingTask] = useState<Task | null>(null)
-  const [isEditing, setIsEditing] = useState(false)
-  const [isUpdating, setIsUpdating] = useState(false)
-  const [groups, setGroups] = useState<TaskGroup[]>([])
-  const [showAllTasks, setShowAllTasks] = useState(false)
+  const { data: session, status } = useSession();
+  const router = useRouter();
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [isCreating, setIsCreating] = useState(false);
+  const [editingTask, setEditingTask] = useState<Task | null>(null);
+  const [isEditing, setIsEditing] = useState(false);
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [groups, setGroups] = useState<TaskGroup[]>([]);
+  const [showAllTasks, setShowAllTasks] = useState(false);
 
   // Redirect if not authenticated
   useEffect(() => {
-    if (status === 'unauthenticated') {
-      router.push('/auth/signin')
+    if (status === "unauthenticated") {
+      router.push("/auth/signin");
     }
-  }, [status, router])
+  }, [status, router]);
 
   // Fetch tasks
   const fetchTasks = async () => {
     try {
-      const response = await fetch('/api/tasks')
+      const response = await fetch("/api/tasks");
       if (response.ok) {
-        const data = await response.json()
-        setTasks(data.tasks || [])
+        const data = await response.json();
+        setTasks(data.tasks || []);
       } else {
-        console.error('Failed to fetch tasks')
+        console.error("Failed to fetch tasks");
       }
     } catch (error) {
-      console.error('Error fetching tasks:', error)
+      console.error("Error fetching tasks:", error);
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }
+  };
 
   const fetchGroups = async () => {
     try {
-      const response = await fetch('/api/task-groups')
+      const response = await fetch("/api/task-groups");
       if (response.ok) {
-        const data = await response.json()
-        setGroups(data.groups || [])
+        const data = await response.json();
+        setGroups(data.groups || []);
       }
     } catch (error) {
-      console.error('Error fetching groups:', error)
+      console.error("Error fetching groups:", error);
     }
-  }
+  };
 
   useEffect(() => {
     if (session) {
-      fetchTasks()
-      fetchGroups()
+      fetchTasks();
+      fetchGroups();
     }
-  }, [session])
+  }, [session]);
 
   // Create task
   const handleCreateTask = async (taskData: CreateTaskRequest) => {
-    setIsCreating(true)
+    setIsCreating(true);
     try {
-      const response = await fetch('/api/tasks', {
-        method: 'POST',
+      const response = await fetch("/api/tasks", {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify(taskData),
-      })
+      });
 
       if (response.ok) {
-        const data = await response.json()
-        setTasks(prev => [data.task, ...prev])
-        setShowCreateForm(false)
+        const data = await response.json();
+        setTasks((prev) => [data.task, ...prev]);
+        setShowCreateForm(false);
       } else {
-        const error = await response.json()
-        console.error('Failed to create task:', error)
-        throw new Error(error.error || 'Failed to create task')
+        const error = await response.json();
+        console.error("Failed to create task:", error);
+        throw new Error(error.error || "Failed to create task");
       }
     } catch (error) {
-      console.error('Error creating task:', error)
-      throw error
+      console.error("Error creating task:", error);
+      throw error;
     } finally {
-      setIsCreating(false)
+      setIsCreating(false);
     }
-  }
+  };
 
   // Edit task
   const handleEditTask = (taskId: string) => {
-    const task = tasks.find(t => t.id === taskId)
+    const task = tasks.find((t) => t.id === taskId);
     if (task) {
-      setEditingTask(task)
-      setIsEditing(true)
+      setEditingTask(task);
+      setIsEditing(true);
     }
-  }
+  };
 
   const handleUpdateTaskForm = async (taskData: CreateTaskRequest) => {
-    if (!editingTask) return
+    if (!editingTask) return;
 
-    setIsUpdating(true)
+    setIsUpdating(true);
     try {
       const response = await fetch(`/api/tasks/${editingTask.id}`, {
-        method: 'PUT',
+        method: "PUT",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify(taskData),
-      })
+      });
 
       if (response.ok) {
-        const data = await response.json()
-        setTasks(prev => prev.map(task => 
-          task.id === editingTask.id ? data.task : task
-        ))
-        setEditingTask(null)
-        setIsEditing(false)
+        const data = await response.json();
+        setTasks((prev) => prev.map((task) => (task.id === editingTask.id ? data.task : task)));
+        setEditingTask(null);
+        setIsEditing(false);
       } else {
-        const error = await response.json()
-        console.error('Failed to update task:', error)
-        throw new Error(error.error || 'Failed to update task')
+        const error = await response.json();
+        console.error("Failed to update task:", error);
+        throw new Error(error.error || "Failed to update task");
       }
     } catch (error) {
-      console.error('Error updating task:', error)
-      throw error
+      console.error("Error updating task:", error);
+      throw error;
     } finally {
-      setIsUpdating(false)
+      setIsUpdating(false);
     }
-  }
+  };
 
   // Update task status/properties
   const handleUpdateTaskStatus = async (taskId: string, updates: Partial<Task>) => {
     try {
       const response = await fetch(`/api/tasks/${taskId}`, {
-        method: 'PUT',
+        method: "PUT",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify(updates),
-      })
+      });
 
       if (response.ok) {
-        const data = await response.json()
-        setTasks(prev => prev.map(task => 
-          task.id === taskId ? data.task : task
-        ))
+        const data = await response.json();
+        setTasks((prev) => prev.map((task) => (task.id === taskId ? data.task : task)));
       } else {
-        const error = await response.json()
-        console.error('Failed to update task:', error)
-        throw new Error(error.error || 'Failed to update task')
+        const error = await response.json();
+        console.error("Failed to update task:", error);
+        throw new Error(error.error || "Failed to update task");
       }
     } catch (error) {
-      console.error('Error updating task:', error)
-      throw error
+      console.error("Error updating task:", error);
+      throw error;
     }
-  }
+  };
 
   // Delete task
   const handleDeleteTask = async (taskId: string) => {
     try {
       const response = await fetch(`/api/tasks/${taskId}`, {
-        method: 'DELETE',
-      })
+        method: "DELETE",
+      });
 
       if (response.ok) {
-        setTasks(prev => prev.filter(task => task.id !== taskId))
+        setTasks((prev) => prev.filter((task) => task.id !== taskId));
       } else {
-        const error = await response.json()
-        console.error('Failed to delete task:', error)
-        throw new Error(error.error || 'Failed to delete task')
+        const error = await response.json();
+        console.error("Failed to delete task:", error);
+        throw new Error(error.error || "Failed to delete task");
       }
     } catch (error) {
-      console.error('Error deleting task:', error)
-      throw error
+      console.error("Error deleting task:", error);
+      throw error;
     }
-  }
+  };
 
   // Extend task (placeholder for future functionality)
   const handleExtendTask = (taskId: string) => {
-    console.log('Extend task:', taskId)
+    console.log("Extend task:", taskId);
     // TODO: Implement task extension
-  }
+  };
 
   // Unschedule task
   const handleUnscheduleTask = async (taskId: string) => {
     try {
       const response = await fetch(`/api/tasks/${taskId}`, {
-        method: 'PUT',
+        method: "PUT",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({
           scheduled_start: null,
           scheduled_end: null,
         }),
-      })
+      });
 
       if (response.ok) {
-        const data = await response.json()
-        setTasks(prev => prev.map(task => 
-          task.id === taskId ? data.task : task
-        ))
+        const data = await response.json();
+        setTasks((prev) => prev.map((task) => (task.id === taskId ? data.task : task)));
       } else {
-        const error = await response.json()
-        console.error('Failed to unschedule task:', error)
-        throw new Error(error.error || 'Failed to unschedule task')
+        const error = await response.json();
+        console.error("Failed to unschedule task:", error);
+        throw new Error(error.error || "Failed to unschedule task");
       }
     } catch (error) {
-      console.error('Error unscheduling task:', error)
-      throw error
+      console.error("Error unscheduling task:", error);
+      throw error;
     }
-  }
+  };
 
-
-  if (status === 'loading' || isLoading) {
+  if (status === "loading" || isLoading) {
     return (
       <div className="min-h-screen bg-background">
         <div className="container mx-auto px-4 py-8">
@@ -233,11 +232,11 @@ export default function TasksPage() {
           </div>
         </div>
       </div>
-    )
+    );
   }
 
   if (!session) {
-    return null // Will redirect
+    return null; // Will redirect
   }
 
   return (
@@ -253,7 +252,12 @@ export default function TasksPage() {
               </p>
             </div>
             <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm" onClick={() => router.push('/calendar')} className="h-11 px-4 md:h-9 md:px-3">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => router.push("/calendar")}
+                className="h-11 px-4 md:h-9 md:px-3"
+              >
                 <Calendar className="w-4 h-4 md:mr-2" />
                 <span className="hidden sm:inline">Calendar View</span>
               </Button>
@@ -309,8 +313,8 @@ export default function TasksPage() {
             <TaskForm
               onSubmit={handleUpdateTaskForm}
               onCancel={() => {
-                setEditingTask(null)
-                setIsEditing(false)
+                setEditingTask(null);
+                setIsEditing(false);
               }}
               initialData={{
                 title: editingTask.title,
@@ -324,7 +328,7 @@ export default function TasksPage() {
                 estimated_completion_time: editingTask.estimated_completion_time || undefined,
                 depends_on_task_id: editingTask.depends_on_task_id || undefined,
                 scheduled_start: editingTask.scheduled_start || undefined,
-                scheduled_end: editingTask.scheduled_end || undefined
+                scheduled_end: editingTask.scheduled_end || undefined,
               }}
               isLoading={isUpdating}
             />
@@ -332,5 +336,5 @@ export default function TasksPage() {
         </DialogContent>
       </Dialog>
     </div>
-  )
+  );
 }

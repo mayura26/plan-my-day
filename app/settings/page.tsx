@@ -1,24 +1,24 @@
-'use client'
+"use client";
 
-import { useSession } from 'next-auth/react'
-import { useRouter } from 'next/navigation'
-import { useEffect } from 'react'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { TimezoneSelector } from '@/components/timezone-selector'
-import { Separator } from '@/components/ui/separator'
-import { Clock } from 'lucide-react'
+import { Clock } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
+import { useEffect } from "react";
+import { TimezoneSelector } from "@/components/timezone-selector";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
 
 export default function SettingsPage() {
-  const { data: session, status } = useSession()
-  const router = useRouter()
+  const { data: session, status } = useSession();
+  const router = useRouter();
 
   useEffect(() => {
-    if (status === 'unauthenticated') {
-      router.push('/auth/signin')
+    if (status === "unauthenticated") {
+      router.push("/auth/signin");
     }
-  }, [status, router])
+  }, [status, router]);
 
-  if (status === 'loading') {
+  if (status === "loading") {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
@@ -26,11 +26,11 @@ export default function SettingsPage() {
           <p className="text-muted-foreground">Loading...</p>
         </div>
       </div>
-    )
+    );
   }
 
   if (!session) {
-    return null
+    return null;
   }
 
   return (
@@ -53,18 +53,19 @@ export default function SettingsPage() {
               <CardTitle>Timezone Preferences</CardTitle>
             </div>
             <CardDescription>
-              Set your preferred timezone. All dates and times will be displayed in this timezone, regardless of your local system time.
+              Set your preferred timezone. All dates and times will be displayed in this timezone,
+              regardless of your local system time.
             </CardDescription>
           </CardHeader>
           <CardContent>
             <TimezoneSelector />
             <p className="text-sm text-muted-foreground mt-4">
-              Changing your timezone will update how all dates and times are displayed throughout the application.
+              Changing your timezone will update how all dates and times are displayed throughout
+              the application.
             </p>
           </CardContent>
         </Card>
       </div>
     </div>
-  )
+  );
 }
-

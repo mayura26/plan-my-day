@@ -1,127 +1,147 @@
-'use client'
+"use client";
 
-import { Task, TaskGroup } from '@/lib/types'
-import { useDraggable } from '@dnd-kit/core'
-import { CSS } from '@dnd-kit/utilities'
-import { GripVertical } from 'lucide-react'
-import { formatTimeShort } from '@/lib/timezone-utils'
-import { useUserTimezone } from '@/hooks/use-user-timezone'
-import { cn } from '@/lib/utils'
+import { useDraggable } from "@dnd-kit/core";
+import { CSS } from "@dnd-kit/utilities";
+import { GripVertical } from "lucide-react";
+import { useUserTimezone } from "@/hooks/use-user-timezone";
+import { formatTimeShort } from "@/lib/timezone-utils";
+import type { Task, TaskGroup } from "@/lib/types";
+import { cn } from "@/lib/utils";
 
 // Helper function to get priority bar color
 export const getPriorityBarColor = (priority: number) => {
   switch (priority) {
-    case 1: return 'bg-red-500'
-    case 2: return 'bg-orange-500'
-    case 3: return 'bg-yellow-500'
-    case 4: return 'bg-green-500'
-    case 5: return 'bg-blue-500'
-    default: return 'bg-gray-500'
+    case 1:
+      return "bg-red-500";
+    case 2:
+      return "bg-orange-500";
+    case 3:
+      return "bg-yellow-500";
+    case 4:
+      return "bg-green-500";
+    case 5:
+      return "bg-blue-500";
+    default:
+      return "bg-gray-500";
   }
-}
+};
 
 interface ResizableTaskProps {
-  task: Task
-  position: { top: string, height: string }
-  onTaskClick?: (taskId: string) => void
-  onResize?: (taskId: string, newEndTime: Date) => void
-  activeDragId?: string | null
-  resizingTaskId?: string | null
-  selectedGroupId?: string | null
-  groups?: TaskGroup[]
+  task: Task;
+  position: { top: string; height: string };
+  onTaskClick?: (taskId: string) => void;
+  onResize?: (taskId: string, newEndTime: Date) => void;
+  activeDragId?: string | null;
+  resizingTaskId?: string | null;
+  selectedGroupId?: string | null;
+  groups?: TaskGroup[];
 }
 
-export function ResizableTask({ 
-  task, 
-  position, 
-  onTaskClick, 
-  onResize, 
-  activeDragId, 
-  resizingTaskId, 
-  selectedGroupId, 
-  groups = [] 
+export function ResizableTask({
+  task,
+  position,
+  onTaskClick,
+  onResize,
+  activeDragId,
+  resizingTaskId,
+  selectedGroupId,
+  groups = [],
 }: ResizableTaskProps) {
-  const { timezone } = useUserTimezone()
+  const { timezone } = useUserTimezone();
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: task.id,
     disabled: task.locked,
     data: {
-      type: 'task',
+      type: "task",
       task,
     },
-  })
+  });
 
-  const bottomResizeHandleId = `resize-bottom-${task.id}`
-  const topResizeHandleId = `resize-top-${task.id}`
-  
-  const { attributes: bottomResizeAttributes, listeners: bottomResizeListeners, setNodeRef: setBottomResizeRef, isDragging: isBottomResizing } = useDraggable({
+  const bottomResizeHandleId = `resize-bottom-${task.id}`;
+  const topResizeHandleId = `resize-top-${task.id}`;
+
+  const {
+    attributes: bottomResizeAttributes,
+    listeners: bottomResizeListeners,
+    setNodeRef: setBottomResizeRef,
+    isDragging: isBottomResizing,
+  } = useDraggable({
     id: bottomResizeHandleId,
     disabled: task.locked,
     data: {
-      type: 'resize-handle',
+      type: "resize-handle",
       task,
-      resizeDirection: 'bottom',
+      resizeDirection: "bottom",
     },
-  })
+  });
 
-  const { attributes: topResizeAttributes, listeners: topResizeListeners, setNodeRef: setTopResizeRef, isDragging: isTopResizing } = useDraggable({
+  const {
+    attributes: topResizeAttributes,
+    listeners: topResizeListeners,
+    setNodeRef: setTopResizeRef,
+    isDragging: isTopResizing,
+  } = useDraggable({
     id: topResizeHandleId,
     disabled: task.locked,
     data: {
-      type: 'resize-handle',
+      type: "resize-handle",
       task,
-      resizeDirection: 'top',
+      resizeDirection: "top",
     },
-  })
+  });
 
-  const isResizing = isTopResizing || isBottomResizing
-  const isActiveDrag = activeDragId === task.id || activeDragId === bottomResizeHandleId || activeDragId === topResizeHandleId
-  const isTaskResizing = resizingTaskId === task.id || isResizing
+  const isResizing = isTopResizing || isBottomResizing;
+  const isActiveDrag =
+    activeDragId === task.id ||
+    activeDragId === bottomResizeHandleId ||
+    activeDragId === topResizeHandleId;
+  const isTaskResizing = resizingTaskId === task.id || isResizing;
 
   // Determine if task belongs to selected group
   // Handle 'ungrouped' string for ungrouped tasks
-  const taskGroupId = task.group_id || null
-  const belongsToSelectedGroup = selectedGroupId === null 
-    ? false 
-    : selectedGroupId === 'ungrouped' 
-      ? taskGroupId === null 
-      : taskGroupId === selectedGroupId
-  const shouldFade = selectedGroupId !== null && !belongsToSelectedGroup
+  const taskGroupId = task.group_id || null;
+  const belongsToSelectedGroup =
+    selectedGroupId === null
+      ? false
+      : selectedGroupId === "ungrouped"
+        ? taskGroupId === null
+        : taskGroupId === selectedGroupId;
+  const shouldFade = selectedGroupId !== null && !belongsToSelectedGroup;
 
   // Get group color for the task
-  const group = task.group_id ? groups.find(g => g.id === task.group_id) : null
-  const groupColor = group?.color || null
+  const group = task.group_id ? groups.find((g) => g.id === task.group_id) : null;
+  const groupColor = group?.color || null;
 
   // Convert hex color to rgba for background
   const hexToRgba = (hex: string, alpha: number) => {
-    const r = parseInt(hex.slice(1, 3), 16)
-    const g = parseInt(hex.slice(3, 5), 16)
-    const b = parseInt(hex.slice(5, 7), 16)
-    return `rgba(${r}, ${g}, ${b}, ${alpha})`
-  }
+    const r = parseInt(hex.slice(1, 3), 16);
+    const g = parseInt(hex.slice(3, 5), 16);
+    const b = parseInt(hex.slice(5, 7), 16);
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+  };
 
   const style = {
     top: position.top,
     height: position.height,
     transform: CSS.Translate.toString(transform),
     opacity: isDragging || isTaskResizing ? 0.7 : shouldFade ? 0.3 : 1,
-    transition: isDragging || isTaskResizing ? 'none' : 'all 0.2s ease-in-out',
+    transition: isDragging || isTaskResizing ? "none" : "all 0.2s ease-in-out",
     zIndex: isActiveDrag ? 50 : 10,
     ...(groupColor && {
       backgroundColor: hexToRgba(groupColor, 0.4),
       borderColor: groupColor,
     }),
-  }
+  };
 
   // Handle click on the task content (not the drag area)
   const handleTaskClick = (e: React.MouseEvent) => {
     // Stop propagation to prevent triggering on parent elements
-    e.stopPropagation()
+    e.stopPropagation();
     // Only trigger if we're not currently dragging
     if (!isDragging && !isResizing) {
-      onTaskClick?.(task.id)
+      onTaskClick?.(task.id);
     }
-  }
+  };
 
   return (
     <div
@@ -143,7 +163,12 @@ export function ResizableTask({
       onClick={handleTaskClick}
     >
       {/* Priority top bar */}
-      <div className={cn("absolute top-0 left-0 right-0 h-1 rounded-t-md", getPriorityBarColor(task.priority))} />
+      <div
+        className={cn(
+          "absolute top-0 left-0 right-0 h-1 rounded-t-md",
+          getPriorityBarColor(task.priority)
+        )}
+      />
       <div className="text-xs font-medium text-white truncate pointer-events-none mt-1">
         {task.title}
       </div>
@@ -151,9 +176,7 @@ export function ResizableTask({
         {formatTimeShort(task.scheduled_start!, timezone)}
       </div>
       {task.locked && (
-        <div className="text-xs text-white/90 mt-1 flex items-center gap-1">
-          🔒 Locked
-        </div>
+        <div className="text-xs text-white/90 mt-1 flex items-center gap-1">🔒 Locked</div>
       )}
       {!task.locked && (
         <>
@@ -164,7 +187,9 @@ export function ResizableTask({
             {...topResizeAttributes}
             className={cn(
               "absolute top-0 left-0 right-0 h-3 md:h-2 cursor-ns-resize bg-white/20 hover:bg-white/30 transition-opacity flex items-center justify-center touch-none",
-              isTopResizing ? "opacity-100 bg-white/40" : "opacity-50 md:opacity-0 md:group-hover:opacity-100"
+              isTopResizing
+                ? "opacity-100 bg-white/40"
+                : "opacity-50 md:opacity-0 md:group-hover:opacity-100"
             )}
             onMouseDown={(e) => e.stopPropagation()}
           >
@@ -177,7 +202,9 @@ export function ResizableTask({
             {...bottomResizeAttributes}
             className={cn(
               "absolute bottom-0 left-0 right-0 h-3 md:h-2 cursor-ns-resize bg-white/20 hover:bg-white/30 transition-opacity flex items-center justify-center touch-none",
-              isBottomResizing ? "opacity-100 bg-white/40" : "opacity-50 md:opacity-0 md:group-hover:opacity-100"
+              isBottomResizing
+                ? "opacity-100 bg-white/40"
+                : "opacity-50 md:opacity-0 md:group-hover:opacity-100"
             )}
             onMouseDown={(e) => e.stopPropagation()}
           >
@@ -186,6 +213,5 @@ export function ResizableTask({
         </>
       )}
     </div>
-  )
+  );
 }
-

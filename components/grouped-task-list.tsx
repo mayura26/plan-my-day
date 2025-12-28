@@ -1,35 +1,35 @@
-'use client'
+"use client";
 
-import { useState, useEffect } from 'react'
-import { Task, TaskGroup, TaskStatus } from '@/lib/types'
-import { TaskCard } from './task-card'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Badge } from '@/components/ui/badge'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { 
-  sortTasksByPriority, 
-  sortTasksByScheduledTime, 
-  sortTasksByCreatedTime
-} from '@/lib/task-utils'
-import { Plus, Search, Filter, ChevronDown, ChevronRight, Folder } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { ChevronDown, ChevronRight, Filter, Folder, Plus, Search } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import {
+  sortTasksByCreatedTime,
+  sortTasksByPriority,
+  sortTasksByScheduledTime,
+} from "@/lib/task-utils";
+import type { Task, TaskGroup, TaskStatus } from "@/lib/types";
+import { cn } from "@/lib/utils";
+import { TaskCard } from "./task-card";
 
 interface GroupedTaskListProps {
-  tasks: Task[]
-  groups: TaskGroup[]
-  onUpdateTask: (taskId: string, updates: Partial<Task>) => Promise<void>
-  onDeleteTask: (taskId: string) => Promise<void>
-  onEditTask?: (taskId: string) => void
-  onExtendTask?: (taskId: string) => void
-  onUnscheduleTask?: (taskId: string) => Promise<void>
-  onCreateTask?: () => void
-  showAllTasks?: boolean
-  onShowAllTasksChange?: (show: boolean) => void
+  tasks: Task[];
+  groups: TaskGroup[];
+  onUpdateTask: (taskId: string, updates: Partial<Task>) => Promise<void>;
+  onDeleteTask: (taskId: string) => Promise<void>;
+  onEditTask?: (taskId: string) => void;
+  onExtendTask?: (taskId: string) => void;
+  onUnscheduleTask?: (taskId: string) => Promise<void>;
+  onCreateTask?: () => void;
+  showAllTasks?: boolean;
+  onShowAllTasksChange?: (show: boolean) => void;
 }
 
-type GroupByOption = 'status' | 'group' | 'none'
-type FilterOption = 'all' | 'pending' | 'in_progress' | 'completed' | 'cancelled'
+type GroupByOption = "status" | "group" | "none";
+type FilterOption = "all" | "pending" | "in_progress" | "completed" | "cancelled";
 
 export function GroupedTaskList({
   tasks,
@@ -41,148 +41,160 @@ export function GroupedTaskList({
   onUnscheduleTask,
   onCreateTask,
   showAllTasks = false,
-  onShowAllTasksChange
+  onShowAllTasksChange,
 }: GroupedTaskListProps) {
-  const [searchQuery, setSearchQuery] = useState('')
-  const [groupBy, setGroupBy] = useState<GroupByOption>('status')
-  const [filter, setFilter] = useState<FilterOption>('all')
-  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set())
-  const [sortBy, setSortBy] = useState<'priority' | 'scheduled' | 'created'>('priority')
+  const [searchQuery, setSearchQuery] = useState("");
+  const [groupBy, setGroupBy] = useState<GroupByOption>("status");
+  const [filter, setFilter] = useState<FilterOption>("all");
+  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set());
+  const [sortBy, setSortBy] = useState<"priority" | "scheduled" | "created">("priority");
 
   // Initialize with all sections expanded
   useEffect(() => {
-    if (groupBy === 'status') {
-      setExpandedSections(new Set(['pending', 'in_progress', 'completed', 'cancelled']))
-    } else if (groupBy === 'group') {
-      const allGroupIds = ['ungrouped', ...groups.map(g => g.id)]
-      setExpandedSections(new Set(allGroupIds))
+    if (groupBy === "status") {
+      setExpandedSections(new Set(["pending", "in_progress", "completed", "cancelled"]));
+    } else if (groupBy === "group") {
+      const allGroupIds = ["ungrouped", ...groups.map((g) => g.id)];
+      setExpandedSections(new Set(allGroupIds));
     }
-  }, [groupBy, groups])
+  }, [groupBy, groups]);
 
   // Filter tasks
-  const filteredTasks = tasks.filter(task => {
+  const filteredTasks = tasks.filter((task) => {
     // Search filter
-    if (searchQuery && !task.title.toLowerCase().includes(searchQuery.toLowerCase()) && 
-        !task.description?.toLowerCase().includes(searchQuery.toLowerCase())) {
-      return false
+    if (
+      searchQuery &&
+      !task.title.toLowerCase().includes(searchQuery.toLowerCase()) &&
+      !task.description?.toLowerCase().includes(searchQuery.toLowerCase())
+    ) {
+      return false;
     }
 
     // Status filter
-    if (filter !== 'all' && task.status !== filter) {
-      return false
+    if (filter !== "all" && task.status !== filter) {
+      return false;
     }
 
     // Show all tasks or only unscheduled
     if (!showAllTasks) {
-      const isUnscheduled = !task.scheduled_start || !task.scheduled_end
-      if (!isUnscheduled) return false
+      const isUnscheduled = !task.scheduled_start || !task.scheduled_end;
+      if (!isUnscheduled) return false;
     }
 
-    return true
-  })
+    return true;
+  });
 
   // Sort tasks
   const sortedTasks = (() => {
     switch (sortBy) {
-      case 'priority':
-        return sortTasksByPriority(filteredTasks)
-      case 'scheduled':
-        return sortTasksByScheduledTime(filteredTasks)
-      case 'created':
-        return sortTasksByCreatedTime(filteredTasks)
+      case "priority":
+        return sortTasksByPriority(filteredTasks);
+      case "scheduled":
+        return sortTasksByScheduledTime(filteredTasks);
+      case "created":
+        return sortTasksByCreatedTime(filteredTasks);
       default:
-        return filteredTasks
+        return filteredTasks;
     }
-  })()
+  })();
 
   // Group tasks
   const groupedTasks: Record<string, Task[]> = (() => {
-    if (groupBy === 'status') {
+    if (groupBy === "status") {
       const grouped: Record<string, Task[]> = {
         pending: [],
         in_progress: [],
         completed: [],
-        cancelled: []
-      }
-      sortedTasks.forEach(task => {
+        cancelled: [],
+      };
+      sortedTasks.forEach((task) => {
         if (grouped[task.status]) {
-          grouped[task.status].push(task)
+          grouped[task.status].push(task);
         }
-      })
-      return grouped
-    } else if (groupBy === 'group') {
+      });
+      return grouped;
+    } else if (groupBy === "group") {
       const grouped: Record<string, Task[]> = {
-        ungrouped: []
-      }
-      groups.forEach(group => {
-        grouped[group.id] = []
-      })
-      sortedTasks.forEach(task => {
+        ungrouped: [],
+      };
+      groups.forEach((group) => {
+        grouped[group.id] = [];
+      });
+      sortedTasks.forEach((task) => {
         if (task.group_id) {
           if (grouped[task.group_id]) {
-            grouped[task.group_id].push(task)
+            grouped[task.group_id].push(task);
           }
         } else {
-          grouped.ungrouped.push(task)
+          grouped.ungrouped.push(task);
         }
-      })
-      return grouped
+      });
+      return grouped;
     } else {
-      return { all: sortedTasks }
+      return { all: sortedTasks };
     }
-  })()
+  })();
 
   const toggleSection = (sectionId: string) => {
-    setExpandedSections(prev => {
-      const newSet = new Set(prev)
+    setExpandedSections((prev) => {
+      const newSet = new Set(prev);
       if (newSet.has(sectionId)) {
-        newSet.delete(sectionId)
+        newSet.delete(sectionId);
       } else {
-        newSet.add(sectionId)
+        newSet.add(sectionId);
       }
-      return newSet
-    })
-  }
+      return newSet;
+    });
+  };
 
   const expandAll = () => {
-    if (groupBy === 'status') {
-      setExpandedSections(new Set(['pending', 'in_progress', 'completed', 'cancelled']))
-    } else if (groupBy === 'group') {
-      const allGroupIds = ['ungrouped', ...groups.map(g => g.id)]
-      setExpandedSections(new Set(allGroupIds))
+    if (groupBy === "status") {
+      setExpandedSections(new Set(["pending", "in_progress", "completed", "cancelled"]));
+    } else if (groupBy === "group") {
+      const allGroupIds = ["ungrouped", ...groups.map((g) => g.id)];
+      setExpandedSections(new Set(allGroupIds));
     }
-  }
+  };
 
   const collapseAll = () => {
-    setExpandedSections(new Set())
-  }
+    setExpandedSections(new Set());
+  };
 
   const getStatusLabel = (status: TaskStatus) => {
     switch (status) {
-      case 'pending': return 'Pending'
-      case 'in_progress': return 'In Progress'
-      case 'completed': return 'Completed'
-      case 'cancelled': return 'Cancelled'
+      case "pending":
+        return "Pending";
+      case "in_progress":
+        return "In Progress";
+      case "completed":
+        return "Completed";
+      case "cancelled":
+        return "Cancelled";
     }
-  }
+  };
 
   const getStatusColor = (status: TaskStatus) => {
     switch (status) {
-      case 'pending': return 'bg-blue-500'
-      case 'in_progress': return 'bg-yellow-500'
-      case 'completed': return 'bg-green-500'
-      case 'cancelled': return 'bg-red-500'
-      default: return 'bg-gray-500'
+      case "pending":
+        return "bg-blue-500";
+      case "in_progress":
+        return "bg-yellow-500";
+      case "completed":
+        return "bg-green-500";
+      case "cancelled":
+        return "bg-red-500";
+      default:
+        return "bg-gray-500";
     }
-  }
+  };
 
   const taskCounts = {
     all: tasks.length,
-    pending: tasks.filter(t => t.status === 'pending').length,
-    in_progress: tasks.filter(t => t.status === 'in_progress').length,
-    completed: tasks.filter(t => t.status === 'completed').length,
-    cancelled: tasks.filter(t => t.status === 'cancelled').length,
-  }
+    pending: tasks.filter((t) => t.status === "pending").length,
+    in_progress: tasks.filter((t) => t.status === "in_progress").length,
+    completed: tasks.filter((t) => t.status === "completed").length,
+    cancelled: tasks.filter((t) => t.status === "cancelled").length,
+  };
 
   return (
     <div className="space-y-4">
@@ -221,41 +233,41 @@ export function GroupedTaskList({
             {/* Filter buttons */}
             <div className="flex flex-wrap gap-2">
               <Button
-                variant={filter === 'all' ? 'default' : 'outline'}
+                variant={filter === "all" ? "default" : "outline"}
                 size="sm"
-                onClick={() => setFilter('all')}
+                onClick={() => setFilter("all")}
                 className="h-11 px-4 md:h-9 md:px-3 text-sm"
               >
                 All ({taskCounts.all})
               </Button>
               <Button
-                variant={filter === 'pending' ? 'default' : 'outline'}
+                variant={filter === "pending" ? "default" : "outline"}
                 size="sm"
-                onClick={() => setFilter('pending')}
+                onClick={() => setFilter("pending")}
                 className="h-11 px-4 md:h-9 md:px-3 text-sm"
               >
                 Pending ({taskCounts.pending})
               </Button>
               <Button
-                variant={filter === 'in_progress' ? 'default' : 'outline'}
+                variant={filter === "in_progress" ? "default" : "outline"}
                 size="sm"
-                onClick={() => setFilter('in_progress')}
+                onClick={() => setFilter("in_progress")}
                 className="h-11 px-4 md:h-9 md:px-3 text-sm"
               >
                 In Progress ({taskCounts.in_progress})
               </Button>
               <Button
-                variant={filter === 'completed' ? 'default' : 'outline'}
+                variant={filter === "completed" ? "default" : "outline"}
                 size="sm"
-                onClick={() => setFilter('completed')}
+                onClick={() => setFilter("completed")}
                 className="h-11 px-4 md:h-9 md:px-3 text-sm"
               >
                 Completed ({taskCounts.completed})
               </Button>
               <Button
-                variant={filter === 'cancelled' ? 'default' : 'outline'}
+                variant={filter === "cancelled" ? "default" : "outline"}
                 size="sm"
-                onClick={() => setFilter('cancelled')}
+                onClick={() => setFilter("cancelled")}
                 className="h-11 px-4 md:h-9 md:px-3 text-sm"
               >
                 Cancelled ({taskCounts.cancelled})
@@ -269,25 +281,25 @@ export function GroupedTaskList({
                   <span className="text-sm font-medium">Group by:</span>
                   <div className="flex gap-2">
                     <Button
-                      variant={groupBy === 'status' ? 'default' : 'outline'}
+                      variant={groupBy === "status" ? "default" : "outline"}
                       size="sm"
-                      onClick={() => setGroupBy('status')}
+                      onClick={() => setGroupBy("status")}
                       className="h-11 px-4 md:h-9 md:px-3"
                     >
                       Status
                     </Button>
                     <Button
-                      variant={groupBy === 'group' ? 'default' : 'outline'}
+                      variant={groupBy === "group" ? "default" : "outline"}
                       size="sm"
-                      onClick={() => setGroupBy('group')}
+                      onClick={() => setGroupBy("group")}
                       className="h-11 px-4 md:h-9 md:px-3"
                     >
                       Group
                     </Button>
                     <Button
-                      variant={groupBy === 'none' ? 'default' : 'outline'}
+                      variant={groupBy === "none" ? "default" : "outline"}
                       size="sm"
-                      onClick={() => setGroupBy('none')}
+                      onClick={() => setGroupBy("none")}
                       className="h-11 px-4 md:h-9 md:px-3"
                     >
                       None
@@ -299,7 +311,9 @@ export function GroupedTaskList({
                   <span className="text-sm font-medium">Sort by:</span>
                   <select
                     value={sortBy}
-                    onChange={(e) => setSortBy(e.target.value as 'priority' | 'scheduled' | 'created')}
+                    onChange={(e) =>
+                      setSortBy(e.target.value as "priority" | "scheduled" | "created")
+                    }
                     className="px-3 py-2.5 md:py-1.5 text-sm border rounded-md bg-background h-11 md:h-9"
                   >
                     <option value="priority">Priority</option>
@@ -312,21 +326,31 @@ export function GroupedTaskList({
               <div className="flex flex-wrap items-center gap-2 md:gap-4 md:ml-auto">
                 {onShowAllTasksChange && (
                   <Button
-                    variant={showAllTasks ? 'default' : 'outline'}
+                    variant={showAllTasks ? "default" : "outline"}
                     size="sm"
                     onClick={() => onShowAllTasksChange(!showAllTasks)}
                     className="h-11 px-4 md:h-9 md:px-3 text-sm"
                   >
-                    {showAllTasks ? 'Show Unscheduled Only' : 'Show All'}
+                    {showAllTasks ? "Show Unscheduled Only" : "Show All"}
                   </Button>
                 )}
 
-                {groupBy !== 'none' && (
+                {groupBy !== "none" && (
                   <div className="flex items-center gap-2">
-                    <Button variant="outline" size="sm" onClick={expandAll} className="h-11 px-4 md:h-9 md:px-3">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={expandAll}
+                      className="h-11 px-4 md:h-9 md:px-3"
+                    >
                       Expand All
                     </Button>
-                    <Button variant="outline" size="sm" onClick={collapseAll} className="h-11 px-4 md:h-9 md:px-3">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={collapseAll}
+                      className="h-11 px-4 md:h-9 md:px-3"
+                    >
                       Collapse All
                     </Button>
                   </div>
@@ -338,15 +362,15 @@ export function GroupedTaskList({
       </Card>
 
       {/* Grouped Task Lists */}
-      {groupBy === 'status' && (
+      {groupBy === "status" && (
         <div className="space-y-3">
-          {(['pending', 'in_progress', 'completed', 'cancelled'] as TaskStatus[]).map(status => {
-            const sectionTasks = groupedTasks[status] || []
-            if (sectionTasks.length === 0 && filter !== 'all' && filter !== status) return null
+          {(["pending", "in_progress", "completed", "cancelled"] as TaskStatus[]).map((status) => {
+            const sectionTasks = groupedTasks[status] || [];
+            if (sectionTasks.length === 0 && filter !== "all" && filter !== status) return null;
 
             return (
               <Card key={status}>
-                <CardHeader 
+                <CardHeader
                   className="cursor-pointer hover:bg-accent/50 transition-colors"
                   onClick={() => toggleSection(status)}
                 >
@@ -371,7 +395,7 @@ export function GroupedTaskList({
                           No {getStatusLabel(status).toLowerCase()} tasks
                         </p>
                       ) : (
-                        sectionTasks.map(task => (
+                        sectionTasks.map((task) => (
                           <TaskCard
                             key={task.id}
                             task={task}
@@ -388,22 +412,22 @@ export function GroupedTaskList({
                   </CardContent>
                 )}
               </Card>
-            )
+            );
           })}
         </div>
       )}
 
-      {groupBy === 'group' && (
+      {groupBy === "group" && (
         <div className="space-y-3">
           {/* Ungrouped tasks */}
           <Card>
-            <CardHeader 
+            <CardHeader
               className="cursor-pointer hover:bg-accent/50 transition-colors"
-              onClick={() => toggleSection('ungrouped')}
+              onClick={() => toggleSection("ungrouped")}
             >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  {expandedSections.has('ungrouped') ? (
+                  {expandedSections.has("ungrouped") ? (
                     <ChevronDown className="h-4 w-4" />
                   ) : (
                     <ChevronRight className="h-4 w-4" />
@@ -414,7 +438,7 @@ export function GroupedTaskList({
                 </div>
               </div>
             </CardHeader>
-            {expandedSections.has('ungrouped') && (
+            {expandedSections.has("ungrouped") && (
               <CardContent className="pt-0">
                 <div className="space-y-3">
                   {(groupedTasks.ungrouped || []).length === 0 ? (
@@ -422,7 +446,7 @@ export function GroupedTaskList({
                       No ungrouped tasks
                     </p>
                   ) : (
-                    (groupedTasks.ungrouped || []).map(task => (
+                    (groupedTasks.ungrouped || []).map((task) => (
                       <TaskCard
                         key={task.id}
                         task={task}
@@ -440,13 +464,13 @@ export function GroupedTaskList({
           </Card>
 
           {/* Group tasks */}
-          {groups.map(group => {
-            const sectionTasks = groupedTasks[group.id] || []
-            if (sectionTasks.length === 0) return null
+          {groups.map((group) => {
+            const sectionTasks = groupedTasks[group.id] || [];
+            if (sectionTasks.length === 0) return null;
 
             return (
               <Card key={group.id}>
-                <CardHeader 
+                <CardHeader
                   className="cursor-pointer hover:bg-accent/50 transition-colors"
                   onClick={() => toggleSection(group.id)}
                 >
@@ -469,7 +493,7 @@ export function GroupedTaskList({
                 {expandedSections.has(group.id) && (
                   <CardContent className="pt-0">
                     <div className="space-y-3">
-                      {sectionTasks.map(task => (
+                      {sectionTasks.map((task) => (
                         <TaskCard
                           key={task.id}
                           task={task}
@@ -484,12 +508,12 @@ export function GroupedTaskList({
                   </CardContent>
                 )}
               </Card>
-            )
+            );
           })}
         </div>
       )}
 
-      {groupBy === 'none' && (
+      {groupBy === "none" && (
         <div className="space-y-3">
           {sortedTasks.length === 0 ? (
             <Card>
@@ -498,7 +522,7 @@ export function GroupedTaskList({
               </CardContent>
             </Card>
           ) : (
-            sortedTasks.map(task => (
+            sortedTasks.map((task) => (
               <TaskCard
                 key={task.id}
                 task={task}
@@ -513,6 +537,5 @@ export function GroupedTaskList({
         </div>
       )}
     </div>
-  )
+  );
 }
-

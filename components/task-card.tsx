@@ -1,128 +1,141 @@
-'use client'
+"use client";
 
-import { useState } from 'react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
-import { Checkbox } from '@/components/ui/checkbox'
-import { Task, TaskStatus, TaskGroup } from '@/lib/types'
-import { 
-  PRIORITY_LABELS, 
-  STATUS_LABELS, 
-  TASK_TYPE_LABELS,
+import { Calendar, CalendarX, Clock, Lock, MoreHorizontal, Zap } from "lucide-react";
+import { useState } from "react";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
+import { useUserTimezone } from "@/hooks/use-user-timezone";
+import {
+  canExtendTask,
+  canRescheduleTask,
   formatDuration,
+  getEnergyLevelColor,
   getTaskPriorityColor,
   getTaskStatusColor,
-  getEnergyLevelColor,
-  isTaskOverdue,
   isTaskDueSoon,
-  canRescheduleTask,
-  canExtendTask
-} from '@/lib/task-utils'
-import { Clock, Calendar, Zap, Lock, MoreHorizontal, CalendarX } from 'lucide-react'
-import { useUserTimezone } from '@/hooks/use-user-timezone'
-import { formatDateShort, formatTimeRange } from '@/lib/timezone-utils'
-import { cn } from '@/lib/utils'
+  isTaskOverdue,
+  PRIORITY_LABELS,
+  STATUS_LABELS,
+  TASK_TYPE_LABELS,
+} from "@/lib/task-utils";
+import { formatDateShort, formatTimeRange } from "@/lib/timezone-utils";
+import type { Task, TaskGroup, TaskStatus } from "@/lib/types";
+import { cn } from "@/lib/utils";
 
 interface TaskCardProps {
-  task: Task
-  onUpdate: (taskId: string, updates: Partial<Task>) => Promise<void>
-  onDelete: (taskId: string) => Promise<void>
-  onEdit?: (taskId: string) => void
-  onExtend?: (taskId: string) => void
-  onUnschedule?: (taskId: string) => Promise<void>
-  showGroup?: boolean
-  compact?: boolean
-  groups?: TaskGroup[]
+  task: Task;
+  onUpdate: (taskId: string, updates: Partial<Task>) => Promise<void>;
+  onDelete: (taskId: string) => Promise<void>;
+  onEdit?: (taskId: string) => void;
+  onExtend?: (taskId: string) => void;
+  onUnschedule?: (taskId: string) => Promise<void>;
+  showGroup?: boolean;
+  compact?: boolean;
+  groups?: TaskGroup[];
 }
 
-export function TaskCard({ 
-  task, 
-  onUpdate, 
-  onDelete, 
+export function TaskCard({
+  task,
+  onUpdate,
+  onDelete,
   onEdit,
   onExtend,
   onUnschedule,
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   showGroup = false,
   compact = false,
-  groups = []
+  groups = [],
 }: TaskCardProps) {
-  const [isUpdating, setIsUpdating] = useState(false)
-  const [isUnscheduling, setIsUnscheduling] = useState(false)
-  const { timezone } = useUserTimezone()
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [isUnscheduling, setIsUnscheduling] = useState(false);
+  const { timezone } = useUserTimezone();
 
   const handleStatusChange = async (newStatus: TaskStatus) => {
-    setIsUpdating(true)
+    setIsUpdating(true);
     try {
-      await onUpdate(task.id, { status: newStatus })
+      await onUpdate(task.id, { status: newStatus });
     } catch (error) {
-      console.error('Error updating task status:', error)
+      console.error("Error updating task status:", error);
     } finally {
-      setIsUpdating(false)
+      setIsUpdating(false);
     }
-  }
+  };
 
   const handleToggleComplete = async (completed: boolean) => {
-    await handleStatusChange(completed ? 'completed' : 'pending')
-  }
+    await handleStatusChange(completed ? "completed" : "pending");
+  };
 
   const handleUnschedule = async () => {
-    if (!onUnschedule) return
-    setIsUnscheduling(true)
+    if (!onUnschedule) return;
+    setIsUnscheduling(true);
     try {
-      await onUnschedule(task.id)
+      await onUnschedule(task.id);
     } catch (error) {
-      console.error('Error unscheduling task:', error)
+      console.error("Error unscheduling task:", error);
     } finally {
-      setIsUnscheduling(false)
+      setIsUnscheduling(false);
     }
-  }
+  };
 
-  const isOverdue = isTaskOverdue(task)
-  const isDueSoon = isTaskDueSoon(task)
-  const priorityColor = getTaskPriorityColor(task.priority)
-  const statusColor = getTaskStatusColor(task.status)
-  const energyColor = getEnergyLevelColor(task.energy_level_required)
+  const isOverdue = isTaskOverdue(task);
+  const isDueSoon = isTaskDueSoon(task);
+  const priorityColor = getTaskPriorityColor(task.priority);
+  const statusColor = getTaskStatusColor(task.status);
+  const energyColor = getEnergyLevelColor(task.energy_level_required);
 
   // Get group color for the task
-  const group = task.group_id ? groups.find(g => g.id === task.group_id) : null
-  const groupColor = group?.color || null
+  const group = task.group_id ? groups.find((g) => g.id === task.group_id) : null;
+  const groupColor = group?.color || null;
 
   // Get priority color for top bar
   const getPriorityBarColor = (priority: number) => {
     switch (priority) {
-      case 1: return 'bg-red-500'
-      case 2: return 'bg-orange-500'
-      case 3: return 'bg-yellow-500'
-      case 4: return 'bg-green-500'
-      case 5: return 'bg-blue-500'
-      default: return 'bg-gray-500'
+      case 1:
+        return "bg-red-500";
+      case 2:
+        return "bg-orange-500";
+      case 3:
+        return "bg-yellow-500";
+      case 4:
+        return "bg-green-500";
+      case 5:
+        return "bg-blue-500";
+      default:
+        return "bg-gray-500";
     }
-  }
+  };
 
   if (compact) {
     return (
-      <Card 
+      <Card
         className={cn(
           "transition-all hover:shadow-md relative",
-          isOverdue && 'border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/20',
-          groupColor && 'border-l-4'
+          isOverdue && "border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/20",
+          groupColor && "border-l-4"
         )}
         style={groupColor ? { borderLeftColor: groupColor } : undefined}
       >
         {/* Priority top bar */}
-        <div className={cn("absolute top-0 left-0 right-0 h-1 rounded-t-lg", getPriorityBarColor(task.priority))} />
+        <div
+          className={cn(
+            "absolute top-0 left-0 right-0 h-1 rounded-t-lg",
+            getPriorityBarColor(task.priority)
+          )}
+        />
         <CardContent className="p-3 pt-4">
           <div className="flex items-center space-x-3">
             <Checkbox
-              checked={task.status === 'completed'}
+              checked={task.status === "completed"}
               onCheckedChange={handleToggleComplete}
               disabled={isUpdating}
               className="h-5 w-5 md:h-4 md:w-4"
             />
             <div className="flex-1 min-w-0">
-              <h4 className={`text-sm font-medium truncate ${task.status === 'completed' ? 'line-through text-muted-foreground' : ''}`}>
+              <h4
+                className={`text-sm font-medium truncate ${task.status === "completed" ? "line-through text-muted-foreground" : ""}`}
+              >
                 {task.title}
               </h4>
               <div className="flex flex-wrap items-center gap-2 mt-1">
@@ -146,32 +159,39 @@ export function TaskCard({
           </div>
         </CardContent>
       </Card>
-    )
+    );
   }
 
   return (
-    <Card 
+    <Card
       className={cn(
         "transition-all hover:shadow-md relative",
-        isOverdue && 'border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/20',
-        isDueSoon && 'border-yellow-200 dark:border-yellow-800 bg-yellow-50 dark:bg-yellow-950/20',
-        groupColor && 'border-l-4'
+        isOverdue && "border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/20",
+        isDueSoon && "border-yellow-200 dark:border-yellow-800 bg-yellow-50 dark:bg-yellow-950/20",
+        groupColor && "border-l-4"
       )}
       style={groupColor ? { borderLeftColor: groupColor } : undefined}
     >
       {/* Priority top bar */}
-      <div className={cn("absolute top-0 left-0 right-0 h-1 rounded-t-lg", getPriorityBarColor(task.priority))} />
+      <div
+        className={cn(
+          "absolute top-0 left-0 right-0 h-1 rounded-t-lg",
+          getPriorityBarColor(task.priority)
+        )}
+      />
       <CardHeader className="pb-3 pt-4 px-4 md:px-6">
         <div className="flex items-start justify-between gap-2">
           <div className="flex items-start space-x-3 flex-1 min-w-0">
             <Checkbox
-              checked={task.status === 'completed'}
+              checked={task.status === "completed"}
               onCheckedChange={handleToggleComplete}
               disabled={isUpdating}
               className="mt-1 h-5 w-5 md:h-4 md:w-4"
             />
             <div className="flex-1 min-w-0">
-              <CardTitle className={`text-base md:text-lg ${task.status === 'completed' ? 'line-through text-muted-foreground' : ''}`}>
+              <CardTitle
+                className={`text-base md:text-lg ${task.status === "completed" ? "line-through text-muted-foreground" : ""}`}
+              >
                 {task.title}
               </CardTitle>
               {task.description && (
@@ -184,8 +204,8 @@ export function TaskCard({
           <div className="flex items-center space-x-2 flex-shrink-0">
             {task.locked && <Lock className="w-4 h-4 text-muted-foreground" />}
             {onEdit && (
-              <Button 
-                variant="ghost" 
+              <Button
+                variant="ghost"
                 size="sm"
                 onClick={() => onEdit(task.id)}
                 title="Edit task"
@@ -235,7 +255,13 @@ export function TaskCard({
             )}
             <div className="flex items-center">
               <Zap className={`w-4 h-4 mr-1 ${energyColor}`} />
-              {task.energy_level_required}. {task.energy_level_required <= 2 ? 'Low' : task.energy_level_required >= 4 ? 'High' : 'Medium'} Energy
+              {task.energy_level_required}.{" "}
+              {task.energy_level_required <= 2
+                ? "Low"
+                : task.energy_level_required >= 4
+                  ? "High"
+                  : "Medium"}{" "}
+              Energy
             </div>
           </div>
 
@@ -272,10 +298,10 @@ export function TaskCard({
                 className="h-11 px-4 md:h-9 md:px-3"
               >
                 <CalendarX className="w-4 h-4 mr-1" />
-                {isUnscheduling ? 'Unscheduling...' : 'Unschedule'}
+                {isUnscheduling ? "Unscheduling..." : "Unschedule"}
               </Button>
             )}
-            {task.status === 'in_progress' && onExtend && canExtendTask(task) && (
+            {task.status === "in_progress" && onExtend && canExtendTask(task) && (
               <Button
                 size="sm"
                 variant="outline"
@@ -285,22 +311,22 @@ export function TaskCard({
                 Extend
               </Button>
             )}
-            {task.status === 'pending' && (
+            {task.status === "pending" && (
               <Button
                 size="sm"
                 variant="outline"
-                onClick={() => handleStatusChange('in_progress')}
+                onClick={() => handleStatusChange("in_progress")}
                 disabled={isUpdating}
                 className="h-11 px-4 md:h-9 md:px-3"
               >
                 Start
               </Button>
             )}
-            {task.status === 'in_progress' && (
+            {task.status === "in_progress" && (
               <Button
                 size="sm"
                 variant="outline"
-                onClick={() => handleStatusChange('completed')}
+                onClick={() => handleStatusChange("completed")}
                 disabled={isUpdating}
                 className="h-11 px-4 md:h-9 md:px-3"
               >
@@ -319,5 +345,5 @@ export function TaskCard({
         </div>
       </CardContent>
     </Card>
-  )
+  );
 }

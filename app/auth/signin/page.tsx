@@ -1,36 +1,36 @@
-'use client'
+"use client";
 
-import { getProviders, signIn, getSession } from 'next-auth/react'
-import { useEffect, useState } from 'react'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Github, Mail } from 'lucide-react'
-import { useRouter } from 'next/navigation'
+import { Github, Mail } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { getProviders, getSession, signIn } from "next-auth/react";
+import { useEffect, useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 export default function SignIn() {
-  const [providers, setProviders] = useState<any>(null)
-  const [isLoading, setIsLoading] = useState(true)
-  const router = useRouter()
+  const [providers, setProviders] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const router = useRouter();
 
   useEffect(() => {
     const fetchProviders = async () => {
-      const res = await getProviders()
-      setProviders(res)
-      setIsLoading(false)
-    }
+      const res = await getProviders();
+      setProviders(res);
+      setIsLoading(false);
+    };
 
-    fetchProviders()
-  }, [])
+    fetchProviders();
+  }, []);
 
   useEffect(() => {
     const checkSession = async () => {
-      const session = await getSession()
+      const session = await getSession();
       if (session) {
-        router.push('/')
+        router.push("/");
       }
-    }
-    checkSession()
-  }, [router])
+    };
+    checkSession();
+  }, [router]);
 
   if (isLoading) {
     return (
@@ -40,7 +40,7 @@ export default function SignIn() {
           <p className="text-muted-foreground">Loading...</p>
         </div>
       </div>
-    )
+    );
   }
 
   return (
@@ -48,38 +48,37 @@ export default function SignIn() {
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <CardTitle className="text-2xl">Welcome to Plan My Day</CardTitle>
-          <CardDescription>
-            Sign in to access your task management dashboard
-          </CardDescription>
+          <CardDescription>Sign in to access your task management dashboard</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {providers && Object.values(providers).map((provider: any) => (
-            <div key={provider.name}>
-              <Button
-                onClick={() => signIn(provider.id, { callbackUrl: '/' })}
-                className="w-full"
-                variant={provider.name === 'Google' ? 'default' : 'outline'}
-              >
-                {provider.name === 'Google' ? (
-                  <>
-                    <Mail className="w-4 h-4 mr-2" />
-                    Continue with Google
-                  </>
-                ) : (
-                  <>
-                    <Github className="w-4 h-4 mr-2" />
-                    Continue with GitHub
-                  </>
-                )}
-              </Button>
-            </div>
-          ))}
-          
+          {providers &&
+            Object.values(providers).map((provider: any) => (
+              <div key={provider.name}>
+                <Button
+                  onClick={() => signIn(provider.id, { callbackUrl: "/" })}
+                  className="w-full"
+                  variant={provider.name === "Google" ? "default" : "outline"}
+                >
+                  {provider.name === "Google" ? (
+                    <>
+                      <Mail className="w-4 h-4 mr-2" />
+                      Continue with Google
+                    </>
+                  ) : (
+                    <>
+                      <Github className="w-4 h-4 mr-2" />
+                      Continue with GitHub
+                    </>
+                  )}
+                </Button>
+              </div>
+            ))}
+
           <div className="text-center text-sm text-muted-foreground">
             By signing in, you agree to our Terms of Service and Privacy Policy
           </div>
         </CardContent>
       </Card>
     </div>
-  )
+  );
 }

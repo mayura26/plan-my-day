@@ -1,54 +1,75 @@
-'use client'
+"use client";
 
-import { useState, useEffect, useMemo } from 'react'
-import { useSession } from 'next-auth/react'
-import { useRouter } from 'next/navigation'
-import { DndContext, DragEndEvent, DragOverEvent, DragStartEvent, PointerSensor, useSensor, useSensors, closestCenter, DragOverlay } from '@dnd-kit/core'
-import { WeeklyCalendar } from '@/components/weekly-calendar'
-import { DayCalendar } from '@/components/day-calendar'
-import { MonthCalendar } from '@/components/month-calendar'
-import { TaskGroupManager, DraggableTaskItem } from '@/components/task-group-manager'
-import { TaskForm } from '@/components/task-form'
-import { TaskDetailDialog } from '@/components/task-detail-dialog'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Calendar as CalendarIcon, Plus, CheckSquare, Clock, Menu, X, ChevronDown, ChevronRight } from 'lucide-react'
-import { Task, TaskGroup, CreateTaskRequest } from '@/lib/types'
-import { format, startOfWeek, startOfMonth } from 'date-fns'
-import { useUserTimezone } from '@/hooks/use-user-timezone'
-import { createDateInTimezone } from '@/lib/timezone-utils'
-import { cn } from '@/lib/utils'
-import { CalendarSkeleton } from '@/components/calendar-skeleton'
+import {
+  closestCenter,
+  DndContext,
+  type DragEndEvent,
+  type DragOverEvent,
+  DragOverlay,
+  type DragStartEvent,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
+import { format, startOfMonth, startOfWeek } from "date-fns";
+import {
+  Calendar as CalendarIcon,
+  CheckSquare,
+  ChevronDown,
+  ChevronRight,
+  Clock,
+  Menu,
+  Plus,
+  X,
+} from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
+import { useEffect, useMemo, useState } from "react";
+import { CalendarSkeleton } from "@/components/calendar-skeleton";
+import { DayCalendar } from "@/components/day-calendar";
+import { MonthCalendar } from "@/components/month-calendar";
+import { TaskDetailDialog } from "@/components/task-detail-dialog";
+import { TaskForm } from "@/components/task-form";
+import { DraggableTaskItem, TaskGroupManager } from "@/components/task-group-manager";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { WeeklyCalendar } from "@/components/weekly-calendar";
+import { useUserTimezone } from "@/hooks/use-user-timezone";
+import { createDateInTimezone } from "@/lib/timezone-utils";
+import type { CreateTaskRequest, Task, TaskGroup } from "@/lib/types";
+import { cn } from "@/lib/utils";
 
-type ViewMode = 'day' | 'week' | 'month'
+type ViewMode = "day" | "week" | "month";
 
 export default function CalendarPage() {
-  const { data: session, status } = useSession()
-  const { timezone, isLoading: timezoneLoading } = useUserTimezone()
-  const router = useRouter()
-  const [tasks, setTasks] = useState<Task[]>([])
-  const [groups, setGroups] = useState<TaskGroup[]>([])
-  const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
-  const [showCreateForm, setShowCreateForm] = useState(false)
-  const [isCreating, setIsCreating] = useState(false)
-  const [selectedTask, setSelectedTask] = useState<Task | null>(null)
-  const [showTaskDetail, setShowTaskDetail] = useState(false)
-  const [editingTask, setEditingTask] = useState<Task | null>(null)
-  const [isEditing, setIsEditing] = useState(false)
-  const [isUpdating, setIsUpdating] = useState(false)
-  const [showAllTasks, setShowAllTasks] = useState(false)
-  const [activeDragId, setActiveDragId] = useState<string | null>(null)
-  const [resizingTaskId, setResizingTaskId] = useState<string | null>(null)
-  const [draggedTask, setDraggedTask] = useState<Task | null>(null)
-  const [hiddenGroups, setHiddenGroups] = useState<Set<string>>(new Set())
-  const [sidebarOpen, setSidebarOpen] = useState(false)
-  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['task-groups', 'quick-stats', 'unscheduled-tasks']))
-  const [viewMode, setViewMode] = useState<ViewMode>('week')
-  const [currentDate, setCurrentDate] = useState<Date>(new Date())
-  
+  const { data: session, status } = useSession();
+  const { timezone, isLoading: timezoneLoading } = useUserTimezone();
+  const router = useRouter();
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [groups, setGroups] = useState<TaskGroup[]>([]);
+  const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [isCreating, setIsCreating] = useState(false);
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const [showTaskDetail, setShowTaskDetail] = useState(false);
+  const [editingTask, setEditingTask] = useState<Task | null>(null);
+  const [isEditing, setIsEditing] = useState(false);
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [showAllTasks, setShowAllTasks] = useState(false);
+  const [activeDragId, setActiveDragId] = useState<string | null>(null);
+  const [resizingTaskId, setResizingTaskId] = useState<string | null>(null);
+  const [draggedTask, setDraggedTask] = useState<Task | null>(null);
+  const [hiddenGroups, setHiddenGroups] = useState<Set<string>>(new Set());
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [expandedSections, setExpandedSections] = useState<Set<string>>(
+    new Set(["task-groups", "quick-stats", "unscheduled-tasks"])
+  );
+  const [viewMode, setViewMode] = useState<ViewMode>("week");
+  const [currentDate, setCurrentDate] = useState<Date>(new Date());
+
   // Configure drag sensors
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -56,549 +77,550 @@ export default function CalendarPage() {
         distance: 8, // Require 8px movement before drag starts
       },
     })
-  )
+  );
 
   useEffect(() => {
-    if (status === 'unauthenticated') {
-      router.push('/auth/signin')
-      return
+    if (status === "unauthenticated") {
+      router.push("/auth/signin");
+      return;
     }
 
     // Only fetch tasks once authenticated AND timezone is loaded
-    if (status === 'authenticated' && !timezoneLoading) {
-      fetchTasks()
+    if (status === "authenticated" && !timezoneLoading) {
+      fetchTasks();
     }
-  }, [status, router, timezoneLoading])
+  }, [status, router, timezoneLoading]);
 
   const fetchTasks = async () => {
     try {
-      setIsLoading(true)
-      const response = await fetch('/api/tasks')
+      setIsLoading(true);
+      const response = await fetch("/api/tasks");
       if (response.ok) {
-        const data = await response.json()
-        setTasks(data.tasks || [])
+        const data = await response.json();
+        setTasks(data.tasks || []);
       } else {
-        console.error('Failed to fetch tasks')
+        console.error("Failed to fetch tasks");
       }
     } catch (error) {
-      console.error('Error fetching tasks:', error)
+      console.error("Error fetching tasks:", error);
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }
+  };
 
   const fetchGroups = async () => {
     try {
-      const response = await fetch('/api/task-groups')
+      const response = await fetch("/api/task-groups");
       if (response.ok) {
-        const data = await response.json()
-        setGroups(data.groups || [])
+        const data = await response.json();
+        setGroups(data.groups || []);
       }
     } catch (error) {
-      console.error('Error fetching groups:', error)
+      console.error("Error fetching groups:", error);
     }
-  }
+  };
 
   useEffect(() => {
     if (session) {
-      fetchGroups()
+      fetchGroups();
     }
-  }, [session])
+  }, [session]);
 
   const handleTaskClick = (taskId: string) => {
-    const task = tasks.find(t => t.id === taskId)
+    const task = tasks.find((t) => t.id === taskId);
     if (task) {
-      setSelectedTask(task)
-      setShowTaskDetail(true)
-      setSidebarOpen(false) // Close sidebar on mobile when viewing task details
+      setSelectedTask(task);
+      setShowTaskDetail(true);
+      setSidebarOpen(false); // Close sidebar on mobile when viewing task details
     }
-  }
+  };
 
   const handleEditTask = (taskId: string) => {
-    const task = tasks.find(t => t.id === taskId)
+    const task = tasks.find((t) => t.id === taskId);
     if (task) {
-      setEditingTask(task)
-      setIsEditing(true)
+      setEditingTask(task);
+      setIsEditing(true);
     }
-  }
+  };
 
   const handleUpdateTask = async (taskData: CreateTaskRequest) => {
-    if (!editingTask) return
+    if (!editingTask) return;
 
-    setIsUpdating(true)
+    setIsUpdating(true);
     try {
       const response = await fetch(`/api/tasks/${editingTask.id}`, {
-        method: 'PUT',
+        method: "PUT",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify(taskData),
-      })
+      });
 
       if (response.ok) {
-        const data = await response.json()
-        setTasks(prev => prev.map(task => 
-          task.id === editingTask.id ? data.task : task
-        ))
-        setEditingTask(null)
-        setIsEditing(false)
+        const data = await response.json();
+        setTasks((prev) => prev.map((task) => (task.id === editingTask.id ? data.task : task)));
+        setEditingTask(null);
+        setIsEditing(false);
       } else {
-        const error = await response.json()
-        console.error('Failed to update task:', error)
-        throw new Error(error.error || 'Failed to update task')
+        const error = await response.json();
+        console.error("Failed to update task:", error);
+        throw new Error(error.error || "Failed to update task");
       }
     } catch (error) {
-      console.error('Error updating task:', error)
-      throw error
+      console.error("Error updating task:", error);
+      throw error;
     } finally {
-      setIsUpdating(false)
+      setIsUpdating(false);
     }
-  }
+  };
 
   const handleUnscheduleTask = async (taskId: string) => {
     try {
       const response = await fetch(`/api/tasks/${taskId}`, {
-        method: 'PUT',
+        method: "PUT",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({
           scheduled_start: null,
           scheduled_end: null,
         }),
-      })
+      });
 
       if (response.ok) {
-        const data = await response.json()
-        setTasks(prev => prev.map(task => 
-          task.id === taskId ? data.task : task
-        ))
+        const data = await response.json();
+        setTasks((prev) => prev.map((task) => (task.id === taskId ? data.task : task)));
         // Update selected task if it's the one being unscheduled
         if (selectedTask?.id === taskId) {
-          setSelectedTask(data.task)
+          setSelectedTask(data.task);
         }
       } else {
-        const error = await response.json()
-        console.error('Failed to unschedule task:', error)
-        throw new Error(error.error || 'Failed to unschedule task')
+        const error = await response.json();
+        console.error("Failed to unschedule task:", error);
+        throw new Error(error.error || "Failed to unschedule task");
       }
     } catch (error) {
-      console.error('Error unscheduling task:', error)
-      throw error
+      console.error("Error unscheduling task:", error);
+      throw error;
     }
-  }
+  };
 
   const handleDeleteTask = async (taskId: string) => {
     try {
       const response = await fetch(`/api/tasks/${taskId}`, {
-        method: 'DELETE',
-      })
+        method: "DELETE",
+      });
 
       if (response.ok) {
-        setTasks(prev => prev.filter(task => task.id !== taskId))
+        setTasks((prev) => prev.filter((task) => task.id !== taskId));
       } else {
-        const error = await response.json()
-        console.error('Failed to delete task:', error)
-        throw new Error(error.error || 'Failed to delete task')
+        const error = await response.json();
+        console.error("Failed to delete task:", error);
+        throw new Error(error.error || "Failed to delete task");
       }
     } catch (error) {
-      console.error('Error deleting task:', error)
-      throw error
+      console.error("Error deleting task:", error);
+      throw error;
     }
-  }
+  };
 
-  const handleStatusChange = async (taskId: string, status: Task['status']) => {
+  const handleStatusChange = async (taskId: string, status: Task["status"]) => {
     try {
       const response = await fetch(`/api/tasks/${taskId}`, {
-        method: 'PUT',
+        method: "PUT",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({ status }),
-      })
+      });
 
       if (response.ok) {
-        const data = await response.json()
-        setTasks(prev => prev.map(task => 
-          task.id === taskId ? data.task : task
-        ))
+        const data = await response.json();
+        setTasks((prev) => prev.map((task) => (task.id === taskId ? data.task : task)));
         // Update selected task if it's the one being changed
         if (selectedTask?.id === taskId) {
-          setSelectedTask(data.task)
+          setSelectedTask(data.task);
         }
       } else {
-        const error = await response.json()
-        console.error('Failed to update task status:', error)
-        throw new Error(error.error || 'Failed to update task status')
+        const error = await response.json();
+        console.error("Failed to update task status:", error);
+        throw new Error(error.error || "Failed to update task status");
       }
     } catch (error) {
-      console.error('Error updating task status:', error)
-      throw error
+      console.error("Error updating task status:", error);
+      throw error;
     }
-  }
+  };
 
   const handleCreateTask = async (taskData: CreateTaskRequest) => {
-    setIsCreating(true)
+    setIsCreating(true);
     try {
-      const response = await fetch('/api/tasks', {
-        method: 'POST',
+      const response = await fetch("/api/tasks", {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify(taskData),
-      })
+      });
 
       if (response.ok) {
-        const data = await response.json()
-        setTasks(prev => [data.task, ...prev])
-        setShowCreateForm(false)
+        const data = await response.json();
+        setTasks((prev) => [data.task, ...prev]);
+        setShowCreateForm(false);
       } else {
-        const error = await response.json()
-        console.error('Failed to create task:', error)
-        throw new Error(error.error || 'Failed to create task')
+        const error = await response.json();
+        console.error("Failed to create task:", error);
+        throw new Error(error.error || "Failed to create task");
       }
     } catch (error) {
-      console.error('Error creating task:', error)
-      throw error
+      console.error("Error creating task:", error);
+      throw error;
     } finally {
-      setIsCreating(false)
+      setIsCreating(false);
     }
-  }
+  };
 
   // Show all tasks - selectedGroupId is now only used for visual highlighting in sidebar
   // Filter out tasks from hidden groups
-  const filteredTasks = tasks.filter(task => {
+  const filteredTasks = tasks.filter((task) => {
     if (!task.group_id) {
       // Ungrouped tasks
-      return !hiddenGroups.has('ungrouped')
+      return !hiddenGroups.has("ungrouped");
     }
     // Grouped tasks
-    return !hiddenGroups.has(task.group_id)
-  })
+    return !hiddenGroups.has(task.group_id);
+  });
 
-  const scheduledTasks = showAllTasks 
-    ? filteredTasks.filter(task => task.scheduled_start && task.scheduled_end)
-    : filteredTasks.filter(task => task.scheduled_start && task.scheduled_end)
-  
-  const unscheduledTasks = filteredTasks.filter(task => !task.scheduled_start || !task.scheduled_end)
-  
+  const scheduledTasks = showAllTasks
+    ? filteredTasks.filter((task) => task.scheduled_start && task.scheduled_end)
+    : filteredTasks.filter((task) => task.scheduled_start && task.scheduled_end);
+
+  const unscheduledTasks = filteredTasks.filter(
+    (task) => !task.scheduled_start || !task.scheduled_end
+  );
+
   // For display in calendar - only show scheduled tasks
-  const calendarTasks = scheduledTasks
+  const calendarTasks = scheduledTasks;
 
   const handleDragStart = (event: DragStartEvent) => {
-    const activeData = event.active.data.current
-    const activeId = event.active.id as string
-    setActiveDragId(activeId)
-    
+    const activeData = event.active.data.current;
+    const activeId = event.active.id as string;
+    setActiveDragId(activeId);
+
     // Track if we're resizing
-    if (activeData?.type === 'resize-handle') {
-      setResizingTaskId(activeData.task?.id || null)
-    } else if (activeData?.type === 'sidebar-task' || activeData?.type === 'task') {
+    if (activeData?.type === "resize-handle") {
+      setResizingTaskId(activeData.task?.id || null);
+    } else if (activeData?.type === "sidebar-task" || activeData?.type === "task") {
       // Track the dragged task for the overlay
-      setDraggedTask(activeData.task as Task)
+      setDraggedTask(activeData.task as Task);
     }
-  }
+  };
 
   const handleDragOver = (event: DragOverEvent) => {
     // Handle real-time resize preview if needed
     // For now, we'll handle resize on drop
-  }
+  };
 
   const handleDragEnd = async (event: DragEndEvent) => {
-    setActiveDragId(null)
-    setResizingTaskId(null)
-    setDraggedTask(null)
-    const { active, over } = event
-    
-    if (!over) return
-    
-    const activeData = active.data.current
-    const dropData = over.data.current
-    
+    setActiveDragId(null);
+    setResizingTaskId(null);
+    setDraggedTask(null);
+    const { active, over } = event;
+
+    if (!over) return;
+
+    const activeData = active.data.current;
+    const dropData = over.data.current;
+
     // Handle resize handle drag
-    if (activeData?.type === 'resize-handle') {
-      const task = activeData.task as Task
-      const resizeDirection = activeData.resizeDirection as 'top' | 'bottom'
-      
-      if (!task.locked && dropData?.type === 'calendar-slot' && task.scheduled_start && task.scheduled_end) {
+    if (activeData?.type === "resize-handle") {
+      const task = activeData.task as Task;
+      const resizeDirection = activeData.resizeDirection as "top" | "bottom";
+
+      if (
+        !task.locked &&
+        dropData?.type === "calendar-slot" &&
+        task.scheduled_start &&
+        task.scheduled_end
+      ) {
         // Calculate new time based on drop position
-        const { day, time } = dropData
+        const { day, time } = dropData;
         // Snap to 15-minute intervals
-        const totalMinutes = time * 60
-        const snappedMinutes = Math.round(totalMinutes / 15) * 15
-        const hours = Math.floor(snappedMinutes / 60)
-        const minutes = snappedMinutes % 60
-        
-        if (resizeDirection === 'bottom') {
+        const totalMinutes = time * 60;
+        const snappedMinutes = Math.round(totalMinutes / 15) * 15;
+        const hours = Math.floor(snappedMinutes / 60);
+        const minutes = snappedMinutes % 60;
+
+        if (resizeDirection === "bottom") {
           // Resize from bottom - change end time
-          const newEndDate = createDateInTimezone(day, hours, minutes, timezone)
-          const startDate = new Date(task.scheduled_start)
-          
+          const newEndDate = createDateInTimezone(day, hours, minutes, timezone);
+          const startDate = new Date(task.scheduled_start);
+
           // Ensure end time is after start time
           if (newEndDate > startDate) {
-            await handleTaskResize(task.id, newEndDate)
+            await handleTaskResize(task.id, newEndDate);
           }
-        } else if (resizeDirection === 'top') {
+        } else if (resizeDirection === "top") {
           // Resize from top - change start time
-          const newStartDate = createDateInTimezone(day, hours, minutes, timezone)
-          const endDate = new Date(task.scheduled_end)
-          
+          const newStartDate = createDateInTimezone(day, hours, minutes, timezone);
+          const endDate = new Date(task.scheduled_end);
+
           // Ensure start time is before end time
           if (newStartDate < endDate) {
-            await handleTaskResizeStart(task.id, newStartDate)
+            await handleTaskResizeStart(task.id, newStartDate);
           }
         }
       }
-      return
+      return;
     }
-    
+
     // Handle task drag (scheduling/rescheduling)
     // Get task from active data (for sidebar tasks) or find it (for calendar tasks)
-    const taskId = active.id as string
-    let task = activeData?.task as Task | undefined
+    const taskId = active.id as string;
+    let task = activeData?.task as Task | undefined;
     if (!task) {
-      task = tasks.find(t => t.id === taskId)
+      task = tasks.find((t) => t.id === taskId);
     }
-    
-    if (!task || task.locked) return
-    
+
+    if (!task || task.locked) return;
+
     // Get drop target data
-    if (dropData?.type === 'calendar-slot') {
-      const { day, time } = dropData
-      
+    if (dropData?.type === "calendar-slot") {
+      const { day, time } = dropData;
+
       // If task is already scheduled, reschedule it; otherwise schedule it
       if (task.scheduled_start) {
-        await handleRescheduleTaskDrop(taskId, day, time)
+        await handleRescheduleTaskDrop(taskId, day, time);
       } else {
-        await handleScheduleTaskDrop(taskId, day, time)
+        await handleScheduleTaskDrop(taskId, day, time);
       }
     }
-  }
-  
+  };
+
   const handleTaskResize = async (taskId: string, newEndTime: Date) => {
-    const task = tasks.find(t => t.id === taskId)
-    if (!task || task.locked || !task.scheduled_start) return
-    
-    const startDate = new Date(task.scheduled_start)
-    
+    const task = tasks.find((t) => t.id === taskId);
+    if (!task || task.locked || !task.scheduled_start) return;
+
+    const startDate = new Date(task.scheduled_start);
+
     // Ensure end time is after start time
-    if (newEndTime <= startDate) return
-    
+    if (newEndTime <= startDate) return;
+
     // newEndTime is already snapped to 15-minute intervals from the drop position
     // Calculate duration based on the new end time
-    const totalMinutes = (newEndTime.getTime() - startDate.getTime()) / 60000
-    const duration = Math.max(15, Math.round(totalMinutes / 15) * 15) // Minimum 15 minutes
-    
+    const totalMinutes = (newEndTime.getTime() - startDate.getTime()) / 60000;
+    const duration = Math.max(15, Math.round(totalMinutes / 15) * 15); // Minimum 15 minutes
+
     try {
       const response = await fetch(`/api/tasks/${taskId}`, {
-        method: 'PUT',
+        method: "PUT",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({
           scheduled_end: newEndTime.toISOString(),
           duration: duration,
         }),
-      })
-      
+      });
+
       if (response.ok) {
-        const data = await response.json()
-        setTasks(prev => prev.map(t => t.id === taskId ? data.task : t))
+        const data = await response.json();
+        setTasks((prev) => prev.map((t) => (t.id === taskId ? data.task : t)));
       }
     } catch (error) {
-      console.error('Error resizing task:', error)
+      console.error("Error resizing task:", error);
     }
-  }
+  };
 
   const handleTaskResizeStart = async (taskId: string, newStartTime: Date) => {
-    const task = tasks.find(t => t.id === taskId)
-    if (!task || task.locked || !task.scheduled_start || !task.scheduled_end) return
-    
-    const endDate = new Date(task.scheduled_end)
-    
+    const task = tasks.find((t) => t.id === taskId);
+    if (!task || task.locked || !task.scheduled_start || !task.scheduled_end) return;
+
+    const endDate = new Date(task.scheduled_end);
+
     // Ensure start time is before end time
-    if (newStartTime >= endDate) return
-    
+    if (newStartTime >= endDate) return;
+
     // The newStartTime is already snapped to 15-minute intervals from the drop position
     // Calculate new duration based on the new start time and existing end time
-    const totalMinutes = (endDate.getTime() - newStartTime.getTime()) / 60000
-    const snappedMinutes = Math.max(15, Math.round(totalMinutes / 15) * 15) // Minimum 15 minutes
-    const duration = snappedMinutes
-    
+    const totalMinutes = (endDate.getTime() - newStartTime.getTime()) / 60000;
+    const snappedMinutes = Math.max(15, Math.round(totalMinutes / 15) * 15); // Minimum 15 minutes
+    const duration = snappedMinutes;
+
     try {
       const response = await fetch(`/api/tasks/${taskId}`, {
-        method: 'PUT',
+        method: "PUT",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({
           scheduled_start: newStartTime.toISOString(),
           duration: duration,
         }),
-      })
-      
+      });
+
       if (response.ok) {
-        const data = await response.json()
-        setTasks(prev => prev.map(t => t.id === taskId ? data.task : t))
+        const data = await response.json();
+        setTasks((prev) => prev.map((t) => (t.id === taskId ? data.task : t)));
       }
     } catch (error) {
-      console.error('Error resizing task start:', error)
+      console.error("Error resizing task start:", error);
     }
-  }
+  };
 
   const handleScheduleTaskDrop = async (taskId: string, day: Date, time: number) => {
-    const task = tasks.find(t => t.id === taskId)
-    if (!task || task.locked) return
-    
+    const task = tasks.find((t) => t.id === taskId);
+    if (!task || task.locked) return;
+
     // Snap to 15-minute intervals
-    const totalMinutes = time * 60
-    const snappedMinutes = Math.round(totalMinutes / 15) * 15
-    const hours = Math.floor(snappedMinutes / 60)
-    const minutes = snappedMinutes % 60
-    
-    const duration = task.duration || task.estimated_completion_time || 60 // Default to 60 minutes
+    const totalMinutes = time * 60;
+    const snappedMinutes = Math.round(totalMinutes / 15) * 15;
+    const hours = Math.floor(snappedMinutes / 60);
+    const minutes = snappedMinutes % 60;
+
+    const duration = task.duration || task.estimated_completion_time || 60; // Default to 60 minutes
     // Create the start date in the user's timezone, then convert to UTC
-    const startDate = createDateInTimezone(day, hours, minutes, timezone)
-    const endDate = new Date(startDate.getTime() + duration * 60000)
-    
+    const startDate = createDateInTimezone(day, hours, minutes, timezone);
+    const endDate = new Date(startDate.getTime() + duration * 60000);
+
     try {
       const response = await fetch(`/api/tasks/${taskId}`, {
-        method: 'PUT',
+        method: "PUT",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({
           scheduled_start: startDate.toISOString(),
           scheduled_end: endDate.toISOString(),
         }),
-      })
-      
+      });
+
       if (response.ok) {
-        const data = await response.json()
-        setTasks(prev => prev.map(t => t.id === taskId ? data.task : t))
+        const data = await response.json();
+        setTasks((prev) => prev.map((t) => (t.id === taskId ? data.task : t)));
       }
     } catch (error) {
-      console.error('Error scheduling task:', error)
+      console.error("Error scheduling task:", error);
     }
-  }
+  };
 
   const handleRescheduleTaskDrop = async (taskId: string, day: Date, time: number) => {
-    const task = tasks.find(t => t.id === taskId)
-    if (!task || task.locked || !task.scheduled_start || !task.scheduled_end) return
-    
+    const task = tasks.find((t) => t.id === taskId);
+    if (!task || task.locked || !task.scheduled_start || !task.scheduled_end) return;
+
     // Snap to 15-minute intervals
-    const totalMinutes = time * 60
-    const snappedMinutes = Math.round(totalMinutes / 15) * 15
-    const hours = Math.floor(snappedMinutes / 60)
-    const minutes = snappedMinutes % 60
-    
+    const totalMinutes = time * 60;
+    const snappedMinutes = Math.round(totalMinutes / 15) * 15;
+    const hours = Math.floor(snappedMinutes / 60);
+    const minutes = snappedMinutes % 60;
+
     // Calculate duration from existing schedule
-    const oldStart = new Date(task.scheduled_start)
-    const oldEnd = new Date(task.scheduled_end)
-    const duration = (oldEnd.getTime() - oldStart.getTime()) / 60000 // in minutes
-    
+    const oldStart = new Date(task.scheduled_start);
+    const oldEnd = new Date(task.scheduled_end);
+    const duration = (oldEnd.getTime() - oldStart.getTime()) / 60000; // in minutes
+
     // Create the start date in the user's timezone, then convert to UTC
-    const startDate = createDateInTimezone(day, hours, minutes, timezone)
-    const endDate = new Date(startDate.getTime() + duration * 60000)
-    
+    const startDate = createDateInTimezone(day, hours, minutes, timezone);
+    const endDate = new Date(startDate.getTime() + duration * 60000);
+
     try {
       const response = await fetch(`/api/tasks/${taskId}`, {
-        method: 'PUT',
+        method: "PUT",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({
           scheduled_start: startDate.toISOString(),
           scheduled_end: endDate.toISOString(),
         }),
-      })
-      
+      });
+
       if (response.ok) {
-        const data = await response.json()
-        setTasks(prev => prev.map(t => t.id === taskId ? data.task : t))
+        const data = await response.json();
+        setTasks((prev) => prev.map((t) => (t.id === taskId ? data.task : t)));
       }
     } catch (error) {
-      console.error('Error rescheduling task:', error)
+      console.error("Error rescheduling task:", error);
     }
-  }
+  };
 
   const handleViewModeChange = (mode: ViewMode) => {
-    setViewMode(mode)
+    setViewMode(mode);
     // When switching views, update currentDate appropriately
-    if (mode === 'day') {
+    if (mode === "day") {
       // If switching to day view, use today or keep current date
-      setCurrentDate(new Date())
-    } else if (mode === 'month') {
+      setCurrentDate(new Date());
+    } else if (mode === "month") {
       // If switching to month view, use current month
-      setCurrentDate(startOfMonth(new Date()))
+      setCurrentDate(startOfMonth(new Date()));
     } else {
       // Week view - use current week
-      setCurrentDate(new Date())
+      setCurrentDate(new Date());
     }
-  }
+  };
 
   // View toggle buttons - mobile (abbreviated)
   const mobileViewToggleButtons = (
     <>
       <Button
-        variant={viewMode === 'day' ? 'default' : 'outline'}
+        variant={viewMode === "day" ? "default" : "outline"}
         size="sm"
-        onClick={() => handleViewModeChange('day')}
+        onClick={() => handleViewModeChange("day")}
         className="min-w-[2.5rem]"
       >
         D
       </Button>
       <Button
-        variant={viewMode === 'week' ? 'default' : 'outline'}
+        variant={viewMode === "week" ? "default" : "outline"}
         size="sm"
-        onClick={() => handleViewModeChange('week')}
+        onClick={() => handleViewModeChange("week")}
         className="min-w-[2.5rem]"
       >
         W
       </Button>
       <Button
-        variant={viewMode === 'month' ? 'default' : 'outline'}
+        variant={viewMode === "month" ? "default" : "outline"}
         size="sm"
-        onClick={() => handleViewModeChange('month')}
+        onClick={() => handleViewModeChange("month")}
         className="min-w-[2.5rem]"
       >
         M
       </Button>
     </>
-  )
+  );
 
   // View toggle buttons - desktop (full text)
   const desktopViewToggleButtons = (
     <>
       <Button
-        variant={viewMode === 'day' ? 'default' : 'outline'}
+        variant={viewMode === "day" ? "default" : "outline"}
         size="sm"
-        onClick={() => handleViewModeChange('day')}
+        onClick={() => handleViewModeChange("day")}
       >
         Day
       </Button>
       <Button
-        variant={viewMode === 'week' ? 'default' : 'outline'}
+        variant={viewMode === "week" ? "default" : "outline"}
         size="sm"
-        onClick={() => handleViewModeChange('week')}
+        onClick={() => handleViewModeChange("week")}
       >
         Week
       </Button>
       <Button
-        variant={viewMode === 'month' ? 'default' : 'outline'}
+        variant={viewMode === "month" ? "default" : "outline"}
         size="sm"
-        onClick={() => handleViewModeChange('month')}
+        onClick={() => handleViewModeChange("month")}
       >
         Month
       </Button>
     </>
-  )
+  );
 
   // Show skeleton while loading session, timezone, or tasks
   // Don't render calendar until timezone is loaded and stable
-  const isReady = status === 'authenticated' && !timezoneLoading && !isLoading && !!session
+  const isReady = status === "authenticated" && !timezoneLoading && !isLoading && !!session;
   if (!isReady) {
-    return <CalendarSkeleton />
+    return <CalendarSkeleton />;
   }
 
   return (
@@ -622,7 +644,7 @@ export default function CalendarPage() {
         <div
           className={cn(
             "fixed md:static inset-y-0 left-0 z-50 md:z-auto w-[85vw] max-w-sm md:w-80 border-r overflow-y-auto bg-background transform transition-transform duration-300 ease-in-out",
-            sidebarOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
+            sidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
           )}
         >
           <div className="p-4 space-y-4">
@@ -639,11 +661,11 @@ export default function CalendarPage() {
               </Button>
             </div>
             {/* Add Task Button */}
-            <Button 
-              className="w-full h-11" 
+            <Button
+              className="w-full h-11"
               onClick={() => {
-                setShowCreateForm(true)
-                setSidebarOpen(false) // Close sidebar on mobile when creating task
+                setShowCreateForm(true);
+                setSidebarOpen(false); // Close sidebar on mobile when creating task
               }}
             >
               <Plus className="h-4 w-4 mr-2" />
@@ -652,20 +674,20 @@ export default function CalendarPage() {
 
             {/* Task Groups */}
             <div className="border rounded-lg overflow-hidden">
-              <div 
+              <div
                 className="px-4 py-3 border-b cursor-pointer hover:bg-accent/50 transition-colors flex items-center justify-between bg-card"
                 onClick={() => {
-                  const newSet = new Set(expandedSections)
-                  if (newSet.has('task-groups')) {
-                    newSet.delete('task-groups')
+                  const newSet = new Set(expandedSections);
+                  if (newSet.has("task-groups")) {
+                    newSet.delete("task-groups");
                   } else {
-                    newSet.add('task-groups')
+                    newSet.add("task-groups");
                   }
-                  setExpandedSections(newSet)
+                  setExpandedSections(newSet);
                 }}
               >
                 <div className="flex items-center gap-2">
-                  {expandedSections.has('task-groups') ? (
+                  {expandedSections.has("task-groups") ? (
                     <ChevronDown className="h-4 w-4" />
                   ) : (
                     <ChevronRight className="h-4 w-4" />
@@ -673,7 +695,7 @@ export default function CalendarPage() {
                   <h3 className="text-sm font-semibold">Task Groups</h3>
                 </div>
               </div>
-              {expandedSections.has('task-groups') && (
+              {expandedSections.has("task-groups") && (
                 <div>
                   <TaskGroupManager
                     onGroupSelect={setSelectedGroupId}
@@ -688,118 +710,110 @@ export default function CalendarPage() {
               )}
             </div>
 
-          {/* Quick Stats */}
-          <Card>
-            <CardHeader 
-              className="cursor-pointer hover:bg-accent/50 transition-colors"
-              onClick={() => {
-                const newSet = new Set(expandedSections)
-                if (newSet.has('quick-stats')) {
-                  newSet.delete('quick-stats')
-                } else {
-                  newSet.add('quick-stats')
-                }
-                setExpandedSections(newSet)
-              }}
-            >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  {expandedSections.has('quick-stats') ? (
-                    <ChevronDown className="h-4 w-4" />
-                  ) : (
-                    <ChevronRight className="h-4 w-4" />
-                  )}
-                  <CardTitle className="text-sm flex items-center gap-2">
-                    <Clock className="h-4 w-4" />
-                    Scheduled Tasks
-                  </CardTitle>
-                </div>
-              </div>
-            </CardHeader>
-            {expandedSections.has('quick-stats') && (
-              <CardContent>
-                <div className="space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span>Scheduled:</span>
-                    <span className="font-medium text-green-600">
-                      {scheduledTasks.length}
-                    </span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span>Unscheduled:</span>
-                    <span className="font-medium text-orange-600">
-                      {unscheduledTasks.length}
-                    </span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span>High Priority:</span>
-                    <span className="font-medium text-red-600">
-                      {filteredTasks.filter(t => t.priority <= 2).length}
-                    </span>
-                  </div>
-                </div>
-              </CardContent>
-            )}
-          </Card>
-
-          {/* Unscheduled Tasks */}
-          {unscheduledTasks.length > 0 && (
+            {/* Quick Stats */}
             <Card>
-              <CardHeader 
+              <CardHeader
                 className="cursor-pointer hover:bg-accent/50 transition-colors"
                 onClick={() => {
-                  const newSet = new Set(expandedSections)
-                  if (newSet.has('unscheduled-tasks')) {
-                    newSet.delete('unscheduled-tasks')
+                  const newSet = new Set(expandedSections);
+                  if (newSet.has("quick-stats")) {
+                    newSet.delete("quick-stats");
                   } else {
-                    newSet.add('unscheduled-tasks')
+                    newSet.add("quick-stats");
                   }
-                  setExpandedSections(newSet)
+                  setExpandedSections(newSet);
                 }}
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    {expandedSections.has('unscheduled-tasks') ? (
+                    {expandedSections.has("quick-stats") ? (
                       <ChevronDown className="h-4 w-4" />
                     ) : (
                       <ChevronRight className="h-4 w-4" />
                     )}
                     <CardTitle className="text-sm flex items-center gap-2">
-                      <CheckSquare className="h-4 w-4" />
-                      Unscheduled ({unscheduledTasks.length})
+                      <Clock className="h-4 w-4" />
+                      Scheduled Tasks
                     </CardTitle>
                   </div>
                 </div>
               </CardHeader>
-              {expandedSections.has('unscheduled-tasks') && (
-                <CardContent className="space-y-2">
-                  {unscheduledTasks.slice(0, 5).map((task) => (
-                    <DraggableTaskItem
-                      key={task.id}
-                      task={task}
-                      onTaskClick={handleTaskClick}
-                    />
-                  ))}
-                  {unscheduledTasks.length > 5 && (
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
-                      className="w-full"
-                      onClick={() => router.push('/tasks')}
-                    >
-                      View all {unscheduledTasks.length} tasks
-                    </Button>
-                  )}
+              {expandedSections.has("quick-stats") && (
+                <CardContent>
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span>Scheduled:</span>
+                      <span className="font-medium text-green-600">{scheduledTasks.length}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span>Unscheduled:</span>
+                      <span className="font-medium text-orange-600">{unscheduledTasks.length}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span>High Priority:</span>
+                      <span className="font-medium text-red-600">
+                        {filteredTasks.filter((t) => t.priority <= 2).length}
+                      </span>
+                    </div>
+                  </div>
                 </CardContent>
               )}
             </Card>
-          )}
+
+            {/* Unscheduled Tasks */}
+            {unscheduledTasks.length > 0 && (
+              <Card>
+                <CardHeader
+                  className="cursor-pointer hover:bg-accent/50 transition-colors"
+                  onClick={() => {
+                    const newSet = new Set(expandedSections);
+                    if (newSet.has("unscheduled-tasks")) {
+                      newSet.delete("unscheduled-tasks");
+                    } else {
+                      newSet.add("unscheduled-tasks");
+                    }
+                    setExpandedSections(newSet);
+                  }}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      {expandedSections.has("unscheduled-tasks") ? (
+                        <ChevronDown className="h-4 w-4" />
+                      ) : (
+                        <ChevronRight className="h-4 w-4" />
+                      )}
+                      <CardTitle className="text-sm flex items-center gap-2">
+                        <CheckSquare className="h-4 w-4" />
+                        Unscheduled ({unscheduledTasks.length})
+                      </CardTitle>
+                    </div>
+                  </div>
+                </CardHeader>
+                {expandedSections.has("unscheduled-tasks") && (
+                  <CardContent className="space-y-2">
+                    {unscheduledTasks.slice(0, 5).map((task) => (
+                      <DraggableTaskItem key={task.id} task={task} onTaskClick={handleTaskClick} />
+                    ))}
+                    {unscheduledTasks.length > 5 && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="w-full"
+                        onClick={() => router.push("/tasks")}
+                      >
+                        View all {unscheduledTasks.length} tasks
+                      </Button>
+                    )}
+                  </CardContent>
+                )}
+              </Card>
+            )}
           </div>
         </div>
 
         {/* Main Calendar Area */}
         <div className="flex-1 overflow-hidden w-full">
-          {viewMode === 'day' && (
+          {viewMode === "day" && (
             <DayCalendar
               tasks={calendarTasks}
               timezone={timezone}
@@ -818,8 +832,8 @@ export default function CalendarPage() {
               desktopViewToggleButtons={desktopViewToggleButtons}
             />
           )}
-          {viewMode === 'week' && (
-            <WeeklyCalendar 
+          {viewMode === "week" && (
+            <WeeklyCalendar
               tasks={calendarTasks}
               timezone={timezone}
               onTaskClick={handleTaskClick}
@@ -835,7 +849,7 @@ export default function CalendarPage() {
               desktopViewToggleButtons={desktopViewToggleButtons}
             />
           )}
-          {viewMode === 'month' && (
+          {viewMode === "month" && (
             <MonthCalendar
               tasks={calendarTasks}
               timezone={timezone}
@@ -846,8 +860,8 @@ export default function CalendarPage() {
               currentDate={currentDate}
               onDateChange={setCurrentDate}
               onDateClick={(date) => {
-                setCurrentDate(date)
-                setViewMode('day')
+                setCurrentDate(date);
+                setViewMode("day");
               }}
               mobileViewToggleButtons={mobileViewToggleButtons}
               desktopViewToggleButtons={desktopViewToggleButtons}
@@ -891,8 +905,8 @@ export default function CalendarPage() {
             <TaskForm
               onSubmit={handleUpdateTask}
               onCancel={() => {
-                setEditingTask(null)
-                setIsEditing(false)
+                setEditingTask(null);
+                setIsEditing(false);
               }}
               initialData={{
                 title: editingTask.title,
@@ -906,7 +920,7 @@ export default function CalendarPage() {
                 estimated_completion_time: editingTask.estimated_completion_time || undefined,
                 depends_on_task_id: editingTask.depends_on_task_id || undefined,
                 scheduled_start: editingTask.scheduled_start || undefined,
-                scheduled_end: editingTask.scheduled_end || undefined
+                scheduled_end: editingTask.scheduled_end || undefined,
               }}
               isLoading={isUpdating}
             />
@@ -917,7 +931,10 @@ export default function CalendarPage() {
       {/* Drag Overlay - renders dragged item in a portal to avoid overflow clipping */}
       <DragOverlay>
         {draggedTask && (
-          <div className="p-2 rounded border bg-card shadow-lg cursor-grabbing text-sm" style={{ opacity: 0.9 }}>
+          <div
+            className="p-2 rounded border bg-card shadow-lg cursor-grabbing text-sm"
+            style={{ opacity: 0.9 }}
+          >
             <div className="font-medium truncate">{draggedTask.title}</div>
             <Badge variant="outline" className="text-xs mt-1">
               Priority {draggedTask.priority}
@@ -926,5 +943,5 @@ export default function CalendarPage() {
         )}
       </DragOverlay>
     </DndContext>
-  )
+  );
 }

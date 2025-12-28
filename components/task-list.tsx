@@ -1,30 +1,36 @@
-'use client'
+"use client";
 
-import { useState } from 'react'
-import { Task, TaskStatus, TaskType, TaskGroup } from '@/lib/types'
-import { TaskCard } from './task-card'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Badge } from '@/components/ui/badge'
-import { Card, CardContent } from '@/components/ui/card'
-import { 
-  sortTasksByPriority, 
-  sortTasksByScheduledTime, 
-  sortTasksByCreatedTime
-} from '@/lib/task-utils'
-import { Plus, Search, Filter, Calendar } from 'lucide-react'
+import { Calendar, Filter, Plus, Search } from "lucide-react";
+import { useState } from "react";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  sortTasksByCreatedTime,
+  sortTasksByPriority,
+  sortTasksByScheduledTime,
+} from "@/lib/task-utils";
+import type { Task, TaskGroup, TaskStatus, TaskType } from "@/lib/types";
+import { TaskCard } from "./task-card";
 
 interface TaskListProps {
-  tasks: Task[]
-  onUpdateTask: (taskId: string, updates: Partial<Task>) => Promise<void>
-  onDeleteTask: (taskId: string) => Promise<void>
-  onEditTask?: (taskId: string) => void
-  onExtendTask?: (taskId: string) => void
-  onCreateTask?: () => void
-  showGroup?: boolean
-  compact?: boolean
-  groups?: TaskGroup[]
+  tasks: Task[];
+  onUpdateTask: (taskId: string, updates: Partial<Task>) => Promise<void>;
+  onDeleteTask: (taskId: string) => Promise<void>;
+  onEditTask?: (taskId: string) => void;
+  onExtendTask?: (taskId: string) => void;
+  onCreateTask?: () => void;
+  showGroup?: boolean;
+  compact?: boolean;
+  groups?: TaskGroup[];
 }
 
 export function TaskList({
@@ -36,65 +42,68 @@ export function TaskList({
   onCreateTask,
   showGroup = false,
   compact = false,
-  groups = []
+  groups = [],
 }: TaskListProps) {
-  const [searchQuery, setSearchQuery] = useState('')
-  const [statusFilter, setStatusFilter] = useState<TaskStatus[]>([])
-  const [priorityFilter, setPriorityFilter] = useState<number[]>([])
-  const [typeFilter, setTypeFilter] = useState<TaskType[]>([])
-  const [sortBy, setSortBy] = useState<'priority' | 'scheduled' | 'created'>('priority')
-  const [showFilters, setShowFilters] = useState(false)
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<TaskStatus[]>([]);
+  const [priorityFilter, setPriorityFilter] = useState<number[]>([]);
+  const [typeFilter, setTypeFilter] = useState<TaskType[]>([]);
+  const [sortBy, setSortBy] = useState<"priority" | "scheduled" | "created">("priority");
+  const [showFilters, setShowFilters] = useState(false);
 
   // Filter and sort tasks
-  const filteredTasks = tasks.filter(task => {
+  const filteredTasks = tasks.filter((task) => {
     // Search filter
-    if (searchQuery && !task.title.toLowerCase().includes(searchQuery.toLowerCase()) && 
-        !task.description?.toLowerCase().includes(searchQuery.toLowerCase())) {
-      return false
+    if (
+      searchQuery &&
+      !task.title.toLowerCase().includes(searchQuery.toLowerCase()) &&
+      !task.description?.toLowerCase().includes(searchQuery.toLowerCase())
+    ) {
+      return false;
     }
 
     // Status filter
     if (statusFilter.length > 0 && !statusFilter.includes(task.status)) {
-      return false
+      return false;
     }
 
     // Priority filter
     if (priorityFilter.length > 0 && !priorityFilter.includes(task.priority)) {
-      return false
+      return false;
     }
 
     // Type filter
     if (typeFilter.length > 0 && !typeFilter.includes(task.task_type)) {
-      return false
+      return false;
     }
 
-    return true
-  })
+    return true;
+  });
 
   // Sort filtered tasks
   const sortedTasks = (() => {
     switch (sortBy) {
-      case 'priority':
-        return sortTasksByPriority(filteredTasks)
-      case 'scheduled':
-        return sortTasksByScheduledTime(filteredTasks)
-      case 'created':
-        return sortTasksByCreatedTime(filteredTasks)
+      case "priority":
+        return sortTasksByPriority(filteredTasks);
+      case "scheduled":
+        return sortTasksByScheduledTime(filteredTasks);
+      case "created":
+        return sortTasksByCreatedTime(filteredTasks);
       default:
-        return filteredTasks
+        return filteredTasks;
     }
-  })()
+  })();
 
   // Task counts by status
   const taskCounts = {
-    pending: tasks.filter(t => t.status === 'pending').length,
-    in_progress: tasks.filter(t => t.status === 'in_progress').length,
-    completed: tasks.filter(t => t.status === 'completed').length,
-    cancelled: tasks.filter(t => t.status === 'cancelled').length,
-  }
+    pending: tasks.filter((t) => t.status === "pending").length,
+    in_progress: tasks.filter((t) => t.status === "in_progress").length,
+    completed: tasks.filter((t) => t.status === "completed").length,
+    cancelled: tasks.filter((t) => t.status === "cancelled").length,
+  };
 
-  const totalTasks = tasks.length
-  const filteredCount = filteredTasks.length
+  const totalTasks = tasks.length;
+  const filteredCount = filteredTasks.length;
 
   return (
     <div className="space-y-4">
@@ -119,25 +128,33 @@ export function TaskList({
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Card>
           <CardContent className="p-4">
-            <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">{taskCounts.pending}</div>
+            <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+              {taskCounts.pending}
+            </div>
             <p className="text-sm text-muted-foreground">Pending</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
-            <div className="text-2xl font-bold text-yellow-600 dark:text-yellow-400">{taskCounts.in_progress}</div>
+            <div className="text-2xl font-bold text-yellow-600 dark:text-yellow-400">
+              {taskCounts.in_progress}
+            </div>
             <p className="text-sm text-muted-foreground">In Progress</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
-            <div className="text-2xl font-bold text-green-600 dark:text-green-400">{taskCounts.completed}</div>
+            <div className="text-2xl font-bold text-green-600 dark:text-green-400">
+              {taskCounts.completed}
+            </div>
             <p className="text-sm text-muted-foreground">Completed</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="p-4">
-            <div className="text-2xl font-bold text-red-600 dark:text-red-400">{taskCounts.cancelled}</div>
+            <div className="text-2xl font-bold text-red-600 dark:text-red-400">
+              {taskCounts.cancelled}
+            </div>
             <p className="text-sm text-muted-foreground">Cancelled</p>
           </CardContent>
         </Card>
@@ -167,7 +184,9 @@ export function TaskList({
               >
                 <Filter className="w-4 h-4 mr-2" />
                 Filters
-                {(statusFilter.length > 0 || priorityFilter.length > 0 || typeFilter.length > 0) && (
+                {(statusFilter.length > 0 ||
+                  priorityFilter.length > 0 ||
+                  typeFilter.length > 0) && (
                   <Badge variant="secondary" className="ml-2">
                     {statusFilter.length + priorityFilter.length + typeFilter.length}
                   </Badge>
@@ -197,23 +216,25 @@ export function TaskList({
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Status</label>
                   <div className="space-y-1">
-                    {(['pending', 'in_progress', 'completed', 'cancelled'] as TaskStatus[]).map(status => (
-                      <label key={status} className="flex items-center space-x-2">
-                        <input
-                          type="checkbox"
-                          checked={statusFilter.includes(status)}
-                          onChange={(e) => {
-                            if (e.target.checked) {
-                              setStatusFilter(prev => [...prev, status])
-                            } else {
-                              setStatusFilter(prev => prev.filter(s => s !== status))
-                            }
-                          }}
-                          className="rounded"
-                        />
-                        <span className="text-sm capitalize">{status.replace('_', ' ')}</span>
-                      </label>
-                    ))}
+                    {(["pending", "in_progress", "completed", "cancelled"] as TaskStatus[]).map(
+                      (status) => (
+                        <label key={status} className="flex items-center space-x-2">
+                          <input
+                            type="checkbox"
+                            checked={statusFilter.includes(status)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setStatusFilter((prev) => [...prev, status]);
+                              } else {
+                                setStatusFilter((prev) => prev.filter((s) => s !== status));
+                              }
+                            }}
+                            className="rounded"
+                          />
+                          <span className="text-sm capitalize">{status.replace("_", " ")}</span>
+                        </label>
+                      )
+                    )}
                   </div>
                 </div>
 
@@ -221,21 +242,23 @@ export function TaskList({
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Priority</label>
                   <div className="space-y-1">
-                    {[1, 2, 3, 4, 5].map(priority => (
+                    {[1, 2, 3, 4, 5].map((priority) => (
                       <label key={priority} className="flex items-center space-x-2">
                         <input
                           type="checkbox"
                           checked={priorityFilter.includes(priority)}
                           onChange={(e) => {
                             if (e.target.checked) {
-                              setPriorityFilter(prev => [...prev, priority])
+                              setPriorityFilter((prev) => [...prev, priority]);
                             } else {
-                              setPriorityFilter(prev => prev.filter(p => p !== priority))
+                              setPriorityFilter((prev) => prev.filter((p) => p !== priority));
                             }
                           }}
                           className="rounded"
                         />
-                        <span className="text-sm">{priority}. Priority {priority}</span>
+                        <span className="text-sm">
+                          {priority}. Priority {priority}
+                        </span>
                       </label>
                     ))}
                   </div>
@@ -245,16 +268,16 @@ export function TaskList({
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Type</label>
                   <div className="space-y-1">
-                    {(['task', 'event'] as TaskType[]).map(type => (
+                    {(["task", "event"] as TaskType[]).map((type) => (
                       <label key={type} className="flex items-center space-x-2">
                         <input
                           type="checkbox"
                           checked={typeFilter.includes(type)}
                           onChange={(e) => {
                             if (e.target.checked) {
-                              setTypeFilter(prev => [...prev, type])
+                              setTypeFilter((prev) => [...prev, type]);
                             } else {
-                              setTypeFilter(prev => prev.filter(t => t !== type))
+                              setTypeFilter((prev) => prev.filter((t) => t !== type));
                             }
                           }}
                           className="rounded"
@@ -277,10 +300,12 @@ export function TaskList({
             <Calendar className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
             <h3 className="text-lg font-medium mb-2">No tasks found</h3>
             <p className="text-muted-foreground mb-4">
-              {searchQuery || statusFilter.length > 0 || priorityFilter.length > 0 || typeFilter.length > 0
-                ? 'Try adjusting your filters or search terms.'
-                : 'Get started by creating your first task.'
-              }
+              {searchQuery ||
+              statusFilter.length > 0 ||
+              priorityFilter.length > 0 ||
+              typeFilter.length > 0
+                ? "Try adjusting your filters or search terms."
+                : "Get started by creating your first task."}
             </p>
             {onCreateTask && (
               <Button onClick={onCreateTask}>
@@ -292,7 +317,7 @@ export function TaskList({
         </Card>
       ) : (
         <div className="space-y-3">
-          {sortedTasks.map(task => (
+          {sortedTasks.map((task) => (
             <TaskCard
               key={task.id}
               task={task}
@@ -308,5 +333,5 @@ export function TaskList({
         </div>
       )}
     </div>
-  )
+  );
 }

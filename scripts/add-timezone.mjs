@@ -41,4 +41,3 @@ async function addTimezoneColumn() {
 }
 
 addTimezoneColumn();
-

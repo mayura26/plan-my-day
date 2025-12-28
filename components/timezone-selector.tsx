@@ -1,44 +1,50 @@
-'use client'
+"use client";
 
-import { useState, useEffect } from 'react'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Button } from '@/components/ui/button'
-import { COMMON_TIMEZONES } from '@/lib/timezone-utils'
-import { useUserTimezone } from '@/hooks/use-user-timezone'
-import { Loader2 } from 'lucide-react'
+import { Loader2 } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { useUserTimezone } from "@/hooks/use-user-timezone";
+import { COMMON_TIMEZONES } from "@/lib/timezone-utils";
 
 interface TimezoneSelectorProps {
-  onTimezoneChange?: (timezone: string) => void
-  showLabel?: boolean
+  onTimezoneChange?: (timezone: string) => void;
+  showLabel?: boolean;
 }
 
 export function TimezoneSelector({ onTimezoneChange, showLabel = true }: TimezoneSelectorProps) {
-  const { timezone, isLoading, updateTimezone } = useUserTimezone()
-  const [selectedTimezone, setSelectedTimezone] = useState<string>(timezone)
-  const [isSaving, setIsSaving] = useState(false)
+  const { timezone, isLoading, updateTimezone } = useUserTimezone();
+  const [selectedTimezone, setSelectedTimezone] = useState<string>(timezone);
+  const [isSaving, setIsSaving] = useState(false);
 
   // Update local state when timezone is loaded
   useEffect(() => {
     if (!isLoading && timezone) {
-      setSelectedTimezone(timezone)
+      setSelectedTimezone(timezone);
     }
-  }, [timezone, isLoading])
+  }, [timezone, isLoading]);
 
   const handleTimezoneChange = async (newTimezone: string) => {
-    setSelectedTimezone(newTimezone)
-    
-    setIsSaving(true)
-    const result = await updateTimezone(newTimezone)
-    setIsSaving(false)
+    setSelectedTimezone(newTimezone);
+
+    setIsSaving(true);
+    const result = await updateTimezone(newTimezone);
+    setIsSaving(false);
 
     if (result.success) {
-      onTimezoneChange?.(newTimezone)
+      onTimezoneChange?.(newTimezone);
     } else {
       // Revert on error
-      setSelectedTimezone(timezone)
-      console.error('Failed to update timezone:', result.error)
+      setSelectedTimezone(timezone);
+      console.error("Failed to update timezone:", result.error);
     }
-  }
+  };
 
   if (isLoading) {
     return (
@@ -49,7 +55,7 @@ export function TimezoneSelector({ onTimezoneChange, showLabel = true }: Timezon
           <span className="text-sm text-muted-foreground">Loading...</span>
         </div>
       </div>
-    )
+    );
   }
 
   return (
@@ -59,11 +65,7 @@ export function TimezoneSelector({ onTimezoneChange, showLabel = true }: Timezon
           Timezone:
         </label>
       )}
-      <Select
-        value={selectedTimezone}
-        onValueChange={handleTimezoneChange}
-        disabled={isSaving}
-      >
+      <Select value={selectedTimezone} onValueChange={handleTimezoneChange} disabled={isSaving}>
         <SelectTrigger id="timezone-select" className="w-full sm:w-[280px] h-11 md:h-10">
           <SelectValue placeholder="Select timezone" />
         </SelectTrigger>
@@ -75,10 +77,7 @@ export function TimezoneSelector({ onTimezoneChange, showLabel = true }: Timezon
           ))}
         </SelectContent>
       </Select>
-      {isSaving && (
-        <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-      )}
+      {isSaving && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
     </div>
-  )
+  );
 }
-

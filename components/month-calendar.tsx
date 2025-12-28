@@ -1,105 +1,118 @@
-'use client'
+"use client";
 
-import { useState, useEffect } from 'react'
-import { Task, TaskGroup } from '@/lib/types'
-import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addDays, addMonths, subMonths, isSameDay, isSameMonth, parseISO, isToday } from 'date-fns'
-import { formatTimeShort, getDateInTimezone, formatDateInTimezone } from '@/lib/timezone-utils'
-import { ChevronLeft, ChevronRight, Menu } from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import { cn } from '@/lib/utils'
+import {
+  addDays,
+  addMonths,
+  endOfMonth,
+  endOfWeek,
+  format,
+  isSameDay,
+  isSameMonth,
+  isToday,
+  parseISO,
+  startOfMonth,
+  startOfWeek,
+  subMonths,
+} from "date-fns";
+import { ChevronLeft, ChevronRight, Menu } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Button } from "@/components/ui/button";
+import { formatDateInTimezone, formatTimeShort, getDateInTimezone } from "@/lib/timezone-utils";
+import type { Task, TaskGroup } from "@/lib/types";
+import { cn } from "@/lib/utils";
 
 interface MonthCalendarProps {
-  tasks: Task[]
-  timezone: string
-  onTaskClick?: (taskId: string) => void
-  selectedGroupId?: string | null
-  groups?: TaskGroup[]
-  onSidebarToggle?: () => void
-  currentDate?: Date
-  onDateChange?: (date: Date) => void
-  onDateClick?: (date: Date) => void
-  mobileViewToggleButtons?: React.ReactNode
-  desktopViewToggleButtons?: React.ReactNode
+  tasks: Task[];
+  timezone: string;
+  onTaskClick?: (taskId: string) => void;
+  selectedGroupId?: string | null;
+  groups?: TaskGroup[];
+  onSidebarToggle?: () => void;
+  currentDate?: Date;
+  onDateChange?: (date: Date) => void;
+  onDateClick?: (date: Date) => void;
+  mobileViewToggleButtons?: React.ReactNode;
+  desktopViewToggleButtons?: React.ReactNode;
 }
 
-const WEEK_DAYS = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT']
+const WEEK_DAYS = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
 
-export function MonthCalendar({ 
+export function MonthCalendar({
   tasks,
   timezone,
-  onTaskClick, 
-  selectedGroupId, 
-  groups = [], 
+  onTaskClick,
+  selectedGroupId,
+  groups = [],
   onSidebarToggle,
   currentDate: externalCurrentDate,
   onDateChange,
   onDateClick,
   mobileViewToggleButtons,
-  desktopViewToggleButtons
+  desktopViewToggleButtons,
 }: MonthCalendarProps) {
-  const [currentDate, setCurrentDate] = useState(externalCurrentDate || new Date())
+  const [currentDate, setCurrentDate] = useState(externalCurrentDate || new Date());
 
   // Sync with external currentDate if provided
   useEffect(() => {
     if (externalCurrentDate && !isSameMonth(currentDate, externalCurrentDate)) {
-      setCurrentDate(externalCurrentDate)
+      setCurrentDate(externalCurrentDate);
     }
-  }, [externalCurrentDate, currentDate])
+  }, [externalCurrentDate, currentDate]);
 
-  const monthStart = startOfMonth(currentDate)
-  const monthEnd = endOfMonth(currentDate)
-  const calendarStart = startOfWeek(monthStart, { weekStartsOn: 0 }) // Start on Sunday
-  const calendarEnd = endOfWeek(monthEnd, { weekStartsOn: 0 })
+  const monthStart = startOfMonth(currentDate);
+  const monthEnd = endOfMonth(currentDate);
+  const calendarStart = startOfWeek(monthStart, { weekStartsOn: 0 }); // Start on Sunday
+  const calendarEnd = endOfWeek(monthEnd, { weekStartsOn: 0 });
 
   const getTasksForDate = (date: Date): Task[] => {
-    const dateInTimezone = getDateInTimezone(date, timezone)
-    return tasks.filter(task => {
-      if (!task.scheduled_start) return false
-      const taskStartUTC = parseISO(task.scheduled_start)
-      const taskStartDate = getDateInTimezone(taskStartUTC, timezone)
-      return isSameDay(taskStartDate, dateInTimezone)
-    })
-  }
+    const dateInTimezone = getDateInTimezone(date, timezone);
+    return tasks.filter((task) => {
+      if (!task.scheduled_start) return false;
+      const taskStartUTC = parseISO(task.scheduled_start);
+      const taskStartDate = getDateInTimezone(taskStartUTC, timezone);
+      return isSameDay(taskStartDate, dateInTimezone);
+    });
+  };
 
   const goToPreviousMonth = () => {
-    const newDate = subMonths(currentDate, 1)
-    setCurrentDate(newDate)
-    onDateChange?.(newDate)
-  }
+    const newDate = subMonths(currentDate, 1);
+    setCurrentDate(newDate);
+    onDateChange?.(newDate);
+  };
 
   const goToNextMonth = () => {
-    const newDate = addMonths(currentDate, 1)
-    setCurrentDate(newDate)
-    onDateChange?.(newDate)
-  }
+    const newDate = addMonths(currentDate, 1);
+    setCurrentDate(newDate);
+    onDateChange?.(newDate);
+  };
 
   const goToToday = () => {
-    const today = new Date()
-    setCurrentDate(today)
-    onDateChange?.(today)
-  }
+    const today = new Date();
+    setCurrentDate(today);
+    onDateChange?.(today);
+  };
 
   const handleDateClick = (date: Date) => {
     if (onDateClick) {
-      onDateClick(date)
+      onDateClick(date);
     }
-  }
+  };
 
   // Generate calendar days
-  const calendarDays: Date[] = []
-  let day = calendarStart
+  const calendarDays: Date[] = [];
+  let day = calendarStart;
   while (day <= calendarEnd) {
-    calendarDays.push(day)
-    day = addDays(day, 1)
+    calendarDays.push(day);
+    day = addDays(day, 1);
   }
 
   // Organize days into weeks
-  const weeks: Date[][] = []
+  const weeks: Date[][] = [];
   for (let i = 0; i < calendarDays.length; i += 7) {
-    weeks.push(calendarDays.slice(i, i + 7))
+    weeks.push(calendarDays.slice(i, i + 7));
   }
 
-  const today = new Date()
+  const today = new Date();
 
   return (
     <div className="flex flex-col h-full">
@@ -120,14 +133,19 @@ export function MonthCalendar({
           <h2 className="text-xl md:text-2xl font-bold truncate">
             {/* Mobile: short month */}
             <span className="md:hidden">
-              {formatDateInTimezone(monthStart, timezone, { month: 'short', year: 'numeric' })}
+              {formatDateInTimezone(monthStart, timezone, { month: "short", year: "numeric" })}
             </span>
             {/* Desktop: long month */}
             <span className="hidden md:inline">
-              {formatDateInTimezone(monthStart, timezone, { month: 'long', year: 'numeric' })}
+              {formatDateInTimezone(monthStart, timezone, { month: "long", year: "numeric" })}
             </span>
           </h2>
-          <Button variant="outline" size="sm" onClick={goToToday} className="hidden sm:inline-flex flex-shrink-0">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={goToToday}
+            className="hidden sm:inline-flex flex-shrink-0"
+          >
             Today
           </Button>
           {/* View toggle buttons - mobile (abbreviated) */}
@@ -158,7 +176,10 @@ export function MonthCalendar({
         {/* Weekday Headers */}
         <div className="grid grid-cols-7 gap-1 mb-2">
           {WEEK_DAYS.map((day) => (
-            <div key={day} className="text-center text-xs md:text-sm font-medium text-muted-foreground p-2">
+            <div
+              key={day}
+              className="text-center text-xs md:text-sm font-medium text-muted-foreground p-2"
+            >
               {day}
             </div>
           ))}
@@ -167,12 +188,12 @@ export function MonthCalendar({
         {/* Calendar Days */}
         <div className="grid grid-cols-7 gap-1">
           {calendarDays.map((day, index) => {
-            const dayTasks = getTasksForDate(day)
-            const dateInTimezone = getDateInTimezone(day, timezone)
-            const currentDateInTimezone = getDateInTimezone(currentDate, timezone)
-            const isCurrentMonth = isSameMonth(dateInTimezone, currentDateInTimezone)
-            const todayDate = getDateInTimezone(new Date(), timezone)
-            const isCurrentDay = isSameDay(dateInTimezone, todayDate)
+            const dayTasks = getTasksForDate(day);
+            const dateInTimezone = getDateInTimezone(day, timezone);
+            const currentDateInTimezone = getDateInTimezone(currentDate, timezone);
+            const isCurrentMonth = isSameMonth(dateInTimezone, currentDateInTimezone);
+            const todayDate = getDateInTimezone(new Date(), timezone);
+            const isCurrentDay = isSameDay(dateInTimezone, todayDate);
 
             return (
               <div
@@ -186,22 +207,24 @@ export function MonthCalendar({
                 onClick={() => handleDateClick(dateInTimezone)}
               >
                 {/* Date Number */}
-                <div className={cn(
-                  "text-sm md:text-base font-bold mb-1 flex items-center justify-center w-8 h-8 rounded-full",
-                  isCurrentDay && "bg-primary text-primary-foreground",
-                  !isCurrentDay && isCurrentMonth && "text-foreground",
-                  !isCurrentMonth && "text-muted-foreground"
-                )}>
-                  {formatDateInTimezone(day, timezone, { day: 'numeric' })}
+                <div
+                  className={cn(
+                    "text-sm md:text-base font-bold mb-1 flex items-center justify-center w-8 h-8 rounded-full",
+                    isCurrentDay && "bg-primary text-primary-foreground",
+                    !isCurrentDay && isCurrentMonth && "text-foreground",
+                    !isCurrentMonth && "text-muted-foreground"
+                  )}
+                >
+                  {formatDateInTimezone(day, timezone, { day: "numeric" })}
                 </div>
 
                 {/* Tasks List */}
                 <div className="space-y-1">
                   {dayTasks.slice(0, 3).map((task) => {
-                    const group = task.group_id ? groups.find(g => g.id === task.group_id) : null
-                    const groupColor = group?.color || null
-                    const isEvent = task.task_type === 'event'
-                    
+                    const group = task.group_id ? groups.find((g) => g.id === task.group_id) : null;
+                    const groupColor = group?.color || null;
+                    const isEvent = task.task_type === "event";
+
                     return (
                       <div
                         key={task.id}
@@ -210,22 +233,30 @@ export function MonthCalendar({
                           "flex items-center gap-1",
                           groupColor && "text-white"
                         )}
-                        style={groupColor ? { backgroundColor: groupColor } : { backgroundColor: 'rgb(107 114 128 / 0.4)' }}
+                        style={
+                          groupColor
+                            ? { backgroundColor: groupColor }
+                            : { backgroundColor: "rgb(107 114 128 / 0.4)" }
+                        }
                         onClick={(e) => {
-                          e.stopPropagation()
-                          onTaskClick?.(task.id)
+                          e.stopPropagation();
+                          onTaskClick?.(task.id);
                         }}
                       >
-                        <span className={cn(
-                          "flex-shrink-0",
-                          isEvent ? "w-2 h-2 border border-white rounded-full" : "w-2 h-2 bg-white rounded-full"
-                        )} />
+                        <span
+                          className={cn(
+                            "flex-shrink-0",
+                            isEvent
+                              ? "w-2 h-2 border border-white rounded-full"
+                              : "w-2 h-2 bg-white rounded-full"
+                          )}
+                        />
                         <span className="font-medium">
                           {formatTimeShort(task.scheduled_start!, timezone)}
                         </span>
                         <span className="truncate">{task.title}</span>
                       </div>
-                    )
+                    );
                   })}
                   {dayTasks.length > 3 && (
                     <div className="text-xs text-muted-foreground px-1">
@@ -234,11 +265,10 @@ export function MonthCalendar({
                   )}
                 </div>
               </div>
-            )
+            );
           })}
         </div>
       </div>
     </div>
-  )
+  );
 }
-
