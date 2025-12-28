@@ -40,6 +40,8 @@ export function WeeklyCalendar({ tasks, timezone, onTaskClick, onTaskSchedule, o
   const [currentWeek, setCurrentWeek] = useState(new Date())
   const [currentTime, setCurrentTime] = useState(new Date())
   const calendarScrollRef = useRef<HTMLDivElement>(null)
+  const headerScrollRef = useRef<HTMLDivElement>(null)
+  const horizontalScrollContainerRef = useRef<HTMLDivElement>(null)
   const weekStart = startOfWeek(currentWeek, { weekStartsOn: 1 }) // Start on Monday
 
   // Update current time every minute
@@ -51,14 +53,42 @@ export function WeeklyCalendar({ tasks, timezone, onTaskClick, onTaskSchedule, o
     return () => clearInterval(timer)
   }, [])
 
-  // Auto-scroll to current time on mount - use useLayoutEffect to set scroll before paint
+  // Sync horizontal scroll between header and grid
+  useEffect(() => {
+    const calendarEl = calendarScrollRef.current
+    const headerEl = headerScrollRef.current
+    if (!calendarEl || !headerEl) return
+
+    const handleCalendarScroll = () => {
+      if (headerEl.scrollLeft !== calendarEl.scrollLeft) {
+        headerEl.scrollLeft = calendarEl.scrollLeft
+      }
+    }
+
+    const handleHeaderScroll = () => {
+      if (calendarEl.scrollLeft !== headerEl.scrollLeft) {
+        calendarEl.scrollLeft = headerEl.scrollLeft
+      }
+    }
+
+    calendarEl.addEventListener('scroll', handleCalendarScroll)
+    headerEl.addEventListener('scroll', handleHeaderScroll)
+
+    return () => {
+      calendarEl.removeEventListener('scroll', handleCalendarScroll)
+      headerEl.removeEventListener('scroll', handleHeaderScroll)
+    }
+  }, [])
+
+  // Auto-scroll to current time and current day on mount
   useLayoutEffect(() => {
-    if (!calendarScrollRef.current) return
+    if (!calendarScrollRef.current || !horizontalScrollContainerRef.current) return
 
     const now = new Date()
     const { hour, minute } = getHoursAndMinutesInTimezone(now, timezone)
     const totalMinutes = hour * 60 + minute
     
+    // Scroll vertically to current time
     // Each hour is 64px (h-16 = 4rem = 64px)
     const pixelsPerMinute = 64 / 60
     const scrollPosition = totalMinutes * pixelsPerMinute
@@ -67,7 +97,33 @@ export function WeeklyCalendar({ tasks, timezone, onTaskClick, onTaskSchedule, o
     const offset = calendarScrollRef.current.clientHeight / 2
     
     calendarScrollRef.current.scrollTop = scrollPosition - offset
-  }, [timezone])
+
+    // Scroll horizontally to current day
+    const weekDays = Array.from({ length: WEEK_DAYS }, (_, i) => addDays(weekStart, i))
+    const today = getDateInTimezone(now, timezone)
+    const todayIndex = weekDays.findIndex(day => {
+      const dayDate = getDateInTimezone(day, timezone)
+      return isSameDay(dayDate, today)
+    })
+
+    if (todayIndex >= 0) {
+      // Calculate the width of one day column
+      // On mobile, the grid has min-w-[600px], so we need to account for that
+      const gridContainer = calendarScrollRef.current.querySelector('.grid') as HTMLElement
+      if (gridContainer && headerScrollRef.current) {
+        const gridWidth = gridContainer.scrollWidth
+        const viewportWidth = calendarScrollRef.current.clientWidth
+        const timeColumnWidth = 60 // 60px on mobile, 80px on desktop (use smaller for mobile calculation)
+        const dayColumnWidth = (gridWidth - timeColumnWidth) / 7
+        // Center the current day in the viewport
+        const scrollToPosition = timeColumnWidth + (dayColumnWidth * todayIndex) - (viewportWidth / 2) + (dayColumnWidth / 2)
+        
+        // Scroll both header and grid to current day
+        calendarScrollRef.current.scrollLeft = Math.max(0, scrollToPosition)
+        headerScrollRef.current.scrollLeft = calendarScrollRef.current.scrollLeft
+      }
+    }
+  }, [timezone, weekStart])
 
   const getWeekDays = () => {
     // Create days - these represent dates as the user sees them
@@ -188,43 +244,50 @@ export function WeeklyCalendar({ tasks, timezone, onTaskClick, onTaskSchedule, o
         </div>
       </div>
 
-      {/* Days Header */}
-      <div className="grid grid-cols-[60px_repeat(7,1fr)] md:grid-cols-[80px_repeat(7,1fr)] border-b bg-muted/30">
-        <div className="p-2"></div>
-        {weekDays.map((day, index) => {
-          const dayDate = getDateInTimezone(day, timezone)
-          const todayDate = getDateInTimezone(new Date(), timezone)
-          const isToday = isSameDay(dayDate, todayDate)
-          return (
-            <div
-              key={index}
-              className={cn(
-                "p-2 text-center border-l",
-                isToday && "bg-primary/10"
-              )}
-            >
-              <div className={cn(
-                "text-xs md:text-sm font-medium",
-                isToday && "text-primary"
-              )}>
-                {formatDateInTimezone(day, timezone, { weekday: 'short' })}
-              </div>
-              <div className={cn(
-                "text-lg md:text-2xl font-bold mt-1",
-                isToday && "bg-primary text-primary-foreground rounded-full w-8 h-8 md:w-10 md:h-10 flex items-center justify-center mx-auto"
-              )}>
-                {formatDateInTimezone(day, timezone, { day: 'numeric' })}
-              </div>
-            </div>
-          )
-        })}
-      </div>
+      {/* Scrollable container for header and grid */}
+      <div ref={horizontalScrollContainerRef} className="flex-1 flex flex-col overflow-hidden">
+        {/* Days Header - horizontally scrollable */}
+        <div 
+          ref={headerScrollRef}
+          className="overflow-x-auto overflow-y-hidden border-b bg-muted/30 scrollbar-hide"
+        >
+          <div className="grid grid-cols-[60px_repeat(7,1fr)] md:grid-cols-[80px_repeat(7,1fr)] min-w-[600px] md:min-w-0">
+            <div className="p-2"></div>
+            {weekDays.map((day, index) => {
+              const dayDate = getDateInTimezone(day, timezone)
+              const todayDate = getDateInTimezone(new Date(), timezone)
+              const isToday = isSameDay(dayDate, todayDate)
+              return (
+                <div
+                  key={index}
+                  className={cn(
+                    "p-2 text-center border-l",
+                    isToday && "bg-primary/10"
+                  )}
+                >
+                  <div className={cn(
+                    "text-xs md:text-sm font-medium",
+                    isToday && "text-primary"
+                  )}>
+                    {formatDateInTimezone(day, timezone, { weekday: 'short' })}
+                  </div>
+                  <div className={cn(
+                    "text-lg md:text-2xl font-bold mt-1",
+                    isToday && "bg-primary text-primary-foreground rounded-full w-8 h-8 md:w-10 md:h-10 flex items-center justify-center mx-auto"
+                  )}>
+                    {formatDateInTimezone(day, timezone, { day: 'numeric' })}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
 
-      {/* Calendar Grid */}
-      <div ref={calendarScrollRef} className="flex-1 overflow-auto">
-        <div className="relative min-w-[600px] md:min-w-0">
-          {/* Time column and day columns */}
-          <div className="grid grid-cols-[60px_repeat(7,1fr)] md:grid-cols-[80px_repeat(7,1fr)]">
+        {/* Calendar Grid - horizontally and vertically scrollable */}
+        <div ref={calendarScrollRef} className="flex-1 overflow-auto">
+          <div className="relative min-w-[600px] md:min-w-0">
+            {/* Time column and day columns */}
+            <div className="grid grid-cols-[60px_repeat(7,1fr)] md:grid-cols-[80px_repeat(7,1fr)]">
             {/* Time labels */}
             <div className="border-r sticky left-0 z-10 bg-background">
               {HOURS.map((hour) => (
@@ -292,6 +355,7 @@ export function WeeklyCalendar({ tasks, timezone, onTaskClick, onTaskSchedule, o
                 </div>
               </div>
             ))}
+            </div>
           </div>
         </div>
       </div>
