@@ -185,12 +185,12 @@ export function getCurrentTimeInTimezone(timezone: string = "UTC"): Date {
   });
 
   const parts = formatter.formatToParts(now);
-  const year = parseInt(parts.find((p) => p.type === "year")?.value || "0");
-  const month = parseInt(parts.find((p) => p.type === "month")?.value || "0") - 1;
-  const day = parseInt(parts.find((p) => p.type === "day")?.value || "0");
-  const hour = parseInt(parts.find((p) => p.type === "hour")?.value || "0");
-  const minute = parseInt(parts.find((p) => p.type === "minute")?.value || "0");
-  const second = parseInt(parts.find((p) => p.type === "second")?.value || "0");
+  const year = parseInt(parts.find((p) => p.type === "year")?.value || "0", 10);
+  const month = parseInt(parts.find((p) => p.type === "month")?.value || "0", 10) - 1;
+  const day = parseInt(parts.find((p) => p.type === "day")?.value || "0", 10);
+  const hour = parseInt(parts.find((p) => p.type === "hour")?.value || "0", 10);
+  const minute = parseInt(parts.find((p) => p.type === "minute")?.value || "0", 10);
+  const second = parseInt(parts.find((p) => p.type === "second")?.value || "0", 10);
 
   return new Date(year, month, day, hour, minute, second);
 }
@@ -215,12 +215,12 @@ export function convertToTimezone(date: Date | string, targetTimezone: string): 
   });
 
   const parts = formatter.formatToParts(dateObj);
-  const year = parseInt(parts.find((p) => p.type === "year")?.value || "0");
-  const month = parseInt(parts.find((p) => p.type === "month")?.value || "0") - 1;
-  const day = parseInt(parts.find((p) => p.type === "day")?.value || "0");
-  const hour = parseInt(parts.find((p) => p.type === "hour")?.value || "0");
-  const minute = parseInt(parts.find((p) => p.type === "minute")?.value || "0");
-  const second = parseInt(parts.find((p) => p.type === "second")?.value || "0");
+  const year = parseInt(parts.find((p) => p.type === "year")?.value || "0", 10);
+  const month = parseInt(parts.find((p) => p.type === "month")?.value || "0", 10) - 1;
+  const day = parseInt(parts.find((p) => p.type === "day")?.value || "0", 10);
+  const hour = parseInt(parts.find((p) => p.type === "hour")?.value || "0", 10);
+  const minute = parseInt(parts.find((p) => p.type === "minute")?.value || "0", 10);
+  const second = parseInt(parts.find((p) => p.type === "second")?.value || "0", 10);
 
   return new Date(year, month, day, hour, minute, second);
 }

@@ -9,7 +9,6 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useUserTimezone } from "@/hooks/use-user-timezone";
 import {
   canExtendTask,
-  canRescheduleTask,
   formatDuration,
   getEnergyLevelColor,
   getTaskPriorityColor,

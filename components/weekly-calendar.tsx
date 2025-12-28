@@ -1,20 +1,9 @@
 "use client";
 
-import {
-  addDays,
-  addWeeks,
-  format,
-  getHours,
-  getMinutes,
-  isSameDay,
-  isToday,
-  parseISO,
-  startOfWeek,
-  subWeeks,
-} from "date-fns";
+import { addDays, addWeeks, isSameDay, parseISO, startOfWeek, subWeeks } from "date-fns";
 import { ChevronLeft, ChevronRight, Menu } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { CalendarSlot, timeToDecimal } from "@/components/calendar-slot";
+import { CalendarSlot } from "@/components/calendar-slot";
 import { ResizableTask } from "@/components/calendar-task";
 import { Button } from "@/components/ui/button";
 import {
@@ -162,7 +151,7 @@ export function WeeklyCalendar({
     return Array.from({ length: WEEK_DAYS }, (_, i) => addDays(weekStart, i));
   };
 
-  const getTasksForDayAndHour = (day: Date, hour: number) => {
+  const _getTasksForDayAndHour = (day: Date, hour: number) => {
     return tasks.filter((task) => {
       if (!task.scheduled_start || !task.scheduled_end) return false;
 

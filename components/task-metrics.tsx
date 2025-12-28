@@ -2,13 +2,13 @@
 
 import { AlertTriangle, ChevronDown, ChevronRight, Clock, PlayCircle, Star } from "lucide-react";
 import { useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { SlimTaskCard } from "@/components/slim-task-card";
-import { 
-  getOverdueTasks, 
-  getUpcomingSoonTasks, 
-  getInProgressTasks, 
-  getHighPriorityUnscheduledTasks 
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  getHighPriorityUnscheduledTasks,
+  getInProgressTasks,
+  getOverdueTasks,
+  getUpcomingSoonTasks,
 } from "@/lib/task-utils";
 import type { Task } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -31,22 +31,22 @@ interface MetricSectionProps {
   onTaskClick?: (taskId: string) => void;
 }
 
-function MetricSection({ 
-  icon, 
-  label, 
-  tasks, 
-  colorClass, 
-  isExpanded, 
+function MetricSection({
+  icon,
+  label,
+  tasks,
+  colorClass,
+  isExpanded,
   onToggle,
-  onTaskClick 
+  onTaskClick,
 }: MetricSectionProps) {
   const count = tasks.length;
-  
+
   return (
     <div className="border-b last:border-b-0">
       <div
         className={cn(
-          "flex items-center justify-between py-2 px-2 rounded-md transition-colors cursor-pointer hover:bg-accent/50",
+          "flex items-center justify-between py-2 px-2 rounded-md transition-colors cursor-pointer hover:bg-accent/50"
         )}
         onClick={onToggle}
       >
@@ -61,11 +61,13 @@ function MetricSection({
           <span className={cn("flex-shrink-0", colorClass)}>{icon}</span>
           <span className="text-sm">{label}</span>
         </div>
-        <span className={cn("font-semibold text-sm", count > 0 ? colorClass : "text-muted-foreground")}>
+        <span
+          className={cn("font-semibold text-sm", count > 0 ? colorClass : "text-muted-foreground")}
+        >
           {count}
         </span>
       </div>
-      
+
       {/* Expanded task list */}
       {isExpanded && count > 0 && (
         <div className="px-2 pb-2 space-y-1">
@@ -74,7 +76,7 @@ function MetricSection({
           ))}
         </div>
       )}
-      
+
       {isExpanded && count === 0 && (
         <div className="px-2 pb-2">
           <p className="text-xs text-muted-foreground text-center py-2">No tasks</p>

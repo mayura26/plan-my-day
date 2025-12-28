@@ -13,6 +13,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { useEffect, useState } from "react";
+import { SlimTaskCard } from "@/components/slim-task-card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -32,7 +33,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { SlimTaskCard } from "@/components/slim-task-card";
 import type { CreateTaskGroupRequest, Task, TaskGroup } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -123,10 +123,7 @@ function GroupCard({
       >
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2 flex-1 min-w-0">
-            <span
-              className="text-sm font-medium truncate"
-              style={{ color: textColor }}
-            >
+            <span className="text-sm font-medium truncate" style={{ color: textColor }}>
               {groupName}
             </span>
           </div>
@@ -153,11 +150,7 @@ function GroupCard({
             }}
             title={isHidden ? "Show in calendar" : "Hide from calendar"}
           >
-            {isHidden ? (
-              <EyeOff className="h-3.5 w-3.5" />
-            ) : (
-              <Eye className="h-3.5 w-3.5" />
-            )}
+            {isHidden ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
           </Button>
           {!isUngrouped && onEdit && (
             <Button
@@ -254,7 +247,7 @@ export function TaskGroupManager({
 
   useEffect(() => {
     fetchGroups();
-  }, []);
+  }, [fetchGroups]);
 
   // Auto-rotate color when create dialog opens
   useEffect(() => {

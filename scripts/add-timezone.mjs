@@ -17,7 +17,7 @@ async function addTimezoneColumn() {
       await turso.execute(`SELECT timezone FROM users LIMIT 1`);
       console.log("✅ Timezone column already exists");
       return;
-    } catch (error) {
+    } catch (_error) {
       // Column doesn't exist, proceed to add it
     }
 

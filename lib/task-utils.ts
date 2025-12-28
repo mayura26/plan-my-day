@@ -82,8 +82,8 @@ export function parseDuration(duration: string): number {
   const hourMatch = duration.match(/(\d+)h/);
   const minuteMatch = duration.match(/(\d+)m/);
 
-  const hours = hourMatch ? parseInt(hourMatch[1]) : 0;
-  const minutes = minuteMatch ? parseInt(minuteMatch[1]) : 0;
+  const hours = hourMatch ? parseInt(hourMatch[1], 10) : 0;
+  const minutes = minuteMatch ? parseInt(minuteMatch[1], 10) : 0;
 
   return hours * 60 + minutes;
 }
@@ -296,7 +296,7 @@ export function getOverdueTasks(tasks: Task[]): Task[] {
 export function getUpcomingSoonTasks(tasks: Task[], hoursThreshold: number = 2): Task[] {
   const now = new Date();
   const thresholdTime = new Date(now.getTime() + hoursThreshold * 60 * 60 * 1000);
-  
+
   return tasks.filter((task) => {
     if (task.status === "completed" || task.status === "cancelled") return false;
     if (!task.scheduled_start) return false;

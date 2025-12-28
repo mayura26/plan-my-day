@@ -1,5 +1,6 @@
 "use client";
 
+import { Calendar, Clock, Zap } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,7 +17,6 @@ import { useUserTimezone } from "@/hooks/use-user-timezone";
 import { ENERGY_LABELS, PRIORITY_LABELS, TASK_TYPE_LABELS } from "@/lib/task-utils";
 import { formatDateTimeLocalForTimezone, parseDateTimeLocalToUTC } from "@/lib/timezone-utils";
 import type { CreateTaskRequest, TaskGroup, TaskType } from "@/lib/types";
-import { Calendar, Clock, Zap } from "lucide-react";
 
 interface TaskFormProps {
   onSubmit: (task: CreateTaskRequest) => Promise<void>;
@@ -65,7 +65,7 @@ export function TaskForm({ onSubmit, onCancel, initialData, isLoading = false }:
 
   // Update form data when initialData or timezone changes (for edit mode)
   useEffect(() => {
-    if (initialData && initialData.title) {
+    if (initialData?.title) {
       setFormData({
         title: initialData.title || "",
         description: initialData.description || "",
@@ -82,7 +82,21 @@ export function TaskForm({ onSubmit, onCancel, initialData, isLoading = false }:
       });
       setShowDescription(!!initialData.description);
     }
-  }, [initialData?.title, initialData?.scheduled_start, initialData?.scheduled_end, initialData?.due_date, timezone]);
+  }, [
+    initialData?.title,
+    initialData?.scheduled_start,
+    initialData?.scheduled_end,
+    initialData?.due_date,
+    timezone,
+    initialData.depends_on_task_id,
+    initialData.description,
+    initialData.duration,
+    initialData.energy_level_required,
+    initialData.group_id,
+    initialData.priority,
+    initialData.task_type,
+    initialData,
+  ]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -92,19 +106,22 @@ export function TaskForm({ onSubmit, onCancel, initialData, isLoading = false }:
     if (!formData.title.trim()) {
       newErrors.title = "Title is required";
     }
-    
+
     if (formData.task_type === "task") {
       if (formData.priority && (formData.priority < 1 || formData.priority > 5)) {
         newErrors.priority = "Priority must be between 1 and 5";
       }
-      if (formData.energy_level_required && (formData.energy_level_required < 1 || formData.energy_level_required > 5)) {
+      if (
+        formData.energy_level_required &&
+        (formData.energy_level_required < 1 || formData.energy_level_required > 5)
+      ) {
         newErrors.energy_level_required = "Energy level must be between 1 and 5";
       }
       if (formData.duration && formData.duration < 0) {
         newErrors.duration = "Duration must be positive";
       }
     }
-    
+
     if (formData.task_type === "event") {
       if (!formData.scheduled_start) {
         newErrors.scheduled_start = "Start time required";
@@ -122,10 +139,16 @@ export function TaskForm({ onSubmit, onCancel, initialData, isLoading = false }:
     try {
       const submissionData = { ...formData };
       if (submissionData.scheduled_start) {
-        submissionData.scheduled_start = parseDateTimeLocalToUTC(submissionData.scheduled_start, timezone);
+        submissionData.scheduled_start = parseDateTimeLocalToUTC(
+          submissionData.scheduled_start,
+          timezone
+        );
       }
       if (submissionData.scheduled_end) {
-        submissionData.scheduled_end = parseDateTimeLocalToUTC(submissionData.scheduled_end, timezone);
+        submissionData.scheduled_end = parseDateTimeLocalToUTC(
+          submissionData.scheduled_end,
+          timezone
+        );
       }
       if (submissionData.due_date) {
         submissionData.due_date = parseDateTimeLocalToUTC(submissionData.due_date, timezone);
@@ -197,9 +220,12 @@ export function TaskForm({ onSubmit, onCancel, initialData, isLoading = false }:
 
   const getTypeLabel = () => {
     switch (formData.task_type) {
-      case "event": return "Event";
-      case "todo": return "To-Do";
-      default: return "Task";
+      case "event":
+        return "Event";
+      case "todo":
+        return "To-Do";
+      default:
+        return "Task";
     }
   };
 
@@ -263,7 +289,7 @@ export function TaskForm({ onSubmit, onCancel, initialData, isLoading = false }:
             <Label className="text-xs text-muted-foreground">Priority</Label>
             <Select
               value={formData.priority?.toString() || "3"}
-              onValueChange={(value) => handleInputChange("priority", parseInt(value))}
+              onValueChange={(value) => handleInputChange("priority", parseInt(value, 10))}
             >
               <SelectTrigger className="h-10">
                 <SelectValue />
@@ -284,7 +310,9 @@ export function TaskForm({ onSubmit, onCancel, initialData, isLoading = false }:
             <Label className="text-xs text-muted-foreground">Group</Label>
             <Select
               value={formData.group_id || "no-group"}
-              onValueChange={(value) => handleInputChange("group_id", value === "no-group" ? undefined : value)}
+              onValueChange={(value) =>
+                handleInputChange("group_id", value === "no-group" ? undefined : value)
+              }
             >
               <SelectTrigger className="h-10">
                 <SelectValue placeholder="None" />
@@ -294,7 +322,10 @@ export function TaskForm({ onSubmit, onCancel, initialData, isLoading = false }:
                 {taskGroups.map((group) => (
                   <SelectItem key={group.id} value={group.id}>
                     <div className="flex items-center gap-2">
-                      <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: group.color }} />
+                      <div
+                        className="w-2.5 h-2.5 rounded-full"
+                        style={{ backgroundColor: group.color }}
+                      />
                       {group.name}
                     </div>
                   </SelectItem>
@@ -318,7 +349,12 @@ export function TaskForm({ onSubmit, onCancel, initialData, isLoading = false }:
                 id="duration"
                 type="number"
                 value={formData.duration || ""}
-                onChange={(e) => handleInputChange("duration", e.target.value ? parseInt(e.target.value) : undefined)}
+                onChange={(e) =>
+                  handleInputChange(
+                    "duration",
+                    e.target.value ? parseInt(e.target.value, 10) : undefined
+                  )
+                }
                 placeholder="mins"
                 min="1"
                 className="h-10"
@@ -334,7 +370,9 @@ export function TaskForm({ onSubmit, onCancel, initialData, isLoading = false }:
               </Label>
               <Select
                 value={formData.energy_level_required?.toString() || "3"}
-                onValueChange={(value) => handleInputChange("energy_level_required", parseInt(value))}
+                onValueChange={(value) =>
+                  handleInputChange("energy_level_required", parseInt(value, 10))
+                }
               >
                 <SelectTrigger className="h-10">
                   <SelectValue />
@@ -384,7 +422,9 @@ export function TaskForm({ onSubmit, onCancel, initialData, isLoading = false }:
               onChange={(e) => handleInputChange("scheduled_start", e.target.value)}
               className={`h-10 text-sm ${errors.scheduled_start ? "border-red-500" : ""}`}
             />
-            {errors.scheduled_start && <p className="text-xs text-red-500">{errors.scheduled_start}</p>}
+            {errors.scheduled_start && (
+              <p className="text-xs text-red-500">{errors.scheduled_start}</p>
+            )}
           </div>
           <div className="space-y-1">
             <span className="text-xs text-muted-foreground">End</span>
@@ -403,12 +443,26 @@ export function TaskForm({ onSubmit, onCancel, initialData, isLoading = false }:
       {/* Action Buttons */}
       <div className="flex gap-2 pt-2">
         {onCancel && (
-          <Button type="button" variant="outline" onClick={onCancel} disabled={isLoading} className="flex-1 h-11">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={onCancel}
+            disabled={isLoading}
+            className="flex-1 h-11"
+          >
             Cancel
           </Button>
         )}
-        <Button type="submit" disabled={isLoading} className={`h-11 ${onCancel ? "flex-1" : "w-full"}`}>
-          {isLoading ? "Saving..." : initialData ? `Update ${getTypeLabel()}` : `Create ${getTypeLabel()}`}
+        <Button
+          type="submit"
+          disabled={isLoading}
+          className={`h-11 ${onCancel ? "flex-1" : "w-full"}`}
+        >
+          {isLoading
+            ? "Saving..."
+            : initialData
+              ? `Update ${getTypeLabel()}`
+              : `Create ${getTypeLabel()}`}
         </Button>
       </div>
     </form>

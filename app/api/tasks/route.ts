@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
 
     if (priority) {
       query += ` AND priority = ?`;
-      params.push(parseInt(priority));
+      params.push(parseInt(priority, 10));
     }
 
     if (task_type) {
@@ -50,12 +50,12 @@ export async function GET(request: NextRequest) {
 
     if (limit) {
       query += ` LIMIT ?`;
-      params.push(parseInt(limit));
+      params.push(parseInt(limit, 10));
     }
 
     if (offset) {
       query += ` OFFSET ?`;
-      params.push(parseInt(offset));
+      params.push(parseInt(offset, 10));
     }
 
     const result = await db.execute(query, params);

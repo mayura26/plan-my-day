@@ -1,11 +1,10 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { validateTaskData } from "@/lib/task-utils";
 import { db } from "@/lib/turso";
 import type { Task, TaskStatus, TaskType, UpdateTaskRequest } from "@/lib/types";
 
 // GET /api/tasks/[id] - Get a specific task
-export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function GET(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const session = await auth();
     if (!session?.user?.id) {
@@ -223,7 +222,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 
 // DELETE /api/tasks/[id] - Delete a specific task
 export async function DELETE(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {

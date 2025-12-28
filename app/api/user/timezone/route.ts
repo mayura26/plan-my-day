@@ -57,7 +57,7 @@ export async function PUT(request: NextRequest) {
     // Validate timezone by trying to use it
     try {
       new Intl.DateTimeFormat("en-US", { timeZone: timezone });
-    } catch (error) {
+    } catch (_error) {
       return NextResponse.json({ error: "Invalid timezone" }, { status: 400 });
     }
 

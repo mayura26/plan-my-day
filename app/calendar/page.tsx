@@ -11,19 +11,11 @@ import {
   useSensor,
   useSensors,
 } from "@dnd-kit/core";
-import { format, startOfMonth, startOfWeek } from "date-fns";
-import {
-  Calendar as CalendarIcon,
-  CheckSquare,
-  ChevronDown,
-  ChevronRight,
-  Menu,
-  Plus,
-  X,
-} from "lucide-react";
+import { startOfMonth } from "date-fns";
+import { CheckSquare, ChevronDown, ChevronRight, Plus, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { CalendarSkeleton } from "@/components/calendar-skeleton";
 import { DayCalendar } from "@/components/day-calendar";
 import { MonthCalendar } from "@/components/month-calendar";
@@ -91,7 +83,7 @@ export default function CalendarPage() {
     if (status === "authenticated" && !timezoneLoading) {
       fetchTasks();
     }
-  }, [status, router, timezoneLoading]);
+  }, [status, router, timezoneLoading, fetchTasks]);
 
   const fetchTasks = async () => {
     try {
@@ -126,7 +118,7 @@ export default function CalendarPage() {
     if (session) {
       fetchGroups();
     }
-  }, [session]);
+  }, [session, fetchGroups]);
 
   const handleTaskClick = (taskId: string) => {
     const task = tasks.find((t) => t.id === taskId);
@@ -318,7 +310,7 @@ export default function CalendarPage() {
     }
   };
 
-  const handleDragOver = (event: DragOverEvent) => {
+  const handleDragOver = (_event: DragOverEvent) => {
     // Handle real-time resize preview if needed
     // For now, we'll handle resize on drop
   };
@@ -713,10 +705,7 @@ export default function CalendarPage() {
             </div>
 
             {/* Task Metrics */}
-            <TaskMetrics
-              tasks={filteredTasks}
-              onTaskClick={handleTaskClick}
-            />
+            <TaskMetrics tasks={filteredTasks} onTaskClick={handleTaskClick} />
 
             {/* Unscheduled Tasks */}
             {unscheduledTasks.length > 0 && (
@@ -749,9 +738,11 @@ export default function CalendarPage() {
                 </CardHeader>
                 {expandedSections.has("unscheduled-tasks") && (
                   <CardContent className="space-y-1 px-2 pb-2 pt-0">
-                    {sortTasksByCreatedTimeDesc(unscheduledTasks).slice(0, 5).map((task) => (
-                      <SlimTaskCard key={task.id} task={task} onTaskClick={handleTaskClick} />
-                    ))}
+                    {sortTasksByCreatedTimeDesc(unscheduledTasks)
+                      .slice(0, 5)
+                      .map((task) => (
+                        <SlimTaskCard key={task.id} task={task} onTaskClick={handleTaskClick} />
+                      ))}
                     {unscheduledTasks.length > 5 && (
                       <Button
                         variant="ghost"

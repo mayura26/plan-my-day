@@ -1,6 +1,6 @@
 "use client";
 
-import { addDays, format, isSameDay, isToday, parseISO, subDays } from "date-fns";
+import { addDays, isSameDay, parseISO, subDays } from "date-fns";
 import { ChevronLeft, ChevronRight, Menu } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { CalendarSlot } from "@/components/calendar-slot";
@@ -12,7 +12,6 @@ import {
   getHoursAndMinutesInTimezone,
 } from "@/lib/timezone-utils";
 import type { Task, TaskGroup } from "@/lib/types";
-import { cn } from "@/lib/utils";
 
 interface DayCalendarProps {
   tasks: Task[];
@@ -94,7 +93,7 @@ export function DayCalendar({
     const offset = calendarScrollRef.current.clientHeight / 2;
 
     calendarScrollRef.current.scrollTop = scrollPosition - offset;
-  }, [timezone, currentDate]);
+  }, [timezone]);
 
   const getTaskPosition = (task: Task) => {
     if (!task.scheduled_start || !task.scheduled_end) return null;

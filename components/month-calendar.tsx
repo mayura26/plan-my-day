@@ -5,10 +5,8 @@ import {
   addMonths,
   endOfMonth,
   endOfWeek,
-  format,
   isSameDay,
   isSameMonth,
-  isToday,
   parseISO,
   startOfMonth,
   startOfWeek,
@@ -112,7 +110,7 @@ export function MonthCalendar({
     weeks.push(calendarDays.slice(i, i + 7));
   }
 
-  const today = new Date();
+  const _today = new Date();
 
   return (
     <div className="flex flex-col h-full">

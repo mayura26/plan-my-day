@@ -4,7 +4,7 @@ import { db } from "@/lib/turso";
 import type { TaskGroup } from "@/lib/types";
 
 // GET /api/task-groups/[id] - Get a specific task group
-export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function GET(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const session = await auth();
     if (!session?.user?.id) {
@@ -119,7 +119,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 
 // DELETE /api/task-groups/[id] - Delete a specific task group
 export async function DELETE(
-  request: NextRequest,
+  _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {

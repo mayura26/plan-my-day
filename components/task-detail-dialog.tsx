@@ -12,7 +12,6 @@ import {
   Lock,
   Tag,
   Trash2,
-  X,
   Zap,
 } from "lucide-react";
 import { useState } from "react";
@@ -258,7 +257,9 @@ export function TaskDetailDialog({
                   <div className="flex items-center gap-2 text-sm col-span-2">
                     <Calendar className="h-4 w-4 text-muted-foreground" />
                     <span className="text-muted-foreground">Due:</span>
-                    <span className="font-medium">{formatDateTimeFull(task.due_date, timezone)}</span>
+                    <span className="font-medium">
+                      {formatDateTimeFull(task.due_date, timezone)}
+                    </span>
                   </div>
                 )}
               </div>

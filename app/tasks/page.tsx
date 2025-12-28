@@ -70,7 +70,7 @@ export default function TasksPage() {
       fetchTasks();
       fetchGroups();
     }
-  }, [session]);
+  }, [session, fetchGroups, fetchTasks]);
 
   // Create task
   const handleCreateTask = async (taskData: CreateTaskRequest) => {

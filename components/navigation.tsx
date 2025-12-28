@@ -25,7 +25,7 @@ export function Navigation() {
   // Close mobile menu when route changes
   useEffect(() => {
     setIsMobileMenuOpen(false);
-  }, [pathname]);
+  }, []);
 
   // Prevent body scroll when mobile menu is open
   useEffect(() => {
@@ -72,7 +72,7 @@ export function Navigation() {
           {/* Desktop Navigation */}
           <nav className="hidden md:flex items-center gap-1.5">
             {navigation.map((item) => {
-              const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
+              const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`);
               return (
                 <Link
                   key={item.name}
@@ -144,7 +144,7 @@ export function Navigation() {
           <div className="border-t border-border/40 pt-2 pb-4">
             <nav className="space-y-1">
               {navigation.map((item) => {
-                const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
+                const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`);
                 return (
                   <Link
                     key={item.name}

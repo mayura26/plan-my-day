@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronDown, ChevronRight, Filter, Folder, Plus, Search } from "lucide-react";
+import { ChevronDown, ChevronRight, Plus, Search } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";

@@ -29,7 +29,7 @@ export function SlimTaskCard({ task, onTaskClick }: SlimTaskCardProps) {
     touchAction: "none" as const,
   };
 
-  const handleClick = (e: React.MouseEvent) => {
+  const handleClick = (_e: React.MouseEvent) => {
     if (!isDragging) {
       onTaskClick?.(task.id);
     }
@@ -84,17 +84,17 @@ export function SlimTaskCard({ task, onTaskClick }: SlimTaskCardProps) {
         {task.locked && <span className="text-[10px]">🔒</span>}
         {task.title}
       </div>
-      
+
       {/* Line 2: Priority, Status, Duration */}
       <div className="flex items-center gap-1 mt-1 flex-wrap">
-        <Badge 
-          variant="outline" 
+        <Badge
+          variant="outline"
           className={cn("text-[10px] px-1 py-0 h-4 border-0", getPriorityBadgeColor(task.priority))}
         >
           P{task.priority}
         </Badge>
-        <Badge 
-          variant="outline" 
+        <Badge
+          variant="outline"
           className={cn("text-[10px] px-1 py-0 h-4 border-0", getStatusBadgeColor(task.status))}
         >
           {STATUS_LABELS[task.status]}
@@ -109,4 +109,3 @@ export function SlimTaskCard({ task, onTaskClick }: SlimTaskCardProps) {
     </div>
   );
 }
-
