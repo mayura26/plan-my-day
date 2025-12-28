@@ -242,3 +242,61 @@ export function filterTasksByDateRange(tasks: Task[], startDate: string, endDate
     return taskDate >= start && taskDate <= end;
   });
 }
+
+// Metric helper functions for task insights
+
+/**
+ * Get all overdue tasks (scheduled_end is in the past and not completed/cancelled)
+ */
+export function getOverdueTasks(tasks: Task[]): Task[] {
+  const now = new Date();
+  return tasks.filter((task) => {
+    if (task.status === "completed" || task.status === "cancelled") return false;
+    if (!task.scheduled_end) return false;
+    return new Date(task.scheduled_end) < now;
+  });
+}
+
+/**
+ * Get tasks starting within the next N hours (not completed/cancelled)
+ */
+export function getUpcomingSoonTasks(tasks: Task[], hoursThreshold: number = 2): Task[] {
+  const now = new Date();
+  const thresholdTime = new Date(now.getTime() + hoursThreshold * 60 * 60 * 1000);
+  
+  return tasks.filter((task) => {
+    if (task.status === "completed" || task.status === "cancelled") return false;
+    if (!task.scheduled_start) return false;
+    const taskStart = new Date(task.scheduled_start);
+    // Task starts between now and threshold, and hasn't started yet
+    return taskStart > now && taskStart <= thresholdTime;
+  });
+}
+
+/**
+ * Get all tasks currently in progress
+ */
+export function getInProgressTasks(tasks: Task[]): Task[] {
+  return tasks.filter((task) => task.status === "in_progress");
+}
+
+/**
+ * Get high priority (priority 1 or 2) tasks that are unscheduled
+ */
+export function getHighPriorityUnscheduledTasks(tasks: Task[]): Task[] {
+  return tasks.filter((task) => {
+    if (task.status === "completed" || task.status === "cancelled") return false;
+    const isUnscheduled = !task.scheduled_start || !task.scheduled_end;
+    const isHighPriority = task.priority <= 2;
+    return isUnscheduled && isHighPriority;
+  });
+}
+
+/**
+ * Sort tasks by created_at descending (newest first)
+ */
+export function sortTasksByCreatedTimeDesc(tasks: Task[]): Task[] {
+  return [...tasks].sort(
+    (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+  );
+}

@@ -17,7 +17,6 @@ import {
   CheckSquare,
   ChevronDown,
   ChevronRight,
-  Clock,
   Menu,
   Plus,
   X,
@@ -28,15 +27,18 @@ import { useEffect, useMemo, useState } from "react";
 import { CalendarSkeleton } from "@/components/calendar-skeleton";
 import { DayCalendar } from "@/components/day-calendar";
 import { MonthCalendar } from "@/components/month-calendar";
+import { SlimTaskCard } from "@/components/slim-task-card";
 import { TaskDetailDialog } from "@/components/task-detail-dialog";
 import { TaskForm } from "@/components/task-form";
-import { DraggableTaskItem, TaskGroupManager } from "@/components/task-group-manager";
+import { TaskGroupManager } from "@/components/task-group-manager";
+import { TaskMetrics } from "@/components/task-metrics";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { WeeklyCalendar } from "@/components/weekly-calendar";
 import { useUserTimezone } from "@/hooks/use-user-timezone";
+import { sortTasksByCreatedTimeDesc } from "@/lib/task-utils";
 import { createDateInTimezone } from "@/lib/timezone-utils";
 import type { CreateTaskRequest, Task, TaskGroup } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -710,61 +712,17 @@ export default function CalendarPage() {
               )}
             </div>
 
-            {/* Quick Stats */}
-            <Card>
-              <CardHeader
-                className="cursor-pointer hover:bg-accent/50 transition-colors"
-                onClick={() => {
-                  const newSet = new Set(expandedSections);
-                  if (newSet.has("quick-stats")) {
-                    newSet.delete("quick-stats");
-                  } else {
-                    newSet.add("quick-stats");
-                  }
-                  setExpandedSections(newSet);
-                }}
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    {expandedSections.has("quick-stats") ? (
-                      <ChevronDown className="h-4 w-4" />
-                    ) : (
-                      <ChevronRight className="h-4 w-4" />
-                    )}
-                    <CardTitle className="text-sm flex items-center gap-2">
-                      <Clock className="h-4 w-4" />
-                      Scheduled Tasks
-                    </CardTitle>
-                  </div>
-                </div>
-              </CardHeader>
-              {expandedSections.has("quick-stats") && (
-                <CardContent>
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-sm">
-                      <span>Scheduled:</span>
-                      <span className="font-medium text-green-600">{scheduledTasks.length}</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span>Unscheduled:</span>
-                      <span className="font-medium text-orange-600">{unscheduledTasks.length}</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span>High Priority:</span>
-                      <span className="font-medium text-red-600">
-                        {filteredTasks.filter((t) => t.priority <= 2).length}
-                      </span>
-                    </div>
-                  </div>
-                </CardContent>
-              )}
-            </Card>
+            {/* Task Metrics */}
+            <TaskMetrics
+              tasks={filteredTasks}
+              onTaskClick={handleTaskClick}
+            />
 
             {/* Unscheduled Tasks */}
             {unscheduledTasks.length > 0 && (
               <Card>
                 <CardHeader
-                  className="cursor-pointer hover:bg-accent/50 transition-colors"
+                  className="cursor-pointer hover:bg-accent/50 transition-colors py-2 px-3"
                   onClick={() => {
                     const newSet = new Set(expandedSections);
                     if (newSet.has("unscheduled-tasks")) {
@@ -790,9 +748,9 @@ export default function CalendarPage() {
                   </div>
                 </CardHeader>
                 {expandedSections.has("unscheduled-tasks") && (
-                  <CardContent className="space-y-2">
-                    {unscheduledTasks.slice(0, 5).map((task) => (
-                      <DraggableTaskItem key={task.id} task={task} onTaskClick={handleTaskClick} />
+                  <CardContent className="space-y-1 px-2 pb-2 pt-0">
+                    {sortTasksByCreatedTimeDesc(unscheduledTasks).slice(0, 5).map((task) => (
+                      <SlimTaskCard key={task.id} task={task} onTaskClick={handleTaskClick} />
                     ))}
                     {unscheduledTasks.length > 5 && (
                       <Button
