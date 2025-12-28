@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react'
 import { Task, TaskGroup } from '@/lib/types'
 import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addDays, addMonths, subMonths, isSameDay, isSameMonth, parseISO, isToday } from 'date-fns'
-import { useUserTimezone } from '@/hooks/use-user-timezone'
 import { formatTimeShort, getDateInTimezone, formatDateInTimezone } from '@/lib/timezone-utils'
 import { ChevronLeft, ChevronRight, Menu } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -11,6 +10,7 @@ import { cn } from '@/lib/utils'
 
 interface MonthCalendarProps {
   tasks: Task[]
+  timezone: string
   onTaskClick?: (taskId: string) => void
   selectedGroupId?: string | null
   groups?: TaskGroup[]
@@ -25,7 +25,8 @@ interface MonthCalendarProps {
 const WEEK_DAYS = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT']
 
 export function MonthCalendar({ 
-  tasks, 
+  tasks,
+  timezone,
   onTaskClick, 
   selectedGroupId, 
   groups = [], 
@@ -36,7 +37,6 @@ export function MonthCalendar({
   mobileViewToggleButtons,
   desktopViewToggleButtons
 }: MonthCalendarProps) {
-  const { timezone } = useUserTimezone()
   const [currentDate, setCurrentDate] = useState(externalCurrentDate || new Date())
 
   // Sync with external currentDate if provided

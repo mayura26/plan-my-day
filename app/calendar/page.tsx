@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { DndContext, DragEndEvent, DragOverEvent, DragStartEvent, PointerSensor, useSensor, useSensors, closestCenter, DragOverlay } from '@dnd-kit/core'
@@ -20,12 +20,13 @@ import { format, startOfWeek, startOfMonth } from 'date-fns'
 import { useUserTimezone } from '@/hooks/use-user-timezone'
 import { createDateInTimezone } from '@/lib/timezone-utils'
 import { cn } from '@/lib/utils'
+import { CalendarSkeleton } from '@/components/calendar-skeleton'
 
 type ViewMode = 'day' | 'week' | 'month'
 
 export default function CalendarPage() {
   const { data: session, status } = useSession()
-  const { timezone } = useUserTimezone()
+  const { timezone, isLoading: timezoneLoading } = useUserTimezone()
   const router = useRouter()
   const [tasks, setTasks] = useState<Task[]>([])
   const [groups, setGroups] = useState<TaskGroup[]>([])
@@ -63,10 +64,11 @@ export default function CalendarPage() {
       return
     }
 
-    if (status === 'authenticated') {
+    // Only fetch tasks once authenticated AND timezone is loaded
+    if (status === 'authenticated' && !timezoneLoading) {
       fetchTasks()
     }
-  }, [status, router])
+  }, [status, router, timezoneLoading])
 
   const fetchTasks = async () => {
     try {
@@ -592,21 +594,11 @@ export default function CalendarPage() {
     </>
   )
 
-  if (status === 'loading' || isLoading) {
-    return (
-      <div className="container mx-auto p-6">
-        <div className="flex items-center justify-center h-64">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
-            <p className="text-muted-foreground">Loading calendar...</p>
-          </div>
-        </div>
-      </div>
-    )
-  }
-
-  if (!session) {
-    return null
+  // Show skeleton while loading session, timezone, or tasks
+  // Don't render calendar until timezone is loaded and stable
+  const isReady = status === 'authenticated' && !timezoneLoading && !isLoading && !!session
+  if (!isReady) {
+    return <CalendarSkeleton />
   }
 
   return (
@@ -810,6 +802,7 @@ export default function CalendarPage() {
           {viewMode === 'day' && (
             <DayCalendar
               tasks={calendarTasks}
+              timezone={timezone}
               onTaskClick={handleTaskClick}
               onTaskSchedule={handleScheduleTaskDrop}
               onTaskReschedule={handleRescheduleTaskDrop}
@@ -827,7 +820,8 @@ export default function CalendarPage() {
           )}
           {viewMode === 'week' && (
             <WeeklyCalendar 
-              tasks={calendarTasks} 
+              tasks={calendarTasks}
+              timezone={timezone}
               onTaskClick={handleTaskClick}
               onTaskSchedule={handleScheduleTaskDrop}
               onTaskReschedule={handleRescheduleTaskDrop}
@@ -844,6 +838,7 @@ export default function CalendarPage() {
           {viewMode === 'month' && (
             <MonthCalendar
               tasks={calendarTasks}
+              timezone={timezone}
               onTaskClick={handleTaskClick}
               selectedGroupId={selectedGroupId}
               groups={groups}

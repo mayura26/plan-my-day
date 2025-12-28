@@ -1,9 +1,8 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useLayoutEffect, useRef } from 'react'
 import { Task, TaskGroup } from '@/lib/types'
 import { format, addDays, subDays, isSameDay, parseISO, isToday } from 'date-fns'
-import { useUserTimezone } from '@/hooks/use-user-timezone'
 import { getHoursAndMinutesInTimezone, getDateInTimezone, formatDateInTimezone } from '@/lib/timezone-utils'
 import { ChevronLeft, ChevronRight, Menu } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -13,6 +12,7 @@ import { CalendarSlot } from '@/components/calendar-slot'
 
 interface DayCalendarProps {
   tasks: Task[]
+  timezone: string
   onTaskClick?: (taskId: string) => void
   onTaskSchedule?: (taskId: string, day: Date, time: number) => void
   onTaskReschedule?: (taskId: string, day: Date, time: number) => void
@@ -38,7 +38,8 @@ const TIME_SLOTS = Array.from({ length: 24 * 4 }, (_, i) => {
 })
 
 export function DayCalendar({ 
-  tasks, 
+  tasks,
+  timezone,
   onTaskClick, 
   onTaskSchedule, 
   onTaskReschedule, 
@@ -53,7 +54,6 @@ export function DayCalendar({
   mobileViewToggleButtons,
   desktopViewToggleButtons
 }: DayCalendarProps) {
-  const { timezone } = useUserTimezone()
   const [currentDate, setCurrentDate] = useState(externalCurrentDate || new Date())
   const [currentTime, setCurrentTime] = useState(new Date())
   const calendarScrollRef = useRef<HTMLDivElement>(null)
@@ -74,29 +74,22 @@ export function DayCalendar({
     return () => clearInterval(timer)
   }, [])
 
-  // Auto-scroll to current time on mount
-  useEffect(() => {
-    const scrollToCurrentTime = () => {
-      if (!calendarScrollRef.current) return
+  // Auto-scroll to current time on mount - use useLayoutEffect to set scroll before paint
+  useLayoutEffect(() => {
+    if (!calendarScrollRef.current) return
 
-      const now = new Date()
-      const { hour, minute } = getHoursAndMinutesInTimezone(now, timezone)
-      const totalMinutes = hour * 60 + minute
-      
-      // Each hour is 64px (h-16 = 4rem = 64px)
-      const pixelsPerMinute = 64 / 60
-      const scrollPosition = totalMinutes * pixelsPerMinute
-      
-      // Offset to center the current time in view (subtract half viewport height)
-      const offset = calendarScrollRef.current.clientHeight / 2
-      
-      calendarScrollRef.current.scrollTop = scrollPosition - offset
-    }
-
-    // Small delay to ensure DOM is ready
-    const timeoutId = setTimeout(scrollToCurrentTime, 100)
-
-    return () => clearTimeout(timeoutId)
+    const now = new Date()
+    const { hour, minute } = getHoursAndMinutesInTimezone(now, timezone)
+    const totalMinutes = hour * 60 + minute
+    
+    // Each hour is 64px (h-16 = 4rem = 64px)
+    const pixelsPerMinute = 64 / 60
+    const scrollPosition = totalMinutes * pixelsPerMinute
+    
+    // Offset to center the current time in view (subtract half viewport height)
+    const offset = calendarScrollRef.current.clientHeight / 2
+    
+    calendarScrollRef.current.scrollTop = scrollPosition - offset
   }, [timezone, currentDate])
 
   const getTaskPosition = (task: Task) => {
