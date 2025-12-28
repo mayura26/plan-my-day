@@ -156,31 +156,32 @@ export function DayCalendar({
     <div className="flex flex-col h-full">
       {/* Calendar Header */}
       <div className="flex items-center justify-between p-4 border-b">
-        <div className="flex items-center gap-2 md:gap-4">
+        <div className="flex items-center gap-2 md:gap-4 flex-1 min-w-0">
           {/* Mobile sidebar toggle button */}
           {onSidebarToggle && (
             <Button
               variant="ghost"
               size="icon"
               onClick={onSidebarToggle}
-              className="md:hidden h-10 w-10"
+              className="md:hidden h-10 w-10 flex-shrink-0"
             >
               <Menu className="h-5 w-5" />
             </Button>
           )}
-          <h2 className="text-xl md:text-2xl font-bold">
+          <h2 className="text-xl md:text-2xl font-bold truncate">
             {format(currentDate, 'EEE d')}
           </h2>
-          <Button variant="outline" size="sm" onClick={goToToday} className="hidden sm:inline-flex">
+          <Button variant="outline" size="sm" onClick={goToToday} className="hidden sm:inline-flex flex-shrink-0">
             Today
           </Button>
-        </div>
-        <div className="flex items-center gap-2">
+          {/* View toggle buttons - shown on mobile in header */}
           {viewToggleButtons && (
-            <div className="hidden md:flex items-center gap-1 mr-2">
+            <div className="flex items-center gap-1 ml-auto sm:ml-2 flex-shrink-0">
               {viewToggleButtons}
             </div>
           )}
+        </div>
+        <div className="flex items-center gap-2 flex-shrink-0">
           <Button variant="ghost" size="icon" onClick={goToPreviousDay} className="h-10 w-10">
             <ChevronLeft className="h-4 w-4" />
           </Button>

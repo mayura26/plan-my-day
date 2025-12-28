@@ -535,29 +535,32 @@ export default function CalendarPage() {
     }
   }
 
-  // View toggle buttons component (for desktop header)
+  // View toggle buttons component (for header)
   const viewToggleButtons = (
     <>
       <Button
         variant={viewMode === 'day' ? 'default' : 'outline'}
         size="sm"
         onClick={() => handleViewModeChange('day')}
+        className="min-w-[2.5rem]"
       >
-        Day
+        D
       </Button>
       <Button
         variant={viewMode === 'week' ? 'default' : 'outline'}
         size="sm"
         onClick={() => handleViewModeChange('week')}
+        className="min-w-[2.5rem]"
       >
-        Week
+        W
       </Button>
       <Button
         variant={viewMode === 'month' ? 'default' : 'outline'}
         size="sm"
         onClick={() => handleViewModeChange('month')}
+        className="min-w-[2.5rem]"
       >
-        Month
+        M
       </Button>
     </>
   )
@@ -772,36 +775,6 @@ export default function CalendarPage() {
               )}
             </Card>
           )}
-          </div>
-        </div>
-
-        {/* View Toggle - Mobile (Top Bar) */}
-        <div className="md:hidden border-b bg-background">
-          <div className="flex items-center justify-center p-2 gap-1">
-            <Button
-              variant={viewMode === 'day' ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => handleViewModeChange('day')}
-              className="flex-1"
-            >
-              Day
-            </Button>
-            <Button
-              variant={viewMode === 'week' ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => handleViewModeChange('week')}
-              className="flex-1"
-            >
-              Week
-            </Button>
-            <Button
-              variant={viewMode === 'month' ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => handleViewModeChange('month')}
-              className="flex-1"
-            >
-              Month
-            </Button>
           </div>
         </div>
 
