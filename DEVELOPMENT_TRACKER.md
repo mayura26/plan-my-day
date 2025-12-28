@@ -1,5 +1,4 @@
 ### ⏳ Pending
-- [ ] LLines not correct
 - [ ] Add due date for tasks, why do we need estimate time. lets streamline this whole popup
 - [ ] Task groups, buttons in row two, with header
 - [ ] Side bar should show tasks overdue, upcoming etc.

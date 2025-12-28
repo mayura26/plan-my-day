@@ -145,7 +145,7 @@ export function DayCalendar({
   }
 
   const dayDate = getDateInTimezone(currentDate, timezone)
-  const isCurrentDay = isToday(dayDate)
+  const todayDate = getDateInTimezone(new Date(), timezone)
 
   return (
     <div className="flex flex-col h-full">
@@ -164,7 +164,18 @@ export function DayCalendar({
             </Button>
           )}
           <h2 className="text-xl md:text-2xl font-bold truncate">
-            {formatDateInTimezone(currentDate, timezone, { weekday: 'short', day: 'numeric' })}
+            {formatDateInTimezone(currentDate, timezone, { weekday: 'short' })}
+            {' '}
+            {formatDateInTimezone(currentDate, timezone, { day: 'numeric' })}
+            {' '}
+            {/* Mobile: short month */}
+            <span className="md:hidden">
+              {formatDateInTimezone(currentDate, timezone, { month: 'short' })}
+            </span>
+            {/* Desktop: long month */}
+            <span className="hidden md:inline">
+              {formatDateInTimezone(currentDate, timezone, { month: 'long' })}
+            </span>
           </h2>
           <Button variant="outline" size="sm" onClick={goToToday} className="hidden sm:inline-flex flex-shrink-0">
             Today
@@ -217,21 +228,6 @@ export function DayCalendar({
                 <CalendarSlot key={slotIndex} day={currentDate} hour={hour} minute={minute} />
               ))}
 
-              {/* Current time indicator (red line) */}
-              {isCurrentDay && (
-                <div 
-                  className="absolute left-0 right-0 pointer-events-none z-20"
-                  style={{ top: getCurrentTimePosition() }}
-                >
-                  <div className="relative">
-                    {/* Red dot */}
-                    <div className="absolute -left-1 -top-1.5 w-3 h-3 rounded-full bg-red-500 border-2 border-white" />
-                    {/* Red line */}
-                    <div className="h-0.5 bg-red-500 shadow-sm" />
-                  </div>
-                </div>
-              )}
-
               {/* Tasks overlay */}
               <div className="absolute inset-0 pointer-events-none">
                 {tasks
@@ -260,6 +256,21 @@ export function DayCalendar({
                     )
                   })}
               </div>
+
+              {/* Current time indicator (red line) - rendered after tasks to ensure it appears on top */}
+              {isSameDay(dayDate, todayDate) && (
+                <div 
+                  className="absolute left-0 right-0 pointer-events-none z-20"
+                  style={{ top: getCurrentTimePosition() }}
+                >
+                  <div className="relative">
+                    {/* Red dot */}
+                    <div className="absolute -left-1 -top-1.5 w-3 h-3 rounded-full bg-red-500 border-2 border-white" />
+                    {/* Red line */}
+                    <div className="h-0.5 bg-red-500 shadow-sm" />
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>

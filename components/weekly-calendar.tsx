@@ -216,7 +216,14 @@ export function WeeklyCalendar({ tasks, timezone, onTaskClick, onTaskSchedule, o
             </Button>
           )}
           <h2 className="text-xl md:text-2xl font-bold truncate">
-            {formatDateInTimezone(weekStart, timezone, { month: 'long', year: 'numeric' })}
+            {/* Mobile: short month */}
+            <span className="md:hidden">
+              {formatDateInTimezone(weekStart, timezone, { month: 'short', year: 'numeric' })}
+            </span>
+            {/* Desktop: long month */}
+            <span className="hidden md:inline">
+              {formatDateInTimezone(weekStart, timezone, { month: 'long', year: 'numeric' })}
+            </span>
           </h2>
           <Button variant="outline" size="sm" onClick={goToToday} className="hidden sm:inline-flex flex-shrink-0">
             Today

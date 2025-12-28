@@ -118,7 +118,14 @@ export function MonthCalendar({
             </Button>
           )}
           <h2 className="text-xl md:text-2xl font-bold truncate">
-            {format(currentDate, 'MMMM yyyy')}
+            {/* Mobile: short month */}
+            <span className="md:hidden">
+              {formatDateInTimezone(monthStart, timezone, { month: 'short', year: 'numeric' })}
+            </span>
+            {/* Desktop: long month */}
+            <span className="hidden md:inline">
+              {formatDateInTimezone(monthStart, timezone, { month: 'long', year: 'numeric' })}
+            </span>
           </h2>
           <Button variant="outline" size="sm" onClick={goToToday} className="hidden sm:inline-flex flex-shrink-0">
             Today
