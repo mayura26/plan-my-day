@@ -5,6 +5,8 @@ import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { DndContext, DragEndEvent, DragOverEvent, DragStartEvent, PointerSensor, useSensor, useSensors, closestCenter, DragOverlay } from '@dnd-kit/core'
 import { WeeklyCalendar } from '@/components/weekly-calendar'
+import { DayCalendar } from '@/components/day-calendar'
+import { MonthCalendar } from '@/components/month-calendar'
 import { TaskGroupManager, DraggableTaskItem } from '@/components/task-group-manager'
 import { TaskForm } from '@/components/task-form'
 import { TaskDetailDialog } from '@/components/task-detail-dialog'
@@ -14,10 +16,12 @@ import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Calendar as CalendarIcon, Plus, CheckSquare, Clock, Menu, X, ChevronDown, ChevronRight } from 'lucide-react'
 import { Task, TaskGroup, CreateTaskRequest } from '@/lib/types'
-import { format, startOfWeek } from 'date-fns'
+import { format, startOfWeek, startOfMonth } from 'date-fns'
 import { useUserTimezone } from '@/hooks/use-user-timezone'
 import { createDateInTimezone } from '@/lib/timezone-utils'
 import { cn } from '@/lib/utils'
+
+type ViewMode = 'day' | 'week' | 'month'
 
 export default function CalendarPage() {
   const { data: session, status } = useSession()
@@ -41,6 +45,8 @@ export default function CalendarPage() {
   const [hiddenGroups, setHiddenGroups] = useState<Set<string>>(new Set())
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['task-groups', 'quick-stats', 'unscheduled-tasks']))
+  const [viewMode, setViewMode] = useState<ViewMode>('week')
+  const [currentDate, setCurrentDate] = useState<Date>(new Date())
   
   // Configure drag sensors
   const sensors = useSensors(
@@ -514,6 +520,48 @@ export default function CalendarPage() {
     }
   }
 
+  const handleViewModeChange = (mode: ViewMode) => {
+    setViewMode(mode)
+    // When switching views, update currentDate appropriately
+    if (mode === 'day') {
+      // If switching to day view, use today or keep current date
+      setCurrentDate(new Date())
+    } else if (mode === 'month') {
+      // If switching to month view, use current month
+      setCurrentDate(startOfMonth(new Date()))
+    } else {
+      // Week view - use current week
+      setCurrentDate(new Date())
+    }
+  }
+
+  // View toggle buttons component (for desktop header)
+  const viewToggleButtons = (
+    <>
+      <Button
+        variant={viewMode === 'day' ? 'default' : 'outline'}
+        size="sm"
+        onClick={() => handleViewModeChange('day')}
+      >
+        Day
+      </Button>
+      <Button
+        variant={viewMode === 'week' ? 'default' : 'outline'}
+        size="sm"
+        onClick={() => handleViewModeChange('week')}
+      >
+        Week
+      </Button>
+      <Button
+        variant={viewMode === 'month' ? 'default' : 'outline'}
+        size="sm"
+        onClick={() => handleViewModeChange('month')}
+      >
+        Month
+      </Button>
+    </>
+  )
+
   if (status === 'loading' || isLoading) {
     return (
       <div className="container mx-auto p-6">
@@ -727,20 +775,86 @@ export default function CalendarPage() {
           </div>
         </div>
 
+        {/* View Toggle - Mobile (Top Bar) */}
+        <div className="md:hidden border-b bg-background">
+          <div className="flex items-center justify-center p-2 gap-1">
+            <Button
+              variant={viewMode === 'day' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => handleViewModeChange('day')}
+              className="flex-1"
+            >
+              Day
+            </Button>
+            <Button
+              variant={viewMode === 'week' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => handleViewModeChange('week')}
+              className="flex-1"
+            >
+              Week
+            </Button>
+            <Button
+              variant={viewMode === 'month' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => handleViewModeChange('month')}
+              className="flex-1"
+            >
+              Month
+            </Button>
+          </div>
+        </div>
+
         {/* Main Calendar Area */}
         <div className="flex-1 overflow-hidden w-full">
-          <WeeklyCalendar 
-            tasks={calendarTasks} 
-            onTaskClick={handleTaskClick}
-            onTaskSchedule={handleScheduleTaskDrop}
-            onTaskReschedule={handleRescheduleTaskDrop}
-            onTaskResize={handleTaskResize}
-            activeDragId={activeDragId}
-            resizingTaskId={resizingTaskId}
-            selectedGroupId={selectedGroupId}
-            groups={groups}
-            onSidebarToggle={() => setSidebarOpen(!sidebarOpen)}
-          />
+          {viewMode === 'day' && (
+            <DayCalendar
+              tasks={calendarTasks}
+              onTaskClick={handleTaskClick}
+              onTaskSchedule={handleScheduleTaskDrop}
+              onTaskReschedule={handleRescheduleTaskDrop}
+              onTaskResize={handleTaskResize}
+              activeDragId={activeDragId}
+              resizingTaskId={resizingTaskId}
+              selectedGroupId={selectedGroupId}
+              groups={groups}
+              onSidebarToggle={() => setSidebarOpen(!sidebarOpen)}
+              currentDate={currentDate}
+              onDateChange={setCurrentDate}
+              viewToggleButtons={viewToggleButtons}
+            />
+          )}
+          {viewMode === 'week' && (
+            <WeeklyCalendar 
+              tasks={calendarTasks} 
+              onTaskClick={handleTaskClick}
+              onTaskSchedule={handleScheduleTaskDrop}
+              onTaskReschedule={handleRescheduleTaskDrop}
+              onTaskResize={handleTaskResize}
+              activeDragId={activeDragId}
+              resizingTaskId={resizingTaskId}
+              selectedGroupId={selectedGroupId}
+              groups={groups}
+              onSidebarToggle={() => setSidebarOpen(!sidebarOpen)}
+              viewToggleButtons={viewToggleButtons}
+            />
+          )}
+          {viewMode === 'month' && (
+            <MonthCalendar
+              tasks={calendarTasks}
+              onTaskClick={handleTaskClick}
+              selectedGroupId={selectedGroupId}
+              groups={groups}
+              onSidebarToggle={() => setSidebarOpen(!sidebarOpen)}
+              currentDate={currentDate}
+              onDateChange={setCurrentDate}
+              onDateClick={(date) => {
+                setCurrentDate(date)
+                setViewMode('day')
+              }}
+              viewToggleButtons={viewToggleButtons}
+            />
+          )}
         </div>
       </div>
 

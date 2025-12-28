@@ -1,5 +1,4 @@
 ### ⏳ Pending
-- [ ] Toggle views between D/W/Month
 - [ ] LLines not correct
 - [ ] Add due date for tasks, why do we need estimate time. lets streamline this whole popup
 - [ ] Task groups, buttons in row two, with header
@@ -12,6 +11,8 @@
 - [ ] Ungrouped is bottom on list
 - [ ] Click on grid, create task in spot. quick tasks
 - [ ] Allow hiding of groups bar on left in desktop view
+- [ ] Handle logical task flow, of tasks being blocked by other tasks
+- [ ] Default for task
 
 ---
 
@@ -24,6 +25,10 @@
 - [ ] Basic task templates
 - [ ] Push notification system
 - [ ] Notification preferences panel
+- [ ] Allow shopping list style saved templates
+- [ ] Allow AI to optimise tasks lists, need space for one on one with AI
+- [ ] Allow open text mode which then geenrates into task/event
+- [ ] SUpport voice
 
 ---
 
