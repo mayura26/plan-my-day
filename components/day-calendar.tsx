@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { Task, TaskGroup } from '@/lib/types'
 import { format, addDays, subDays, isSameDay, parseISO, isToday } from 'date-fns'
 import { useUserTimezone } from '@/hooks/use-user-timezone'
-import { getHoursAndMinutesInTimezone, getDateInTimezone } from '@/lib/timezone-utils'
+import { getHoursAndMinutesInTimezone, getDateInTimezone, formatDateInTimezone } from '@/lib/timezone-utils'
 import { ChevronLeft, ChevronRight, Menu } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
@@ -24,7 +24,8 @@ interface DayCalendarProps {
   onSidebarToggle?: () => void
   currentDate?: Date
   onDateChange?: (date: Date) => void
-  viewToggleButtons?: React.ReactNode
+  mobileViewToggleButtons?: React.ReactNode
+  desktopViewToggleButtons?: React.ReactNode
 }
 
 const HOURS = Array.from({ length: 24 }, (_, i) => i) // 0-23 hours
@@ -49,7 +50,8 @@ export function DayCalendar({
   onSidebarToggle,
   currentDate: externalCurrentDate,
   onDateChange,
-  viewToggleButtons
+  mobileViewToggleButtons,
+  desktopViewToggleButtons
 }: DayCalendarProps) {
   const { timezone } = useUserTimezone()
   const [currentDate, setCurrentDate] = useState(externalCurrentDate || new Date())
@@ -169,15 +171,21 @@ export function DayCalendar({
             </Button>
           )}
           <h2 className="text-xl md:text-2xl font-bold truncate">
-            {format(currentDate, 'EEE d')}
+            {formatDateInTimezone(currentDate, timezone, { weekday: 'short', day: 'numeric' })}
           </h2>
           <Button variant="outline" size="sm" onClick={goToToday} className="hidden sm:inline-flex flex-shrink-0">
             Today
           </Button>
-          {/* View toggle buttons - shown on mobile in header */}
-          {viewToggleButtons && (
-            <div className="flex items-center gap-1 ml-auto sm:ml-2 flex-shrink-0">
-              {viewToggleButtons}
+          {/* View toggle buttons - mobile (abbreviated) */}
+          {mobileViewToggleButtons && (
+            <div className="flex items-center gap-1 ml-auto sm:ml-2 flex-shrink-0 md:hidden">
+              {mobileViewToggleButtons}
+            </div>
+          )}
+          {/* View toggle buttons - desktop (full text) */}
+          {desktopViewToggleButtons && (
+            <div className="hidden md:flex items-center gap-1 ml-auto sm:ml-2 flex-shrink-0">
+              {desktopViewToggleButtons}
             </div>
           )}
         </div>

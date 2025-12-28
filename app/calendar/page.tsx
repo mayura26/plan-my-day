@@ -535,8 +535,8 @@ export default function CalendarPage() {
     }
   }
 
-  // View toggle buttons component (for header)
-  const viewToggleButtons = (
+  // View toggle buttons - mobile (abbreviated)
+  const mobileViewToggleButtons = (
     <>
       <Button
         variant={viewMode === 'day' ? 'default' : 'outline'}
@@ -561,6 +561,33 @@ export default function CalendarPage() {
         className="min-w-[2.5rem]"
       >
         M
+      </Button>
+    </>
+  )
+
+  // View toggle buttons - desktop (full text)
+  const desktopViewToggleButtons = (
+    <>
+      <Button
+        variant={viewMode === 'day' ? 'default' : 'outline'}
+        size="sm"
+        onClick={() => handleViewModeChange('day')}
+      >
+        Day
+      </Button>
+      <Button
+        variant={viewMode === 'week' ? 'default' : 'outline'}
+        size="sm"
+        onClick={() => handleViewModeChange('week')}
+      >
+        Week
+      </Button>
+      <Button
+        variant={viewMode === 'month' ? 'default' : 'outline'}
+        size="sm"
+        onClick={() => handleViewModeChange('month')}
+      >
+        Month
       </Button>
     </>
   )
@@ -794,7 +821,8 @@ export default function CalendarPage() {
               onSidebarToggle={() => setSidebarOpen(!sidebarOpen)}
               currentDate={currentDate}
               onDateChange={setCurrentDate}
-              viewToggleButtons={viewToggleButtons}
+              mobileViewToggleButtons={mobileViewToggleButtons}
+              desktopViewToggleButtons={desktopViewToggleButtons}
             />
           )}
           {viewMode === 'week' && (
@@ -809,7 +837,8 @@ export default function CalendarPage() {
               selectedGroupId={selectedGroupId}
               groups={groups}
               onSidebarToggle={() => setSidebarOpen(!sidebarOpen)}
-              viewToggleButtons={viewToggleButtons}
+              mobileViewToggleButtons={mobileViewToggleButtons}
+              desktopViewToggleButtons={desktopViewToggleButtons}
             />
           )}
           {viewMode === 'month' && (
@@ -825,7 +854,8 @@ export default function CalendarPage() {
                 setCurrentDate(date)
                 setViewMode('day')
               }}
-              viewToggleButtons={viewToggleButtons}
+              mobileViewToggleButtons={mobileViewToggleButtons}
+              desktopViewToggleButtons={desktopViewToggleButtons}
             />
           )}
         </div>

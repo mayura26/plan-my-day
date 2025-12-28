@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { Task, TaskGroup } from '@/lib/types'
 import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addDays, addMonths, subMonths, isSameDay, isSameMonth, parseISO, isToday } from 'date-fns'
 import { useUserTimezone } from '@/hooks/use-user-timezone'
-import { formatTimeShort, getDateInTimezone } from '@/lib/timezone-utils'
+import { formatTimeShort, getDateInTimezone, formatDateInTimezone } from '@/lib/timezone-utils'
 import { ChevronLeft, ChevronRight, Menu } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
@@ -18,7 +18,8 @@ interface MonthCalendarProps {
   currentDate?: Date
   onDateChange?: (date: Date) => void
   onDateClick?: (date: Date) => void
-  viewToggleButtons?: React.ReactNode
+  mobileViewToggleButtons?: React.ReactNode
+  desktopViewToggleButtons?: React.ReactNode
 }
 
 const WEEK_DAYS = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT']
@@ -32,7 +33,8 @@ export function MonthCalendar({
   currentDate: externalCurrentDate,
   onDateChange,
   onDateClick,
-  viewToggleButtons
+  mobileViewToggleButtons,
+  desktopViewToggleButtons
 }: MonthCalendarProps) {
   const { timezone } = useUserTimezone()
   const [currentDate, setCurrentDate] = useState(externalCurrentDate || new Date())
@@ -121,10 +123,16 @@ export function MonthCalendar({
           <Button variant="outline" size="sm" onClick={goToToday} className="hidden sm:inline-flex flex-shrink-0">
             Today
           </Button>
-          {/* View toggle buttons - shown on mobile in header */}
-          {viewToggleButtons && (
-            <div className="flex items-center gap-1 ml-auto sm:ml-2 flex-shrink-0">
-              {viewToggleButtons}
+          {/* View toggle buttons - mobile (abbreviated) */}
+          {mobileViewToggleButtons && (
+            <div className="flex items-center gap-1 ml-auto sm:ml-2 flex-shrink-0 md:hidden">
+              {mobileViewToggleButtons}
+            </div>
+          )}
+          {/* View toggle buttons - desktop (full text) */}
+          {desktopViewToggleButtons && (
+            <div className="hidden md:flex items-center gap-1 ml-auto sm:ml-2 flex-shrink-0">
+              {desktopViewToggleButtons}
             </div>
           )}
         </div>
@@ -153,9 +161,11 @@ export function MonthCalendar({
         <div className="grid grid-cols-7 gap-1">
           {calendarDays.map((day, index) => {
             const dayTasks = getTasksForDate(day)
-            const isCurrentMonth = isSameMonth(day, currentDate)
-            const isCurrentDay = isToday(day)
             const dateInTimezone = getDateInTimezone(day, timezone)
+            const currentDateInTimezone = getDateInTimezone(currentDate, timezone)
+            const isCurrentMonth = isSameMonth(dateInTimezone, currentDateInTimezone)
+            const todayDate = getDateInTimezone(new Date(), timezone)
+            const isCurrentDay = isSameDay(dateInTimezone, todayDate)
 
             return (
               <div
@@ -175,7 +185,7 @@ export function MonthCalendar({
                   !isCurrentDay && isCurrentMonth && "text-foreground",
                   !isCurrentMonth && "text-muted-foreground"
                 )}>
-                  {format(day, 'd')}
+                  {formatDateInTimezone(day, timezone, { day: 'numeric' })}
                 </div>
 
                 {/* Tasks List */}

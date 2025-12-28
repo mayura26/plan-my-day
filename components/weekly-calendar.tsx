@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { Task, TaskGroup } from '@/lib/types'
 import { format, startOfWeek, addDays, addWeeks, subWeeks, isSameDay, parseISO, getHours, getMinutes, isToday } from 'date-fns'
 import { useUserTimezone } from '@/hooks/use-user-timezone'
-import { getHoursAndMinutesInTimezone, getDateInTimezone } from '@/lib/timezone-utils'
+import { getHoursAndMinutesInTimezone, getDateInTimezone, formatDateInTimezone } from '@/lib/timezone-utils'
 import { ChevronLeft, ChevronRight, Menu } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
@@ -22,7 +22,8 @@ interface WeeklyCalendarProps {
   selectedGroupId?: string | null
   groups?: TaskGroup[]
   onSidebarToggle?: () => void
-  viewToggleButtons?: React.ReactNode
+  mobileViewToggleButtons?: React.ReactNode
+  desktopViewToggleButtons?: React.ReactNode
 }
 
 const HOURS = Array.from({ length: 24 }, (_, i) => i) // 0-23 hours
@@ -35,7 +36,7 @@ const TIME_SLOTS = Array.from({ length: 24 * 4 }, (_, i) => {
   return { hour, minute, slotIndex: i }
 })
 
-export function WeeklyCalendar({ tasks, onTaskClick, onTaskSchedule, onTaskReschedule, onTaskResize, activeDragId, resizingTaskId, selectedGroupId, groups = [], onSidebarToggle, viewToggleButtons }: WeeklyCalendarProps) {
+export function WeeklyCalendar({ tasks, onTaskClick, onTaskSchedule, onTaskReschedule, onTaskResize, activeDragId, resizingTaskId, selectedGroupId, groups = [], onSidebarToggle, mobileViewToggleButtons, desktopViewToggleButtons }: WeeklyCalendarProps) {
   const { timezone } = useUserTimezone()
   const [currentWeek, setCurrentWeek] = useState(new Date())
   const [currentTime, setCurrentTime] = useState(new Date())
@@ -167,15 +168,21 @@ export function WeeklyCalendar({ tasks, onTaskClick, onTaskSchedule, onTaskResch
             </Button>
           )}
           <h2 className="text-xl md:text-2xl font-bold truncate">
-            {format(weekStart, 'MMMM yyyy')}
+            {formatDateInTimezone(weekStart, timezone, { month: 'long', year: 'numeric' })}
           </h2>
           <Button variant="outline" size="sm" onClick={goToToday} className="hidden sm:inline-flex flex-shrink-0">
             Today
           </Button>
-          {/* View toggle buttons - shown on mobile in header */}
-          {viewToggleButtons && (
-            <div className="flex items-center gap-1 ml-auto sm:ml-2 flex-shrink-0">
-              {viewToggleButtons}
+          {/* View toggle buttons - mobile (abbreviated) */}
+          {mobileViewToggleButtons && (
+            <div className="flex items-center gap-1 ml-auto sm:ml-2 flex-shrink-0 md:hidden">
+              {mobileViewToggleButtons}
+            </div>
+          )}
+          {/* View toggle buttons - desktop (full text) */}
+          {desktopViewToggleButtons && (
+            <div className="hidden md:flex items-center gap-1 ml-auto sm:ml-2 flex-shrink-0">
+              {desktopViewToggleButtons}
             </div>
           )}
         </div>
@@ -193,7 +200,9 @@ export function WeeklyCalendar({ tasks, onTaskClick, onTaskSchedule, onTaskResch
       <div className="grid grid-cols-[60px_repeat(7,1fr)] md:grid-cols-[80px_repeat(7,1fr)] border-b bg-muted/30">
         <div className="p-2"></div>
         {weekDays.map((day, index) => {
-          const isToday = isSameDay(day, new Date())
+          const dayDate = getDateInTimezone(day, timezone)
+          const todayDate = getDateInTimezone(new Date(), timezone)
+          const isToday = isSameDay(dayDate, todayDate)
           return (
             <div
               key={index}
@@ -206,13 +215,13 @@ export function WeeklyCalendar({ tasks, onTaskClick, onTaskSchedule, onTaskResch
                 "text-xs md:text-sm font-medium",
                 isToday && "text-primary"
               )}>
-                {format(day, 'EEE')}
+                {formatDateInTimezone(day, timezone, { weekday: 'short' })}
               </div>
               <div className={cn(
                 "text-lg md:text-2xl font-bold mt-1",
                 isToday && "bg-primary text-primary-foreground rounded-full w-8 h-8 md:w-10 md:h-10 flex items-center justify-center mx-auto"
               )}>
-                {format(day, 'd')}
+                {formatDateInTimezone(day, timezone, { day: 'numeric' })}
               </div>
             </div>
           )
@@ -246,7 +255,7 @@ export function WeeklyCalendar({ tasks, onTaskClick, onTaskSchedule, onTaskResch
                 ))}
 
                 {/* Current time indicator (red line) */}
-                {isToday(day) && (
+                {isSameDay(getDateInTimezone(day, timezone), getDateInTimezone(new Date(), timezone)) && (
                   <div 
                     className="absolute left-0 right-0 pointer-events-none z-20"
                     style={{ top: getCurrentTimePosition() }}
