@@ -17,9 +17,10 @@ export interface Task {
   description?: string | null;
   priority: number; // 1-5 scale (1 = most urgent, 5 = least urgent)
   status: TaskStatus;
-  duration?: number | null; // in minutes
+  duration?: number | null; // in minutes (estimated time to complete)
   scheduled_start?: string | null; // ISO datetime
   scheduled_end?: string | null; // ISO datetime
+  due_date?: string | null; // ISO datetime - when task must be completed by
   locked: boolean;
   group_id?: string | null;
   template_id?: string | null;
@@ -28,13 +29,12 @@ export interface Task {
   notification_sent: boolean;
   depends_on_task_id?: string | null;
   energy_level_required: number; // 1-5 scale (1 = low energy, 5 = high energy)
-  estimated_completion_time?: number | null; // in minutes
   created_at: string;
   updated_at: string;
 }
 
 export type TaskStatus = "pending" | "in_progress" | "completed" | "cancelled";
-export type TaskType = "task" | "event";
+export type TaskType = "task" | "event" | "todo";
 
 export interface TaskGroup {
   id: string;
@@ -115,15 +115,15 @@ export interface CreateTaskRequest {
   title: string;
   description?: string;
   priority?: number;
-  duration?: number;
+  duration?: number; // estimated time in minutes
   task_type?: TaskType;
   group_id?: string;
   template_id?: string;
   energy_level_required?: number;
-  estimated_completion_time?: number;
   depends_on_task_id?: string;
   scheduled_start?: string;
   scheduled_end?: string;
+  due_date?: string; // when task must be completed by
 }
 
 export interface UpdateTaskRequest extends Partial<CreateTaskRequest> {
@@ -152,7 +152,7 @@ export interface CalendarEvent {
   title: string;
   start: Date;
   end: Date;
-  type: "task" | "event" | "google_calendar";
+  type: TaskType | "google_calendar";
   priority?: number;
   status?: TaskStatus;
   locked?: boolean;

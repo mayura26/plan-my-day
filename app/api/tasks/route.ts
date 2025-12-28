@@ -69,6 +69,7 @@ export async function GET(request: NextRequest) {
       duration: row.duration as number | null,
       scheduled_start: row.scheduled_start as string | null,
       scheduled_end: row.scheduled_end as string | null,
+      due_date: row.due_date as string | null,
       locked: Boolean(row.locked),
       group_id: row.group_id as string | null,
       template_id: row.template_id as string | null,
@@ -77,7 +78,6 @@ export async function GET(request: NextRequest) {
       notification_sent: Boolean(row.notification_sent),
       depends_on_task_id: row.depends_on_task_id as string | null,
       energy_level_required: row.energy_level_required as number,
-      estimated_completion_time: row.estimated_completion_time as number | null,
       created_at: row.created_at as string,
       updated_at: row.updated_at as string,
     }));
@@ -116,8 +116,9 @@ export async function POST(request: NextRequest) {
       priority: body.priority || 3,
       status: "pending",
       duration: body.duration || null,
-      scheduled_start: null,
-      scheduled_end: null,
+      scheduled_start: body.scheduled_start || null,
+      scheduled_end: body.scheduled_end || null,
+      due_date: body.due_date || null,
       locked: false,
       group_id: body.group_id || null,
       template_id: body.template_id || null,
@@ -126,7 +127,6 @@ export async function POST(request: NextRequest) {
       notification_sent: false,
       depends_on_task_id: body.depends_on_task_id || null,
       energy_level_required: body.energy_level_required || 3,
-      estimated_completion_time: body.estimated_completion_time || null,
       created_at: now,
       updated_at: now,
     };
@@ -135,9 +135,9 @@ export async function POST(request: NextRequest) {
       `
       INSERT INTO tasks (
         id, user_id, title, description, priority, status, duration,
-        scheduled_start, scheduled_end, locked, group_id, template_id,
+        scheduled_start, scheduled_end, due_date, locked, group_id, template_id,
         task_type, google_calendar_event_id, notification_sent,
-        depends_on_task_id, energy_level_required, estimated_completion_time,
+        depends_on_task_id, energy_level_required,
         created_at, updated_at
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `,
@@ -151,6 +151,7 @@ export async function POST(request: NextRequest) {
         task.duration || null,
         task.scheduled_start || null,
         task.scheduled_end || null,
+        task.due_date || null,
         task.locked,
         task.group_id || null,
         task.template_id || null,
@@ -159,7 +160,6 @@ export async function POST(request: NextRequest) {
         task.notification_sent,
         task.depends_on_task_id || null,
         task.energy_level_required,
-        task.estimated_completion_time || null,
         task.created_at,
         task.updated_at,
       ]

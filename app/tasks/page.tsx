@@ -325,10 +325,10 @@ export default function TasksPage() {
                 group_id: editingTask.group_id || undefined,
                 template_id: editingTask.template_id || undefined,
                 energy_level_required: editingTask.energy_level_required,
-                estimated_completion_time: editingTask.estimated_completion_time || undefined,
                 depends_on_task_id: editingTask.depends_on_task_id || undefined,
                 scheduled_start: editingTask.scheduled_start || undefined,
                 scheduled_end: editingTask.scheduled_end || undefined,
+                due_date: editingTask.due_date || undefined,
               }}
               isLoading={isUpdating}
             />

@@ -480,7 +480,7 @@ export default function CalendarPage() {
     const hours = Math.floor(snappedMinutes / 60);
     const minutes = snappedMinutes % 60;
 
-    const duration = task.duration || task.estimated_completion_time || 60; // Default to 60 minutes
+    const duration = task.duration || 60; // Default to 60 minutes
     // Create the start date in the user's timezone, then convert to UTC
     const startDate = createDateInTimezone(day, hours, minutes, timezone);
     const endDate = new Date(startDate.getTime() + duration * 60000);
@@ -875,10 +875,10 @@ export default function CalendarPage() {
                 group_id: editingTask.group_id || undefined,
                 template_id: editingTask.template_id || undefined,
                 energy_level_required: editingTask.energy_level_required,
-                estimated_completion_time: editingTask.estimated_completion_time || undefined,
                 depends_on_task_id: editingTask.depends_on_task_id || undefined,
                 scheduled_start: editingTask.scheduled_start || undefined,
                 scheduled_end: editingTask.scheduled_end || undefined,
+                due_date: editingTask.due_date || undefined,
               }}
               isLoading={isUpdating}
             />

@@ -1,18 +1,20 @@
 ### ⏳ Pending
-- [ ] Add due date for tasks, why do we need estimate time. lets streamline this whole popup
-- [ ] Task groups, buttons in row two, with header
-- [ ] Side bar should show tasks overdue, upcoming etc.
 - [ ] Tasks should support subtasks. sub task can be pushed into new task for scheduling if neededW
+- [ ] Handle logical task flow, of tasks being blocked by other tasks
+- [ ] Task overrun into new task
+- [ ] Spew into subtasks and when this happens parent task owns them and complete when all subs is completed. subs only need time needed and can be scdule aloone but no group, task. but yes to priority adn energy
+
 - [ ] PWA setup with service worker
 - [ ] Basic offline functionality
+
 - [ ] Add toasts
-- [ ] Task view. tasks should be flatter more like a list
+
 - [ ] Group badge on both views
-- [ ] Ungrouped is bottom on list
+
 - [ ] Click on grid, create task in spot. quick tasks
+
 - [ ] Allow hiding of groups bar on left in desktop view
-- [ ] Handle logical task flow, of tasks being blocked by other tasks
-- [ ] Default for task
+
 
 ---
 

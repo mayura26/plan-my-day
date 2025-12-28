@@ -33,6 +33,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       duration: row.duration as number | null,
       scheduled_start: row.scheduled_start as string | null,
       scheduled_end: row.scheduled_end as string | null,
+      due_date: row.due_date as string | null,
       locked: Boolean(row.locked),
       group_id: row.group_id as string | null,
       template_id: row.template_id as string | null,
@@ -41,7 +42,6 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       notification_sent: Boolean(row.notification_sent),
       depends_on_task_id: row.depends_on_task_id as string | null,
       energy_level_required: row.energy_level_required as number,
-      estimated_completion_time: row.estimated_completion_time as number | null,
       created_at: row.created_at as string,
       updated_at: row.updated_at as string,
     };
@@ -161,10 +161,6 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       updateFields.push("energy_level_required = ?");
       values.push(body.energy_level_required);
     }
-    if (body.estimated_completion_time !== undefined) {
-      updateFields.push("estimated_completion_time = ?");
-      values.push(body.estimated_completion_time);
-    }
     if (body.task_type !== undefined) {
       updateFields.push("task_type = ?");
       values.push(body.task_type);
@@ -172,6 +168,10 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     if (body.depends_on_task_id !== undefined) {
       updateFields.push("depends_on_task_id = ?");
       values.push(body.depends_on_task_id);
+    }
+    if (body.due_date !== undefined) {
+      updateFields.push("due_date = ?");
+      values.push(body.due_date);
     }
 
     updateFields.push("updated_at = ?");
@@ -201,6 +201,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       duration: row.duration as number | null,
       scheduled_start: row.scheduled_start as string | null,
       scheduled_end: row.scheduled_end as string | null,
+      due_date: row.due_date as string | null,
       locked: Boolean(row.locked),
       group_id: row.group_id as string | null,
       template_id: row.template_id as string | null,
@@ -209,7 +210,6 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       notification_sent: Boolean(row.notification_sent),
       depends_on_task_id: row.depends_on_task_id as string | null,
       energy_level_required: row.energy_level_required as number,
-      estimated_completion_time: row.estimated_completion_time as number | null,
       created_at: row.created_at as string,
       updated_at: row.updated_at as string,
     };

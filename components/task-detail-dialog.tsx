@@ -254,11 +254,11 @@ export function TaskDetailDialog({
                     </span>
                   </div>
                 )}
-                {task.estimated_completion_time && (
+                {task.due_date && (
                   <div className="flex items-center gap-2 text-sm col-span-2">
-                    <Clock className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-muted-foreground">Estimated Time:</span>
-                    <span className="font-medium">{task.estimated_completion_time} min</span>
+                    <Calendar className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-muted-foreground">Due:</span>
+                    <span className="font-medium">{formatDateTimeFull(task.due_date, timezone)}</span>
                   </div>
                 )}
               </div>

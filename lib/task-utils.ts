@@ -49,6 +49,7 @@ export const STATUS_COLORS = {
 export const TASK_TYPE_LABELS = {
   task: "Task",
   event: "Event",
+  todo: "To-Do",
 } as const;
 
 // Utility functions
@@ -88,22 +89,47 @@ export function parseDuration(duration: string): number {
 }
 
 export function isTaskOverdue(task: Task): boolean {
-  if (task.status === "completed" || !task.scheduled_end) {
-    return false;
-  }
-  return new Date(task.scheduled_end) < new Date();
-}
-
-export function isTaskDueSoon(task: Task, hoursThreshold: number = 2): boolean {
-  if (task.status === "completed" || !task.scheduled_start) {
+  if (task.status === "completed" || task.status === "cancelled") {
     return false;
   }
   const now = new Date();
-  const taskStart = new Date(task.scheduled_start);
-  const timeDiff = taskStart.getTime() - now.getTime();
-  const hoursDiff = timeDiff / (1000 * 60 * 60);
+  // Check if due_date has passed
+  if (task.due_date && new Date(task.due_date) < now) {
+    return true;
+  }
+  // Check if scheduled_end has passed
+  if (task.scheduled_end && new Date(task.scheduled_end) < now) {
+    return true;
+  }
+  return false;
+}
 
-  return hoursDiff <= hoursThreshold && hoursDiff > 0;
+export function isTaskDueSoon(task: Task, hoursThreshold: number = 2): boolean {
+  if (task.status === "completed" || task.status === "cancelled") {
+    return false;
+  }
+  const now = new Date();
+  const thresholdMs = hoursThreshold * 60 * 60 * 1000;
+
+  // Check if due_date is approaching
+  if (task.due_date) {
+    const dueDate = new Date(task.due_date);
+    const timeDiff = dueDate.getTime() - now.getTime();
+    if (timeDiff > 0 && timeDiff <= thresholdMs) {
+      return true;
+    }
+  }
+
+  // Check if scheduled_start is approaching
+  if (task.scheduled_start) {
+    const taskStart = new Date(task.scheduled_start);
+    const timeDiff = taskStart.getTime() - now.getTime();
+    if (timeDiff > 0 && timeDiff <= thresholdMs) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 export function getTaskProgress(task: Task): number {
@@ -246,14 +272,21 @@ export function filterTasksByDateRange(tasks: Task[], startDate: string, endDate
 // Metric helper functions for task insights
 
 /**
- * Get all overdue tasks (scheduled_end is in the past and not completed/cancelled)
+ * Get all overdue tasks (due_date or scheduled_end is in the past and not completed/cancelled)
  */
 export function getOverdueTasks(tasks: Task[]): Task[] {
   const now = new Date();
   return tasks.filter((task) => {
     if (task.status === "completed" || task.status === "cancelled") return false;
-    if (!task.scheduled_end) return false;
-    return new Date(task.scheduled_end) < now;
+    // Check if due_date has passed
+    if (task.due_date && new Date(task.due_date) < now) {
+      return true;
+    }
+    // Check if scheduled_end has passed
+    if (task.scheduled_end && new Date(task.scheduled_end) < now) {
+      return true;
+    }
+    return false;
   });
 }
 
