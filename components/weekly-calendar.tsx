@@ -228,7 +228,7 @@ export function WeeklyCalendar({ tasks, onTaskClick, onTaskSchedule, onTaskResch
               {HOURS.map((hour) => (
                 <div
                   key={hour}
-                  className="h-16 border-b px-1 md:px-2 text-xs text-muted-foreground flex items-start pt-1"
+                  className="h-16 border-b-2 border-border px-1 md:px-2 text-xs text-muted-foreground flex items-center"
                 >
                   <span className="hidden sm:inline">{formatTime(hour)}</span>
                   <span className="sm:hidden">{hour === 0 ? '12' : hour > 12 ? hour - 12 : hour}{hour >= 12 ? 'p' : 'a'}</span>
@@ -240,7 +240,7 @@ export function WeeklyCalendar({ tasks, onTaskClick, onTaskSchedule, onTaskResch
             {weekDays.map((day, dayIndex) => (
               <div key={dayIndex} className="relative border-l">
                 {/* 15-minute interval slots with drop zones */}
-                {TIME_SLOTS.map(({ hour, minute, slotIndex }) => (
+                {TIME_SLOTS.slice(1).map(({ hour, minute, slotIndex }) => (
                   <CalendarSlot key={slotIndex} day={day} hour={hour} minute={minute} />
                 ))}
 
