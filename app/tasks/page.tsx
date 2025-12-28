@@ -70,7 +70,8 @@ export default function TasksPage() {
       fetchTasks();
       fetchGroups();
     }
-  }, [session, fetchGroups, fetchTasks]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session]);
 
   // Create task
   const handleCreateTask = async (taskData: CreateTaskRequest) => {

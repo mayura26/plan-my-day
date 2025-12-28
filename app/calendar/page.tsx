@@ -73,18 +73,6 @@ export default function CalendarPage() {
     })
   );
 
-  useEffect(() => {
-    if (status === "unauthenticated") {
-      router.push("/auth/signin");
-      return;
-    }
-
-    // Only fetch tasks once authenticated AND timezone is loaded
-    if (status === "authenticated" && !timezoneLoading) {
-      fetchTasks();
-    }
-  }, [status, router, timezoneLoading, fetchTasks]);
-
   const fetchTasks = async () => {
     try {
       setIsLoading(true);
@@ -115,10 +103,24 @@ export default function CalendarPage() {
   };
 
   useEffect(() => {
+    if (status === "unauthenticated") {
+      router.push("/auth/signin");
+      return;
+    }
+
+    // Only fetch tasks once authenticated AND timezone is loaded
+    if (status === "authenticated" && !timezoneLoading) {
+      fetchTasks();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status, router, timezoneLoading]);
+
+  useEffect(() => {
     if (session) {
       fetchGroups();
     }
-  }, [session, fetchGroups]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session]);
 
   const handleTaskClick = (taskId: string) => {
     const task = tasks.find((t) => t.id === taskId);

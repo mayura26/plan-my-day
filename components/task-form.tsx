@@ -82,21 +82,8 @@ export function TaskForm({ onSubmit, onCancel, initialData, isLoading = false }:
       });
       setShowDescription(!!initialData.description);
     }
-  }, [
-    initialData?.title,
-    initialData?.scheduled_start,
-    initialData?.scheduled_end,
-    initialData?.due_date,
-    timezone,
-    initialData.depends_on_task_id,
-    initialData.description,
-    initialData.duration,
-    initialData.energy_level_required,
-    initialData.group_id,
-    initialData.priority,
-    initialData.task_type,
-    initialData,
-  ]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialData, timezone]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

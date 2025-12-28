@@ -245,9 +245,27 @@ export function TaskGroupManager({
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const [hiddenGroups, setHiddenGroups] = useState<Set<string>>(new Set());
 
+  const fetchGroups = async () => {
+    try {
+      setIsLoading(true);
+      const response = await fetch("/api/task-groups");
+      if (response.ok) {
+        const data = await response.json();
+        setGroups(data.groups || []);
+      } else {
+        console.error("Failed to fetch task groups");
+      }
+    } catch (error) {
+      console.error("Error fetching task groups:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   useEffect(() => {
     fetchGroups();
-  }, [fetchGroups]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Auto-rotate color when create dialog opens
   useEffect(() => {
@@ -277,23 +295,6 @@ export function TaskGroupManager({
       setNewGroupColor(getNextColor());
     }
   }, [isCreateDialogOpen, groups]);
-
-  const fetchGroups = async () => {
-    try {
-      setIsLoading(true);
-      const response = await fetch("/api/task-groups");
-      if (response.ok) {
-        const data = await response.json();
-        setGroups(data.groups || []);
-      } else {
-        console.error("Failed to fetch task groups");
-      }
-    } catch (error) {
-      console.error("Error fetching task groups:", error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   const createGroup = async () => {
     if (!newGroupName.trim()) return;
