@@ -358,3 +358,85 @@ export function createDateInTimezone(
   return new Date(Date.UTC(year, month, date, hours, minutes, 0, 0))
 }
 
+/**
+ * Convert a UTC ISO datetime string to datetime-local format in a specific timezone
+ * This is used for displaying dates in HTML datetime-local inputs
+ * 
+ * @param isoString - UTC ISO datetime string (e.g., "2025-12-22T13:15:00Z")
+ * @param timezone - The timezone to display the date in
+ * @returns datetime-local format string (e.g., "2025-12-22T08:15")
+ */
+export function formatDateTimeLocalForTimezone(
+  isoString: string | null | undefined,
+  timezone: string = 'UTC'
+): string {
+  if (!isoString) return ''
+  
+  try {
+    const date = new Date(isoString)
+    const formatter = new Intl.DateTimeFormat('en-US', {
+      timeZone: timezone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    })
+    
+    const parts = formatter.formatToParts(date)
+    const year = parts.find(p => p.type === 'year')?.value || '0'
+    const month = parts.find(p => p.type === 'month')?.value || '0'
+    const day = parts.find(p => p.type === 'day')?.value || '0'
+    const hour = parts.find(p => p.type === 'hour')?.value || '0'
+    const minute = parts.find(p => p.type === 'minute')?.value || '0'
+    
+    return `${year}-${month}-${day}T${hour}:${minute}`
+  } catch {
+    return ''
+  }
+}
+
+/**
+ * Convert a datetime-local string (in a specific timezone) to UTC ISO string
+ * This is used when submitting forms - the user enters a time in their timezone,
+ * and we need to convert it to UTC for database storage.
+ * 
+ * @param datetimeLocal - datetime-local format string (e.g., "2025-12-22T08:15")
+ * @param timezone - The timezone that the datetime-local string represents
+ * @returns UTC ISO datetime string (e.g., "2025-12-22T13:15:00.000Z")
+ */
+export function parseDateTimeLocalToUTC(
+  datetimeLocal: string | null | undefined,
+  timezone: string = 'UTC'
+): string | undefined {
+  if (!datetimeLocal) return undefined
+  
+  try {
+    // Parse the datetime-local string (format: "YYYY-MM-DDTHH:mm")
+    const match = datetimeLocal.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/)
+    if (!match) {
+      console.error('Invalid datetime-local format:', datetimeLocal)
+      return undefined
+    }
+    
+    const year = parseInt(match[1], 10)
+    const month = parseInt(match[2], 10) - 1 // Month is 0-indexed
+    const day = parseInt(match[3], 10)
+    const hours = parseInt(match[4], 10)
+    const minutes = parseInt(match[5], 10)
+    
+    // Create a Date object representing the date at midnight in the timezone
+    // We'll use this to find the correct UTC timestamp
+    const dayDate = new Date(year, month, day)
+    
+    // Use createDateInTimezone to convert the time in the user's timezone to UTC
+    const utcDate = createDateInTimezone(dayDate, hours, minutes, timezone)
+    
+    return utcDate.toISOString()
+  } catch (error) {
+    console.error('Error parsing datetime-local to UTC:', error)
+    return undefined
+  }
+}
+

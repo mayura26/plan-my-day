@@ -8,6 +8,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { CreateTaskRequest, TaskType, TaskGroup } from '@/lib/types'
 import { PRIORITY_LABELS, ENERGY_LABELS, TASK_TYPE_LABELS } from '@/lib/task-utils'
+import { useUserTimezone } from '@/hooks/use-user-timezone'
+import { formatDateTimeLocalForTimezone, parseDateTimeLocalToUTC } from '@/lib/timezone-utils'
 
 interface TaskFormProps {
   onSubmit: (task: CreateTaskRequest) => Promise<void>
@@ -17,21 +19,7 @@ interface TaskFormProps {
 }
 
 export function TaskForm({ onSubmit, onCancel, initialData, isLoading = false }: TaskFormProps) {
-  // Convert ISO datetime to datetime-local format
-  const formatDateTimeLocal = (isoString?: string) => {
-    if (!isoString) return ''
-    try {
-      const date = new Date(isoString)
-      const year = date.getFullYear()
-      const month = String(date.getMonth() + 1).padStart(2, '0')
-      const day = String(date.getDate()).padStart(2, '0')
-      const hours = String(date.getHours()).padStart(2, '0')
-      const minutes = String(date.getMinutes()).padStart(2, '0')
-      return `${year}-${month}-${day}T${hours}:${minutes}`
-    } catch {
-      return ''
-    }
-  }
+  const { timezone } = useUserTimezone()
 
   const [formData, setFormData] = useState<CreateTaskRequest>({
     title: initialData?.title || '',
@@ -44,8 +32,8 @@ export function TaskForm({ onSubmit, onCancel, initialData, isLoading = false }:
     group_id: initialData?.group_id || undefined,
     template_id: initialData?.template_id || undefined,
     depends_on_task_id: initialData?.depends_on_task_id || undefined,
-    scheduled_start: formatDateTimeLocal(initialData?.scheduled_start),
-    scheduled_end: formatDateTimeLocal(initialData?.scheduled_end),
+    scheduled_start: formatDateTimeLocalForTimezone(initialData?.scheduled_start, timezone),
+    scheduled_end: formatDateTimeLocalForTimezone(initialData?.scheduled_end, timezone),
   })
 
   const [errors, setErrors] = useState<Record<string, string>>({})
@@ -67,7 +55,7 @@ export function TaskForm({ onSubmit, onCancel, initialData, isLoading = false }:
     fetchTaskGroups()
   }, [])
 
-  // Update form data when initialData changes (for edit mode)
+  // Update form data when initialData or timezone changes (for edit mode)
   useEffect(() => {
     if (initialData && initialData.title) {
       setFormData({
@@ -81,11 +69,11 @@ export function TaskForm({ onSubmit, onCancel, initialData, isLoading = false }:
         group_id: initialData.group_id || undefined,
         template_id: initialData.template_id || undefined,
         depends_on_task_id: initialData.depends_on_task_id || undefined,
-        scheduled_start: formatDateTimeLocal(initialData.scheduled_start),
-        scheduled_end: formatDateTimeLocal(initialData.scheduled_end),
+        scheduled_start: formatDateTimeLocalForTimezone(initialData.scheduled_start, timezone),
+        scheduled_end: formatDateTimeLocalForTimezone(initialData.scheduled_end, timezone),
       })
     }
-  }, [initialData?.title, initialData?.scheduled_start, initialData?.scheduled_end]) // Re-run when initialData changes
+  }, [initialData?.title, initialData?.scheduled_start, initialData?.scheduled_end, timezone]) // Re-run when initialData or timezone changes
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -112,13 +100,13 @@ export function TaskForm({ onSubmit, onCancel, initialData, isLoading = false }:
     }
 
     try {
-      // Convert datetime-local to ISO format
+      // Convert datetime-local (in user's timezone) to UTC ISO format
       const submissionData = { ...formData }
       if (submissionData.scheduled_start) {
-        submissionData.scheduled_start = new Date(submissionData.scheduled_start).toISOString()
+        submissionData.scheduled_start = parseDateTimeLocalToUTC(submissionData.scheduled_start, timezone)
       }
       if (submissionData.scheduled_end) {
-        submissionData.scheduled_end = new Date(submissionData.scheduled_end).toISOString()
+        submissionData.scheduled_end = parseDateTimeLocalToUTC(submissionData.scheduled_end, timezone)
       }
       
       await onSubmit(submissionData)
@@ -143,14 +131,26 @@ export function TaskForm({ onSubmit, onCancel, initialData, isLoading = false }:
         
         if (startTime && duration && !prev.scheduled_end) {
           try {
-            const startDate = new Date(startTime)
-            const endDate = new Date(startDate.getTime() + duration * 60000) // duration is in minutes
-            const year = endDate.getFullYear()
-            const month = String(endDate.getMonth() + 1).padStart(2, '0')
-            const day = String(endDate.getDate()).padStart(2, '0')
-            const hours = String(endDate.getHours()).padStart(2, '0')
-            const minutes = String(endDate.getMinutes()).padStart(2, '0')
-            updated.scheduled_end = `${year}-${month}-${day}T${hours}:${minutes}`
+            // Parse the datetime-local string to get date/time components in user's timezone
+            const match = startTime.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/)
+            if (match) {
+              const year = parseInt(match[1], 10)
+              const month = parseInt(match[2], 10) - 1
+              const day = parseInt(match[3], 10)
+              const hours = parseInt(match[4], 10)
+              const minutes = parseInt(match[5], 10)
+              
+              // Calculate end time in user's timezone
+              const startDate = new Date(year, month, day, hours, minutes)
+              const endDate = new Date(startDate.getTime() + duration * 60000) // duration is in minutes
+              
+              const endYear = endDate.getFullYear()
+              const endMonth = String(endDate.getMonth() + 1).padStart(2, '0')
+              const endDay = String(endDate.getDate()).padStart(2, '0')
+              const endHours = String(endDate.getHours()).padStart(2, '0')
+              const endMinutes = String(endDate.getMinutes()).padStart(2, '0')
+              updated.scheduled_end = `${endYear}-${endMonth}-${endDay}T${endHours}:${endMinutes}`
+            }
           } catch (error) {
             console.error('Error calculating end time:', error)
           }
@@ -160,14 +160,26 @@ export function TaskForm({ onSubmit, onCancel, initialData, isLoading = false }:
       // Also update end time if start time changes and end time already exists
       if (field === 'scheduled_start' && prev.scheduled_end && prev.duration) {
         try {
-          const startDate = new Date(value)
-          const endDate = new Date(startDate.getTime() + prev.duration * 60000)
-          const year = endDate.getFullYear()
-          const month = String(endDate.getMonth() + 1).padStart(2, '0')
-          const day = String(endDate.getDate()).padStart(2, '0')
-          const hours = String(endDate.getHours()).padStart(2, '0')
-          const minutes = String(endDate.getMinutes()).padStart(2, '0')
-          updated.scheduled_end = `${year}-${month}-${day}T${hours}:${minutes}`
+          // Parse the datetime-local string to get date/time components in user's timezone
+          const match = value.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/)
+          if (match) {
+            const year = parseInt(match[1], 10)
+            const month = parseInt(match[2], 10) - 1
+            const day = parseInt(match[3], 10)
+            const hours = parseInt(match[4], 10)
+            const minutes = parseInt(match[5], 10)
+            
+            // Calculate end time in user's timezone
+            const startDate = new Date(year, month, day, hours, minutes)
+            const endDate = new Date(startDate.getTime() + prev.duration * 60000)
+            
+            const endYear = endDate.getFullYear()
+            const endMonth = String(endDate.getMonth() + 1).padStart(2, '0')
+            const endDay = String(endDate.getDate()).padStart(2, '0')
+            const endHours = String(endDate.getHours()).padStart(2, '0')
+            const endMinutes = String(endDate.getMinutes()).padStart(2, '0')
+            updated.scheduled_end = `${endYear}-${endMonth}-${endDay}T${endHours}:${endMinutes}`
+          }
         } catch (error) {
           console.error('Error updating end time:', error)
         }
