@@ -208,7 +208,14 @@ export default function CalendarPage() {
       });
 
       if (response.ok) {
-        setTasks((prev) => prev.filter((task) => task.id !== taskId));
+        const data = await response.json();
+        // Remove the deleted task and all its subtasks from the UI
+        const deletedIds = data.deleted_task_ids || [taskId];
+        setTasks((prev) => prev.filter((task) => !deletedIds.includes(task.id)));
+        // Also clear selected task if it was deleted
+        if (selectedTask && deletedIds.includes(selectedTask.id)) {
+          setSelectedTask(null);
+        }
       } else {
         const error = await response.json();
         console.error("Failed to delete task:", error);

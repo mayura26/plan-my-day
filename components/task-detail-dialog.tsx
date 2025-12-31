@@ -9,20 +9,23 @@ import {
   Clock,
   Edit,
   Flag,
+  GitBranch,
+  Link2,
   Lock,
   Tag,
   Trash2,
   Zap,
 } from "lucide-react";
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { SubtaskManager } from "@/components/subtask-manager";
 import { useUserTimezone } from "@/hooks/use-user-timezone";
 import { ENERGY_LABELS, PRIORITY_LABELS, TASK_TYPE_LABELS } from "@/lib/task-utils";
 import { formatDateTimeFull } from "@/lib/timezone-utils";
-import type { Task } from "@/lib/types";
+import type { Task, TaskDependency, TaskStatus } from "@/lib/types";
 
 interface TaskDetailDialogProps {
   task: Task | null;
@@ -32,6 +35,12 @@ interface TaskDetailDialogProps {
   onDelete?: (taskId: string) => void;
   onStatusChange?: (taskId: string, status: Task["status"]) => void;
   onUnschedule?: (taskId: string) => void;
+  onTaskUpdate?: () => void;
+}
+
+interface DependencyInfo extends TaskDependency {
+  dependency_title: string;
+  dependency_status: TaskStatus;
 }
 
 export function TaskDetailDialog({
@@ -42,10 +51,35 @@ export function TaskDetailDialog({
   onDelete,
   onStatusChange,
   onUnschedule,
+  onTaskUpdate,
 }: TaskDetailDialogProps) {
   const [isDeleting, setIsDeleting] = useState(false);
   const [isUnscheduling, setIsUnscheduling] = useState(false);
+  const [dependencies, setDependencies] = useState<DependencyInfo[]>([]);
+  const [blockedBy, setBlockedBy] = useState<Task[]>([]);
+  const [isBlocked, setIsBlocked] = useState(false);
   const { timezone } = useUserTimezone();
+
+  const fetchDependencies = useCallback(async () => {
+    if (!task) return;
+    try {
+      const response = await fetch(`/api/tasks/${task.id}/dependencies`);
+      if (response.ok) {
+        const data = await response.json();
+        setDependencies(data.dependencies || []);
+        setBlockedBy(data.blocked_by || []);
+        setIsBlocked(data.is_blocked || false);
+      }
+    } catch (error) {
+      console.error("Error fetching dependencies:", error);
+    }
+  }, [task]);
+
+  useEffect(() => {
+    if (open && task) {
+      fetchDependencies();
+    }
+  }, [open, task, fetchDependencies]);
 
   if (!task) return null;
 
@@ -84,6 +118,10 @@ export function TaskDetailDialog({
     } finally {
       setIsUnscheduling(false);
     }
+  };
+
+  const handleSubtaskChange = () => {
+    onTaskUpdate?.();
   };
 
   const getStatusColor = (status: Task["status"]) => {
@@ -129,6 +167,9 @@ export function TaskDetailDialog({
     }
   };
 
+  const isSubtask = task.task_type === "subtask" || !!task.parent_task_id;
+  const isCarryover = !!task.continued_from_task_id;
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto w-[95vw] md:w-full mx-2 md:mx-auto">
@@ -162,7 +203,39 @@ export function TaskDetailDialog({
                 Locked
               </Badge>
             )}
+            {isBlocked && (
+              <Badge variant="destructive">
+                <GitBranch className="h-3 w-3 mr-1" />
+                Blocked
+              </Badge>
+            )}
+            {isCarryover && (
+              <Badge variant="secondary">
+                <Link2 className="h-3 w-3 mr-1" />
+                Continued
+              </Badge>
+            )}
           </div>
+
+          {/* Blocked By Warning */}
+          {isBlocked && blockedBy.length > 0 && (
+            <Card className="border-destructive bg-destructive/10">
+              <CardContent className="pt-6">
+                <h3 className="text-sm font-semibold mb-2 text-destructive flex items-center gap-2">
+                  <GitBranch className="h-4 w-4" />
+                  Blocked by incomplete tasks
+                </h3>
+                <ul className="text-sm space-y-1">
+                  {blockedBy.map((dep) => (
+                    <li key={dep.id} className="flex items-center gap-2">
+                      <Circle className="h-3 w-3 text-muted-foreground" />
+                      <span>{dep.title}</span>
+                    </li>
+                  ))}
+                </ul>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Description */}
           {task.description && (
@@ -172,6 +245,47 @@ export function TaskDetailDialog({
                 <p className="text-sm text-muted-foreground whitespace-pre-wrap">
                   {task.description}
                 </p>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Subtasks - Only show for non-subtask tasks */}
+          {!isSubtask && (
+            <SubtaskManager
+              parentTaskId={task.id}
+              onSubtaskChange={handleSubtaskChange}
+              readOnly={task.status === "completed" || task.status === "cancelled"}
+            />
+          )}
+
+          {/* Dependencies */}
+          {dependencies.length > 0 && (
+            <Card>
+              <CardContent className="pt-6">
+                <h3 className="text-sm font-semibold mb-2 flex items-center gap-2">
+                  <GitBranch className="h-4 w-4" />
+                  Dependencies
+                </h3>
+                <ul className="text-sm space-y-1">
+                  {dependencies.map((dep) => (
+                    <li key={dep.id} className="flex items-center gap-2">
+                      {dep.dependency_status === "completed" ? (
+                        <CheckCircle2 className="h-3 w-3 text-green-500" />
+                      ) : (
+                        <Circle className="h-3 w-3 text-muted-foreground" />
+                      )}
+                      <span
+                        className={
+                          dep.dependency_status === "completed"
+                            ? "line-through text-muted-foreground"
+                            : ""
+                        }
+                      >
+                        {dep.dependency_title}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
               </CardContent>
             </Card>
           )}
@@ -267,7 +381,7 @@ export function TaskDetailDialog({
           </Card>
 
           {/* Quick Status Change */}
-          {task.status !== "completed" && (
+          {task.status !== "completed" && task.status !== "cancelled" && (
             <Card>
               <CardContent className="pt-6">
                 <h3 className="text-sm font-semibold mb-3">Quick Actions</h3>
@@ -277,8 +391,9 @@ export function TaskDetailDialog({
                       size="sm"
                       variant="outline"
                       onClick={() => onStatusChange?.(task.id, "in_progress")}
+                      disabled={isBlocked}
                     >
-                      Start Task
+                      {isBlocked ? "Blocked" : "Start Task"}
                     </Button>
                   )}
                   {task.status === "in_progress" && (
@@ -291,7 +406,7 @@ export function TaskDetailDialog({
                       Mark Complete
                     </Button>
                   )}
-                  {task.status === "pending" && (
+                  {task.status === "pending" && !isBlocked && (
                     <Button
                       size="sm"
                       variant="default"
@@ -328,6 +443,9 @@ export function TaskDetailDialog({
             <div>Created: {formatDateTimeFull(task.created_at, timezone)}</div>
             <div>Updated: {formatDateTimeFull(task.updated_at, timezone)}</div>
             {task.id && <div className="font-mono">ID: {task.id}</div>}
+            {task.continued_from_task_id && (
+              <div className="font-mono">Continued from: {task.continued_from_task_id}</div>
+            )}
           </div>
         </div>
       </DialogContent>

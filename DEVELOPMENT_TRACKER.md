@@ -1,9 +1,12 @@
-### ⏳ Pending
-- [ ] Tasks should support subtasks. sub task can be pushed into new task for scheduling if neededW
-- [ ] Handle logical task flow, of tasks being blocked by other tasks
-- [ ] Task overrun into new task
-- [ ] Spew into subtasks and when this happens parent task owns them and complete when all subs is completed. subs only need time needed and can be scdule aloone but no group, task. but yes to priority adn energy
+### ✅ Completed - Task System Streamlining
+- [x] Tasks support subtasks (parent task owns them, auto-completes when all subs done)
+- [x] Subtasks have duration, priority, energy - can be scheduled independently (no group)
+- [x] Handle task dependencies (blocked by other tasks, with circular dependency detection)
+- [x] Support multiple dependencies per task via task_dependencies table
+- [x] Task carryover flow (create new task for remaining work when time ends)
+- [x] Carryover task links to original via continued_from_task_id
 
+### ⏳ Pending
 - [ ] PWA setup with service worker
 - [ ] Basic offline functionality
 
@@ -15,6 +18,7 @@
 
 - [ ] Allow hiding of groups bar on left in desktop view
 
+- [ ] Allow API push of data
 
 ---
 

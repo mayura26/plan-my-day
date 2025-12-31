@@ -66,6 +66,7 @@ async function initDatabase() {
     `);
 
     // Create tasks table for the planning app (expanded per PRD)
+    // task_type can be: 'task', 'event', 'todo', 'subtask'
     await turso.execute(`
       CREATE TABLE IF NOT EXISTS tasks (
         id TEXT PRIMARY KEY,
@@ -86,12 +87,29 @@ async function initDatabase() {
         notification_sent BOOLEAN DEFAULT FALSE,
         depends_on_task_id TEXT,
         energy_level_required INTEGER DEFAULT 3,
+        parent_task_id TEXT,
+        continued_from_task_id TEXT,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
         FOREIGN KEY (group_id) REFERENCES task_groups(id) ON DELETE SET NULL,
         FOREIGN KEY (template_id) REFERENCES task_templates(id) ON DELETE SET NULL,
-        FOREIGN KEY (depends_on_task_id) REFERENCES tasks(id) ON DELETE SET NULL
+        FOREIGN KEY (depends_on_task_id) REFERENCES tasks(id) ON DELETE SET NULL,
+        FOREIGN KEY (parent_task_id) REFERENCES tasks(id) ON DELETE CASCADE,
+        FOREIGN KEY (continued_from_task_id) REFERENCES tasks(id) ON DELETE SET NULL
+      )
+    `);
+
+    // Create task_dependencies table for multiple task dependencies
+    await turso.execute(`
+      CREATE TABLE IF NOT EXISTS task_dependencies (
+        id TEXT PRIMARY KEY,
+        task_id TEXT NOT NULL,
+        depends_on_task_id TEXT NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE,
+        FOREIGN KEY (depends_on_task_id) REFERENCES tasks(id) ON DELETE CASCADE,
+        UNIQUE(task_id, depends_on_task_id)
       )
     `);
 

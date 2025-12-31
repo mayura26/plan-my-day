@@ -13,6 +13,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { DependencySelector } from "@/components/dependency-selector";
 import { useUserTimezone } from "@/hooks/use-user-timezone";
 import { ENERGY_LABELS, PRIORITY_LABELS, TASK_TYPE_LABELS } from "@/lib/task-utils";
 import { formatDateTimeLocalForTimezone, parseDateTimeLocalToUTC } from "@/lib/timezone-utils";
@@ -21,7 +22,7 @@ import type { CreateTaskRequest, TaskGroup, TaskType } from "@/lib/types";
 interface TaskFormProps {
   onSubmit: (task: CreateTaskRequest) => Promise<void>;
   onCancel?: () => void;
-  initialData?: Partial<CreateTaskRequest>;
+  initialData?: Partial<CreateTaskRequest> & { id?: string };
   isLoading?: boolean;
 }
 
@@ -38,6 +39,7 @@ export function TaskForm({ onSubmit, onCancel, initialData, isLoading = false }:
     group_id: initialData?.group_id || undefined,
     template_id: initialData?.template_id || undefined,
     depends_on_task_id: initialData?.depends_on_task_id || undefined,
+    dependency_ids: initialData?.dependency_ids || [],
     scheduled_start: formatDateTimeLocalForTimezone(initialData?.scheduled_start, timezone),
     scheduled_end: formatDateTimeLocalForTimezone(initialData?.scheduled_end, timezone),
     due_date: formatDateTimeLocalForTimezone(initialData?.due_date, timezone),
@@ -46,6 +48,9 @@ export function TaskForm({ onSubmit, onCancel, initialData, isLoading = false }:
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [taskGroups, setTaskGroups] = useState<TaskGroup[]>([]);
   const [showDescription, setShowDescription] = useState(!!initialData?.description);
+  const [showDependencies, setShowDependencies] = useState(
+    (initialData?.dependency_ids?.length ?? 0) > 0
+  );
 
   // Fetch task groups
   useEffect(() => {
@@ -63,10 +68,33 @@ export function TaskForm({ onSubmit, onCancel, initialData, isLoading = false }:
     fetchTaskGroups();
   }, []);
 
+  // Fetch existing dependencies when editing a task
+  useEffect(() => {
+    const fetchDependencies = async () => {
+      if (initialData?.id) {
+        try {
+          const response = await fetch(`/api/tasks/${initialData.id}/dependencies`);
+          if (response.ok) {
+            const data = await response.json();
+            const depIds = (data.dependencies || []).map((d: any) => d.depends_on_task_id);
+            if (depIds.length > 0) {
+              setFormData((prev) => ({ ...prev, dependency_ids: depIds }));
+              setShowDependencies(true);
+            }
+          }
+        } catch (error) {
+          console.error("Error fetching dependencies:", error);
+        }
+      }
+    };
+    fetchDependencies();
+  }, [initialData?.id]);
+
   // Update form data when initialData or timezone changes (for edit mode)
   useEffect(() => {
     if (initialData?.title) {
-      setFormData({
+      setFormData((prev) => ({
+        ...prev,
         title: initialData.title || "",
         description: initialData.description || "",
         priority: initialData.priority || 3,
@@ -79,7 +107,7 @@ export function TaskForm({ onSubmit, onCancel, initialData, isLoading = false }:
         scheduled_start: formatDateTimeLocalForTimezone(initialData.scheduled_start, timezone),
         scheduled_end: formatDateTimeLocalForTimezone(initialData.scheduled_end, timezone),
         due_date: formatDateTimeLocalForTimezone(initialData.due_date, timezone),
-      });
+      }));
       setShowDescription(!!initialData.description);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -140,6 +168,16 @@ export function TaskForm({ onSubmit, onCancel, initialData, isLoading = false }:
       if (submissionData.due_date) {
         submissionData.due_date = parseDateTimeLocalToUTC(submissionData.due_date, timezone);
       }
+
+      // If editing, update dependencies separately
+      if (initialData?.id && formData.dependency_ids) {
+        await fetch(`/api/tasks/${initialData.id}/dependencies`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ dependency_ids: formData.dependency_ids }),
+        });
+      }
+
       await onSubmit(submissionData);
     } catch (error) {
       console.error("Error submitting task:", error);
@@ -204,6 +242,7 @@ export function TaskForm({ onSubmit, onCancel, initialData, isLoading = false }:
   const showEnergy = isTask;
   const showDuration = isTask || isTodo;
   const showDueDate = isTask || isTodo;
+  const showDependencyOption = isTask; // Only tasks can have dependencies
 
   const getTypeLabel = () => {
     switch (formData.task_type) {
@@ -392,6 +431,27 @@ export function TaskForm({ onSubmit, onCancel, initialData, isLoading = false }:
             className="h-10"
           />
         </div>
+      )}
+
+      {/* Dependencies Section */}
+      {showDependencyOption && (
+        <>
+          {!showDependencies ? (
+            <button
+              type="button"
+              onClick={() => setShowDependencies(true)}
+              className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+            >
+              + Add dependencies
+            </button>
+          ) : (
+            <DependencySelector
+              taskId={initialData?.id}
+              selectedIds={formData.dependency_ids || []}
+              onChange={(ids) => handleInputChange("dependency_ids", ids)}
+            />
+          )}
+        </>
       )}
 
       {/* Schedule Section */}

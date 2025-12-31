@@ -27,14 +27,37 @@ export interface Task {
   task_type: TaskType;
   google_calendar_event_id?: string | null;
   notification_sent: boolean;
-  depends_on_task_id?: string | null;
+  depends_on_task_id?: string | null; // Legacy single dependency (kept for backward compatibility)
   energy_level_required: number; // 1-5 scale (1 = low energy, 5 = high energy)
+  parent_task_id?: string | null; // For subtasks - links to parent task
+  continued_from_task_id?: string | null; // For carryover tasks - links to original task
   created_at: string;
   updated_at: string;
 }
 
 export type TaskStatus = "pending" | "in_progress" | "completed" | "cancelled";
-export type TaskType = "task" | "event" | "todo";
+export type TaskType = "task" | "event" | "todo" | "subtask";
+
+// Task with additional computed properties for UI
+export interface TaskWithSubtasks extends Task {
+  subtasks?: Task[];
+  subtask_count?: number;
+  completed_subtask_count?: number;
+}
+
+// Task dependency for multiple dependency support
+export interface TaskDependency {
+  id: string;
+  task_id: string;
+  depends_on_task_id: string;
+  created_at: string;
+}
+
+// Task with its dependencies loaded
+export interface TaskWithDependencies extends Task {
+  dependencies?: TaskDependency[];
+  blocked_by?: Task[]; // Tasks that must be completed before this one
+}
 
 export interface TaskGroup {
   id: string;
@@ -120,7 +143,9 @@ export interface CreateTaskRequest {
   group_id?: string;
   template_id?: string;
   energy_level_required?: number;
-  depends_on_task_id?: string;
+  depends_on_task_id?: string; // Legacy single dependency
+  dependency_ids?: string[]; // Multiple dependencies - tasks this depends on
+  parent_task_id?: string; // For creating subtasks
   scheduled_start?: string;
   scheduled_end?: string;
   due_date?: string; // when task must be completed by
@@ -131,6 +156,12 @@ export interface UpdateTaskRequest extends Partial<CreateTaskRequest> {
   scheduled_start?: string;
   scheduled_end?: string;
   locked?: boolean;
+}
+
+// Request for creating a carryover task from an incomplete task
+export interface CreateCarryoverTaskRequest {
+  additional_duration: number; // Extra time needed in minutes
+  notes?: string; // Optional notes about what's left to do
 }
 
 export interface CreateTaskGroupRequest {

@@ -3,8 +3,68 @@ import { auth } from "@/lib/auth";
 import { db } from "@/lib/turso";
 import type { Task, TaskStatus, TaskType, UpdateTaskRequest } from "@/lib/types";
 
+// Helper to map database row to Task object
+function mapRowToTask(row: any): Task {
+  return {
+    id: row.id as string,
+    user_id: row.user_id as string,
+    title: row.title as string,
+    description: row.description as string | null,
+    priority: row.priority as number,
+    status: row.status as TaskStatus,
+    duration: row.duration as number | null,
+    scheduled_start: row.scheduled_start as string | null,
+    scheduled_end: row.scheduled_end as string | null,
+    due_date: row.due_date as string | null,
+    locked: Boolean(row.locked),
+    group_id: row.group_id as string | null,
+    template_id: row.template_id as string | null,
+    task_type: row.task_type as TaskType,
+    google_calendar_event_id: row.google_calendar_event_id as string | null,
+    notification_sent: Boolean(row.notification_sent),
+    depends_on_task_id: row.depends_on_task_id as string | null,
+    energy_level_required: row.energy_level_required as number,
+    parent_task_id: row.parent_task_id as string | null,
+    continued_from_task_id: row.continued_from_task_id as string | null,
+    created_at: row.created_at as string,
+    updated_at: row.updated_at as string,
+  };
+}
+
+// Helper to check and update parent task status when subtask changes
+async function checkAndUpdateParentStatus(parentTaskId: string, userId: string): Promise<void> {
+  // Get all subtasks of this parent
+  const subtasksResult = await db.execute(
+    `SELECT status FROM tasks WHERE parent_task_id = ? AND user_id = ?`,
+    [parentTaskId, userId]
+  );
+
+  if (subtasksResult.rows.length === 0) return;
+
+  // Check if all subtasks are completed
+  const allCompleted = subtasksResult.rows.every((row) => row.status === "completed");
+
+  if (allCompleted) {
+    // Auto-complete the parent task
+    const now = new Date().toISOString();
+    await db.execute(
+      `UPDATE tasks SET status = 'completed', updated_at = ? WHERE id = ? AND user_id = ?`,
+      [now, parentTaskId, userId]
+    );
+  }
+}
+
+// Helper to complete all subtasks when parent is completed
+async function completeAllSubtasks(parentTaskId: string, userId: string): Promise<void> {
+  const now = new Date().toISOString();
+  await db.execute(
+    `UPDATE tasks SET status = 'completed', updated_at = ? WHERE parent_task_id = ? AND user_id = ? AND status != 'completed'`,
+    [now, parentTaskId, userId]
+  );
+}
+
 // GET /api/tasks/[id] - Get a specific task
-export async function GET(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const session = await auth();
     if (!session?.user?.id) {
@@ -12,6 +72,9 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
     }
 
     const { id } = await params;
+    const { searchParams } = new URL(request.url);
+    const includeSubtasks = searchParams.get("include_subtasks") === "true";
+
     const result = await db.execute("SELECT * FROM tasks WHERE id = ? AND user_id = ?", [
       id,
       session.user.id,
@@ -21,29 +84,24 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
       return NextResponse.json({ error: "Task not found" }, { status: 404 });
     }
 
-    const row = result.rows[0];
-    const task: Task = {
-      id: row.id as string,
-      user_id: row.user_id as string,
-      title: row.title as string,
-      description: row.description as string | null,
-      priority: row.priority as number,
-      status: row.status as TaskStatus,
-      duration: row.duration as number | null,
-      scheduled_start: row.scheduled_start as string | null,
-      scheduled_end: row.scheduled_end as string | null,
-      due_date: row.due_date as string | null,
-      locked: Boolean(row.locked),
-      group_id: row.group_id as string | null,
-      template_id: row.template_id as string | null,
-      task_type: row.task_type as TaskType,
-      google_calendar_event_id: row.google_calendar_event_id as string | null,
-      notification_sent: Boolean(row.notification_sent),
-      depends_on_task_id: row.depends_on_task_id as string | null,
-      energy_level_required: row.energy_level_required as number,
-      created_at: row.created_at as string,
-      updated_at: row.updated_at as string,
-    };
+    const task = mapRowToTask(result.rows[0]);
+
+    // Optionally include subtasks
+    if (includeSubtasks) {
+      const subtasksResult = await db.execute(
+        `SELECT * FROM tasks WHERE parent_task_id = ? ORDER BY priority ASC, created_at ASC`,
+        [task.id]
+      );
+      return NextResponse.json({
+        task: {
+          ...task,
+          subtasks: subtasksResult.rows.map(mapRowToTask),
+          subtask_count: subtasksResult.rows.length,
+          completed_subtask_count: subtasksResult.rows.filter((r) => r.status === "completed")
+            .length,
+        },
+      });
+    }
 
     return NextResponse.json({ task });
   } catch (error) {
@@ -101,15 +159,16 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     }
 
     // Check if task exists and belongs to user
-    const existingTask = await db.execute("SELECT * FROM tasks WHERE id = ? AND user_id = ?", [
-      id,
-      session.user.id,
-    ]);
+    const existingTaskResult = await db.execute(
+      "SELECT * FROM tasks WHERE id = ? AND user_id = ?",
+      [id, session.user.id]
+    );
 
-    if (existingTask.rows.length === 0) {
+    if (existingTaskResult.rows.length === 0) {
       return NextResponse.json({ error: "Task not found" }, { status: 404 });
     }
 
+    const existingTask = mapRowToTask(existingTaskResult.rows[0]);
     const now = new Date().toISOString();
 
     // Build dynamic update query
@@ -183,35 +242,68 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       values
     );
 
+    // Propagate changes from parent task to subtasks
+    // Only propagate if this is a parent task (not a subtask itself)
+    if (!existingTask.parent_task_id) {
+      const subtaskUpdateFields: string[] = [];
+      const subtaskUpdateValues: any[] = [];
+
+      // Priority should propagate to subtasks
+      if (body.priority !== undefined) {
+        subtaskUpdateFields.push("priority = ?");
+        subtaskUpdateValues.push(body.priority);
+      }
+
+      // Energy level should propagate to subtasks
+      if (body.energy_level_required !== undefined) {
+        subtaskUpdateFields.push("energy_level_required = ?");
+        subtaskUpdateValues.push(body.energy_level_required);
+      }
+
+      // Due date should propagate to subtasks (they should respect parent's deadline)
+      if (body.due_date !== undefined) {
+        subtaskUpdateFields.push("due_date = ?");
+        subtaskUpdateValues.push(body.due_date);
+      }
+
+      // Group should propagate to subtasks (they inherit parent's group)
+      if (body.group_id !== undefined) {
+        subtaskUpdateFields.push("group_id = ?");
+        subtaskUpdateValues.push(body.group_id);
+      }
+
+      // Update subtasks if any fields need propagation
+      if (subtaskUpdateFields.length > 0) {
+        subtaskUpdateFields.push("updated_at = ?");
+        subtaskUpdateValues.push(now, id, session.user.id);
+
+        await db.execute(
+          `UPDATE tasks SET ${subtaskUpdateFields.join(", ")} WHERE parent_task_id = ? AND user_id = ?`,
+          subtaskUpdateValues
+        );
+      }
+    }
+
+    // Handle parent-subtask completion logic
+    if (body.status !== undefined) {
+      // If this is a subtask being completed, check if parent should auto-complete
+      if (body.status === "completed" && existingTask.parent_task_id) {
+        await checkAndUpdateParentStatus(existingTask.parent_task_id, session.user.id);
+      }
+
+      // If this is a parent task being completed, complete all subtasks
+      if (body.status === "completed" && !existingTask.parent_task_id) {
+        await completeAllSubtasks(id, session.user.id);
+      }
+    }
+
     // Fetch updated task
     const result = await db.execute("SELECT * FROM tasks WHERE id = ? AND user_id = ?", [
       id,
       session.user.id,
     ]);
 
-    const row = result.rows[0];
-    const task: Task = {
-      id: row.id as string,
-      user_id: row.user_id as string,
-      title: row.title as string,
-      description: row.description as string | null,
-      priority: row.priority as number,
-      status: row.status as TaskStatus,
-      duration: row.duration as number | null,
-      scheduled_start: row.scheduled_start as string | null,
-      scheduled_end: row.scheduled_end as string | null,
-      due_date: row.due_date as string | null,
-      locked: Boolean(row.locked),
-      group_id: row.group_id as string | null,
-      template_id: row.template_id as string | null,
-      task_type: row.task_type as TaskType,
-      google_calendar_event_id: row.google_calendar_event_id as string | null,
-      notification_sent: Boolean(row.notification_sent),
-      depends_on_task_id: row.depends_on_task_id as string | null,
-      energy_level_required: row.energy_level_required as number,
-      created_at: row.created_at as string,
-      updated_at: row.updated_at as string,
-    };
+    const task = mapRowToTask(result.rows[0]);
 
     return NextResponse.json({ task });
   } catch (error) {
@@ -233,19 +325,35 @@ export async function DELETE(
 
     const { id } = await params;
     // Check if task exists and belongs to user
-    const existingTask = await db.execute("SELECT * FROM tasks WHERE id = ? AND user_id = ?", [
-      id,
-      session.user.id,
-    ]);
+    const existingTaskResult = await db.execute(
+      "SELECT * FROM tasks WHERE id = ? AND user_id = ?",
+      [id, session.user.id]
+    );
 
-    if (existingTask.rows.length === 0) {
+    if (existingTaskResult.rows.length === 0) {
       return NextResponse.json({ error: "Task not found" }, { status: 404 });
     }
 
-    // Delete task (cascade will handle related records)
+    const existingTask = mapRowToTask(existingTaskResult.rows[0]);
+
+    // Get all subtask IDs before deletion (for UI refresh)
+    const deletedTaskIds: string[] = [id];
+    if (!existingTask.parent_task_id) {
+      // This is a parent task - get all subtask IDs
+      const subtasksResult = await db.execute(
+        "SELECT id FROM tasks WHERE parent_task_id = ? AND user_id = ?",
+        [id, session.user.id]
+      );
+      deletedTaskIds.push(...subtasksResult.rows.map((row) => row.id as string));
+    }
+
+    // Delete task (cascade will handle related records including subtasks)
     await db.execute("DELETE FROM tasks WHERE id = ? AND user_id = ?", [id, session.user.id]);
 
-    return NextResponse.json({ message: "Task deleted successfully" });
+    return NextResponse.json({
+      message: "Task deleted successfully",
+      deleted_task_ids: deletedTaskIds,
+    });
   } catch (error) {
     console.error("Error deleting task:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

@@ -50,6 +50,7 @@ export const TASK_TYPE_LABELS = {
   task: "Task",
   event: "Event",
   todo: "To-Do",
+  subtask: "Subtask",
 } as const;
 
 // Utility functions
@@ -332,4 +333,122 @@ export function sortTasksByCreatedTimeDesc(tasks: Task[]): Task[] {
   return [...tasks].sort(
     (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
   );
+}
+
+// Subtask helper functions
+
+/**
+ * Check if a task is a subtask
+ */
+export function isSubtask(task: Task): boolean {
+  return task.task_type === "subtask" || !!task.parent_task_id;
+}
+
+/**
+ * Check if a task has subtasks (based on loaded subtasks array)
+ */
+export function hasSubtasks(task: Task & { subtasks?: Task[] }): boolean {
+  return Array.isArray(task.subtasks) && task.subtasks.length > 0;
+}
+
+/**
+ * Get subtask completion progress
+ */
+export function getSubtaskProgress(subtasks: Task[]): { completed: number; total: number; percentage: number } {
+  const total = subtasks.length;
+  const completed = subtasks.filter((st) => st.status === "completed").length;
+  const percentage = total > 0 ? Math.round((completed / total) * 100) : 0;
+  return { completed, total, percentage };
+}
+
+/**
+ * Check if all subtasks are completed
+ */
+export function allSubtasksCompleted(subtasks: Task[]): boolean {
+  if (subtasks.length === 0) return true;
+  return subtasks.every((st) => st.status === "completed");
+}
+
+/**
+ * Generate a dependency ID
+ */
+export function generateDependencyId(): string {
+  return `dep_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+}
+
+// Carryover task helpers
+
+/**
+ * Check if a task is a carryover from another task
+ */
+export function isCarryoverTask(task: Task): boolean {
+  return !!task.continued_from_task_id;
+}
+
+/**
+ * Check if a task's scheduled time has ended but it's not completed
+ */
+export function isTaskTimeExpired(task: Task): boolean {
+  if (task.status === "completed" || task.status === "cancelled") return false;
+  if (!task.scheduled_end) return false;
+  return new Date(task.scheduled_end) < new Date();
+}
+
+/**
+ * Check if a task needs a completion check (time ended, not completed)
+ */
+export function needsCompletionCheck(task: Task): boolean {
+  return (
+    task.task_type === "task" &&
+    task.status !== "completed" &&
+    task.status !== "cancelled" &&
+    isTaskTimeExpired(task)
+  );
+}
+
+// Dependency helper functions
+
+/**
+ * Check if a task has incomplete dependencies (is blocked)
+ */
+export function isTaskBlocked(task: Task, allTasks: Task[]): boolean {
+  // Check legacy single dependency
+  if (task.depends_on_task_id) {
+    const dependency = allTasks.find((t) => t.id === task.depends_on_task_id);
+    if (dependency && dependency.status !== "completed") {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Get tasks that block this task (incomplete dependencies)
+ */
+export function getBlockingTasks(task: Task, allTasks: Task[]): Task[] {
+  const blocking: Task[] = [];
+  
+  // Check legacy single dependency
+  if (task.depends_on_task_id) {
+    const dependency = allTasks.find((t) => t.id === task.depends_on_task_id);
+    if (dependency && dependency.status !== "completed") {
+      blocking.push(dependency);
+    }
+  }
+  
+  return blocking;
+}
+
+/**
+ * Filter out subtasks from a task list (get only parent/standalone tasks)
+ */
+export function getParentTasks(tasks: Task[]): Task[] {
+  return tasks.filter((task) => !task.parent_task_id);
+}
+
+/**
+ * Get subtasks for a specific parent task
+ */
+export function getSubtasksForParent(tasks: Task[], parentId: string): Task[] {
+  return tasks.filter((task) => task.parent_task_id === parentId);
 }

@@ -175,7 +175,10 @@ export default function TasksPage() {
       });
 
       if (response.ok) {
-        setTasks((prev) => prev.filter((task) => task.id !== taskId));
+        const data = await response.json();
+        // Remove the deleted task and all its subtasks from the UI
+        const deletedIds = data.deleted_task_ids || [taskId];
+        setTasks((prev) => prev.filter((task) => !deletedIds.includes(task.id)));
       } else {
         const error = await response.json();
         console.error("Failed to delete task:", error);
