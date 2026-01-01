@@ -3,8 +3,6 @@
 import { useDraggable } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
 import { GripVertical } from "lucide-react";
-import { useUserTimezone } from "@/hooks/use-user-timezone";
-import { formatTimeShort } from "@/lib/timezone-utils";
 import { isTaskOverdue, isTaskTimeExpired } from "@/lib/task-utils";
 import type { Task, TaskGroup } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -48,7 +46,6 @@ export function ResizableTask({
   selectedGroupId,
   groups = [],
 }: ResizableTaskProps) {
-  const { timezone } = useUserTimezone();
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: task.id,
     disabled: task.locked,
@@ -182,9 +179,6 @@ export function ResizableTask({
         (isCompleted || isPastEvent) && "line-through"
       )}>
         {task.title}
-      </div>
-      <div className="text-xs text-white/90 mt-1">
-        {formatTimeShort(task.scheduled_start!, timezone)}
       </div>
       {task.locked && (
         <div className="text-xs text-white/90 mt-1 flex items-center gap-1">🔒 Locked</div>

@@ -64,6 +64,7 @@ export function WeeklyCalendar({
   const calendarScrollRef = useRef<HTMLDivElement>(null);
   const headerScrollRef = useRef<HTMLDivElement>(null);
   const horizontalScrollContainerRef = useRef<HTMLDivElement>(null);
+  const hasAutoScrolledRef = useRef(false);
   const weekStart = startOfWeek(currentWeek, { weekStartsOn: 1 }); // Start on Monday
 
   // Update current time every minute
@@ -102,9 +103,9 @@ export function WeeklyCalendar({
     };
   }, []);
 
-  // Auto-scroll to current time and current day on mount
+  // Auto-scroll to current time and current day on initial mount only
   useLayoutEffect(() => {
-    if (!calendarScrollRef.current || !horizontalScrollContainerRef.current) return;
+    if (!calendarScrollRef.current || !horizontalScrollContainerRef.current || hasAutoScrolledRef.current) return;
 
     const now = new Date();
     const { hour, minute } = getHoursAndMinutesInTimezone(now, timezone);
@@ -146,7 +147,9 @@ export function WeeklyCalendar({
         headerScrollRef.current.scrollLeft = calendarScrollRef.current.scrollLeft;
       }
     }
-  }, [timezone, weekStart]);
+    
+    hasAutoScrolledRef.current = true;
+  }, [timezone]);
 
   const getWeekDays = () => {
     // Create days - these represent dates as the user sees them

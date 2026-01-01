@@ -64,6 +64,7 @@ export function DayCalendar({
   const [currentDate, setCurrentDate] = useState(externalCurrentDate || new Date());
   const [currentTime, setCurrentTime] = useState(new Date());
   const calendarScrollRef = useRef<HTMLDivElement>(null);
+  const hasAutoScrolledRef = useRef(false);
 
   // Sync with external currentDate if provided
   useEffect(() => {
@@ -81,9 +82,9 @@ export function DayCalendar({
     return () => clearInterval(timer);
   }, []);
 
-  // Auto-scroll to current time on mount - use useLayoutEffect to set scroll before paint
+  // Auto-scroll to current time on initial mount only - use useLayoutEffect to set scroll before paint
   useLayoutEffect(() => {
-    if (!calendarScrollRef.current) return;
+    if (!calendarScrollRef.current || hasAutoScrolledRef.current) return;
 
     const now = new Date();
     const { hour, minute } = getHoursAndMinutesInTimezone(now, timezone);
@@ -97,6 +98,7 @@ export function DayCalendar({
     const offset = calendarScrollRef.current.clientHeight / 2;
 
     calendarScrollRef.current.scrollTop = scrollPosition - offset;
+    hasAutoScrolledRef.current = true;
   }, [timezone]);
 
   const getTaskPosition = (task: Task) => {

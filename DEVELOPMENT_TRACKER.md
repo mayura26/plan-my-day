@@ -7,9 +7,7 @@
 - [x] Carryover task links to original via continued_from_task_id
 
 ### ⏳ Pending
-- [ ] Group badge on both views
-
-- [ ] when task is completed on calender we need to show grey-d or corssed out. and then for overdue task which is not rescheduled we show with border to get attenito. events we also cross out after the time
+- [ ] task card should have energy  badge and due date badge. bottom left
 
 - [ ] Click on grid, create task in spot. quick tasks
 
@@ -17,11 +15,9 @@
 
 - [ ] Allow API push of data
 
-- [ ] Rework task view to be nicer
-
 - [ ] Allow import of tasks, csv with Type, group, name, description, time, due date
 
-- [ ] Process overdue tasks
+- [ ] Process overdue tasks, and then we can show task as not complete bu t redsculed which will be a grey out but not crossed
 
 - [ ] Add toasts
 

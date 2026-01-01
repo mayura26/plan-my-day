@@ -497,14 +497,24 @@ export default function CalendarPage() {
         // Calculate new time based on drop position
         const { day, time } = dropData;
         // Snap to 15-minute intervals
-        const totalMinutes = time * 60;
-        const snappedMinutes = Math.round(totalMinutes / 15) * 15;
+        let totalMinutes = time * 60;
+        let snappedMinutes = Math.round(totalMinutes / 15) * 15;
+        
+        // When resizing from the top, the drop target is often the slot below the handle
+        // So we need to subtract 15 minutes to get the correct time
+        if (resizeDirection === "top") {
+          snappedMinutes = Math.max(0, snappedMinutes - 15);
+        }
+        
         const hours = Math.floor(snappedMinutes / 60);
         const minutes = snappedMinutes % 60;
 
+        // Normalize the day to represent the correct date in the user's timezone
+        const normalizedDay = getDateInTimezone(day, timezone);
+
         if (resizeDirection === "bottom") {
           // Resize from bottom - change end time
-          const newEndDate = createDateInTimezone(day, hours, minutes, timezone);
+          const newEndDate = createDateInTimezone(normalizedDay, hours, minutes, timezone);
           const startDate = new Date(task.scheduled_start);
 
           // Ensure end time is after start time
@@ -513,7 +523,7 @@ export default function CalendarPage() {
           }
         } else if (resizeDirection === "top") {
           // Resize from top - change start time
-          const newStartDate = createDateInTimezone(day, hours, minutes, timezone);
+          const newStartDate = createDateInTimezone(normalizedDay, hours, minutes, timezone);
           const endDate = new Date(task.scheduled_end);
 
           // Ensure start time is before end time
@@ -630,8 +640,13 @@ export default function CalendarPage() {
     const minutes = snappedMinutes % 60;
 
     const duration = task.duration || 60; // Default to 60 minutes
+    
+    // Normalize the day to represent the correct date in the user's timezone
+    // This ensures createDateInTimezone gets the correct date context
+    const normalizedDay = getDateInTimezone(day, timezone);
+    
     // Create the start date in the user's timezone, then convert to UTC
-    const startDate = createDateInTimezone(day, hours, minutes, timezone);
+    const startDate = createDateInTimezone(normalizedDay, hours, minutes, timezone);
     const endDate = new Date(startDate.getTime() + duration * 60000);
 
     try {
@@ -670,8 +685,12 @@ export default function CalendarPage() {
     const oldEnd = new Date(task.scheduled_end);
     const duration = (oldEnd.getTime() - oldStart.getTime()) / 60000; // in minutes
 
+    // Normalize the day to represent the correct date in the user's timezone
+    // This ensures createDateInTimezone gets the correct date context
+    const normalizedDay = getDateInTimezone(day, timezone);
+    
     // Create the start date in the user's timezone, then convert to UTC
-    const startDate = createDateInTimezone(day, hours, minutes, timezone);
+    const startDate = createDateInTimezone(normalizedDay, hours, minutes, timezone);
     const endDate = new Date(startDate.getTime() + duration * 60000);
 
     try {
