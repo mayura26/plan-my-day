@@ -1,6 +1,6 @@
 "use client";
 
-import { Calendar, CalendarX, Clock, Flag, Lock, Zap } from "lucide-react";
+import { Calendar, CalendarX, Clock, Flag, Lock, Trash2, Zap } from "lucide-react";
 import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -49,6 +49,7 @@ export function TaskCard({
 }: TaskCardProps) {
   const [isUpdating, setIsUpdating] = useState(false);
   const [isUnscheduling, setIsUnscheduling] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const { timezone } = useUserTimezone();
 
   const handleStatusChange = async (newStatus: TaskStatus) => {
@@ -75,6 +76,19 @@ export function TaskCard({
       console.error("Error unscheduling task:", error);
     } finally {
       setIsUnscheduling(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!confirm("Are you sure you want to delete this task?")) return;
+
+    setIsDeleting(true);
+    try {
+      await onDelete(task.id);
+    } catch (error) {
+      console.error("Error deleting task:", error);
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -291,7 +305,7 @@ export function TaskCard({
                 variant="ghost"
                 size="sm"
                 onClick={() => handleStatusChange("in_progress")}
-                disabled={isUpdating}
+                disabled={isUpdating || isDeleting}
                 className="h-8 px-2 text-xs"
                 title="Start"
               >
@@ -303,13 +317,23 @@ export function TaskCard({
                 variant="ghost"
                 size="sm"
                 onClick={() => handleStatusChange("completed")}
-                disabled={isUpdating}
+                disabled={isUpdating || isDeleting}
                 className="h-8 px-2 text-xs"
                 title="Complete"
               >
                 Done
               </Button>
             )}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleDelete}
+              disabled={isUpdating || isDeleting}
+              className="h-8 px-2 text-xs text-red-600 hover:text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:text-red-300 dark:hover:bg-red-950/20"
+              title="Delete"
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
           </div>
         </div>
         

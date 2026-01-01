@@ -7,10 +7,6 @@
 - [x] Carryover task links to original via continued_from_task_id
 
 ### ⏳ Pending
-- [ ] Allow hiding of groups bar on left in desktop view
-
-- [ ] Allow API push of data
-
 - [ ] Process overdue tasks, and then we can show task as not complete bu t redsculed which will be a grey out but not crossed
 
 - [ ] Add toasts

@@ -91,6 +91,7 @@ interface TaskImportResult {
   task?: Task;
   error?: string;
   taskData?: ImportTaskRequest;
+  parsedDueDate?: string | null;
 }
 
 /**
@@ -158,13 +159,13 @@ export async function POST(request: NextRequest) {
       }
 
       // Parse due date
-      let dueDate: string | null = null;
+      let parsedDueDate: string | null = null;
       if (taskData.due_date) {
         const parsed = parseDueDate(taskData.due_date, userTimezone);
         if (!parsed) {
           errors.push("Invalid due_date format");
         } else {
-          dueDate = parsed;
+          parsedDueDate = parsed;
         }
       }
 
@@ -184,6 +185,7 @@ export async function POST(request: NextRequest) {
             ...taskData,
             task_type: taskType || "task",
           },
+          parsedDueDate,
         });
       }
     }
@@ -240,7 +242,7 @@ export async function POST(request: NextRequest) {
           duration,
           scheduled_start: null,
           scheduled_end: null,
-          due_date: dueDate,
+          due_date: result.parsedDueDate || null,
           locked: false,
           group_id: groupId,
           template_id: null,
