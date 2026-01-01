@@ -33,7 +33,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { WeeklyCalendar } from "@/components/weekly-calendar";
 import { useUserTimezone } from "@/hooks/use-user-timezone";
 import { sortTasksByCreatedTimeDesc } from "@/lib/task-utils";
-import { createDateInTimezone, getDateInTimezone } from "@/lib/timezone-utils";
+import { createDateInTimezone, formatDateTimeLocalForTimezone, getDateInTimezone } from "@/lib/timezone-utils";
 import type { CreateTaskRequest, DayNote, Task, TaskGroup } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -68,6 +68,7 @@ export default function CalendarPage() {
   const [dayNotes, setDayNotes] = useState<Map<string, DayNote>>(new Map());
   const [noteDialogOpen, setNoteDialogOpen] = useState(false);
   const [noteDialogDate, setNoteDialogDate] = useState<Date | null>(null);
+  const [quickAddInitialData, setQuickAddInitialData] = useState<Partial<CreateTaskRequest> | null>(null);
 
   // Configure drag sensors
   const sensors = useSensors(
@@ -411,6 +412,7 @@ export default function CalendarPage() {
         const data = await response.json();
         setTasks((prev) => [data.task, ...prev]);
         setShowCreateForm(false);
+        setQuickAddInitialData(null); // Clear quick add data after successful creation
       } else {
         const error = await response.json();
         console.error("Failed to create task:", error);
@@ -422,6 +424,29 @@ export default function CalendarPage() {
     } finally {
       setIsCreating(false);
     }
+  };
+
+  const handleSlotDoubleClick = (day: Date, hour: number, minute: number) => {
+    // Create the start time in UTC using the user's timezone
+    const startDate = createDateInTimezone(day, hour, minute, timezone);
+    
+    // Calculate end time (30 minutes later)
+    const endDate = new Date(startDate.getTime() + 30 * 60000);
+    
+    // Convert to datetime-local format for the form inputs
+    const scheduledStart = formatDateTimeLocalForTimezone(startDate.toISOString(), timezone);
+    const scheduledEnd = formatDateTimeLocalForTimezone(endDate.toISOString(), timezone);
+    
+    // Set initial data for quick add
+    setQuickAddInitialData({
+      scheduled_start: scheduledStart,
+      scheduled_end: scheduledEnd,
+      duration: 30, // Default duration of 30 minutes
+    });
+    
+    // Open the create form dialog
+    setShowCreateForm(true);
+    setSidebarOpen(false); // Close sidebar on mobile when creating task
   };
 
   // Show all tasks - selectedGroupId is now only used for visual highlighting in sidebar
@@ -976,6 +1001,7 @@ export default function CalendarPage() {
               desktopViewToggleButtons={desktopViewToggleButtons}
               dayNote={dayNotes.get(formatDateKey(currentDate)) || null}
               onNoteClick={handleNoteClick}
+              onSlotDoubleClick={handleSlotDoubleClick}
             />
           )}
           {viewMode === "week" && (
@@ -995,6 +1021,7 @@ export default function CalendarPage() {
               desktopViewToggleButtons={desktopViewToggleButtons}
               dayNotes={dayNotes}
               onNoteClick={handleNoteClick}
+              onSlotDoubleClick={handleSlotDoubleClick}
             />
           )}
           {viewMode === "month" && (
@@ -1053,15 +1080,28 @@ export default function CalendarPage() {
       )}
 
       {/* Create Task Dialog */}
-      <Dialog open={showCreateForm} onOpenChange={setShowCreateForm}>
+      <Dialog 
+        open={showCreateForm} 
+        onOpenChange={(open) => {
+          setShowCreateForm(open);
+          if (!open) {
+            // Clear quick add data when dialog closes
+            setQuickAddInitialData(null);
+          }
+        }}
+      >
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto w-[95vw] md:w-full mx-2 md:mx-auto">
           <DialogHeader>
             <DialogTitle>Create New Task</DialogTitle>
           </DialogHeader>
           <TaskForm
             onSubmit={handleCreateTask}
-            onCancel={() => setShowCreateForm(false)}
+            onCancel={() => {
+              setShowCreateForm(false);
+              setQuickAddInitialData(null);
+            }}
             isLoading={isCreating}
+            initialData={quickAddInitialData || undefined}
           />
         </DialogContent>
       </Dialog>

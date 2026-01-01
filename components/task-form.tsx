@@ -16,7 +16,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { useUserTimezone } from "@/hooks/use-user-timezone";
 import { ENERGY_LABELS, PRIORITY_LABELS, TASK_TYPE_LABELS } from "@/lib/task-utils";
-import { formatDateTimeLocalForTimezone, parseDateTimeLocalToUTC } from "@/lib/timezone-utils";
+import { createDateInTimezone, formatDateTimeLocalForTimezone, getDateInTimezone, parseDateTimeLocalToUTC } from "@/lib/timezone-utils";
 import type { CreateTaskRequest, TaskGroup, TaskType } from "@/lib/types";
 
 interface TaskFormProps {
@@ -226,6 +226,32 @@ export function TaskForm({ onSubmit, onCancel, initialData, isLoading = false }:
         }
       }
 
+      if (field === "due_date") {
+        // When user selects a date, default to 5pm (17:00) in their timezone
+        // If the previous value was empty or the time is midnight (00:00), set to 5pm
+        if (value && typeof value === "string") {
+          const datetimePattern = /^(\d{4}-\d{2}-\d{2})T(\d{2}):(\d{2})$/;
+          const match = value.match(datetimePattern);
+          if (match) {
+            const [, datePart, hours, minutes] = match;
+            // If this is a new due date (was empty) or time is 00:00 (midnight), default to 5pm (17:00)
+            const wasEmpty = !prev.due_date;
+            const isMidnight = hours === "00" && minutes === "00";
+            if (wasEmpty || isMidnight) {
+              updated.due_date = `${datePart}T17:00`;
+            } else {
+              // User has specified a different time, keep it as is
+              updated.due_date = value;
+            }
+          } else {
+            // Fallback: if format doesn't match, use as-is
+            updated.due_date = value;
+          }
+        } else {
+          updated.due_date = value;
+        }
+      }
+
       return updated;
     });
 
@@ -252,6 +278,17 @@ export function TaskForm({ onSubmit, onCancel, initialData, isLoading = false }:
         return "To-Do";
       default:
         return "Task";
+    }
+  };
+
+  const handleDueDateFocus = () => {
+    // If due_date is empty, initialize it to today at 5pm in user's timezone
+    if (!formData.due_date) {
+      const today = new Date();
+      const todayInTimezone = getDateInTimezone(today, timezone);
+      const dateAt5pm = createDateInTimezone(todayInTimezone, 17, 0, timezone);
+      const formattedDate = formatDateTimeLocalForTimezone(dateAt5pm.toISOString(), timezone);
+      handleInputChange("due_date", formattedDate);
     }
   };
 
@@ -428,6 +465,7 @@ export function TaskForm({ onSubmit, onCancel, initialData, isLoading = false }:
             type="datetime-local"
             value={formData.due_date || ""}
             onChange={(e) => handleInputChange("due_date", e.target.value)}
+            onFocus={handleDueDateFocus}
             className="h-10"
           />
         </div>

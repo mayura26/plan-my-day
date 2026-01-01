@@ -30,6 +30,7 @@ interface WeeklyCalendarProps {
   desktopViewToggleButtons?: React.ReactNode;
   dayNotes?: Map<string, DayNote>;
   onNoteClick?: (date: Date) => void;
+  onSlotDoubleClick?: (day: Date, hour: number, minute: number) => void;
 }
 
 const HOURS = Array.from({ length: 24 }, (_, i) => i); // 0-23 hours
@@ -58,6 +59,7 @@ export function WeeklyCalendar({
   desktopViewToggleButtons,
   dayNotes = new Map(),
   onNoteClick,
+  onSlotDoubleClick,
 }: WeeklyCalendarProps) {
   const [currentWeek, setCurrentWeek] = useState(new Date());
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -416,7 +418,7 @@ export function WeeklyCalendar({
                 <div key={dayIndex} className="relative border-l" style={{ height: "1536px" }} data-day-column={dayIndex}>
                   {/* 15-minute interval slots with drop zones */}
                   {TIME_SLOTS.slice(1).map(({ hour, minute, slotIndex }) => (
-                    <CalendarSlot key={slotIndex} day={day} hour={hour} minute={minute} />
+                    <CalendarSlot key={slotIndex} day={day} hour={hour} minute={minute} onDoubleClick={onSlotDoubleClick} />
                   ))}
 
                   {/* Current time indicator (red line) */}

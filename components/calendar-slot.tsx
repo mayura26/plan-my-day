@@ -13,9 +13,10 @@ interface CalendarSlotProps {
   hour: number;
   minute: number;
   children?: React.ReactNode;
+  onDoubleClick?: (day: Date, hour: number, minute: number) => void;
 }
 
-export function CalendarSlot({ day, hour, minute, children }: CalendarSlotProps) {
+export function CalendarSlot({ day, hour, minute, children, onDoubleClick }: CalendarSlotProps) {
   const time = timeToDecimal(hour, minute); // Convert to decimal hours (e.g., 1.25 for 1:15)
   const { setNodeRef, isOver } = useDroppable({
     id: `calendar-slot-${day.getTime()}-${hour}-${minute}`,
@@ -26,9 +27,16 @@ export function CalendarSlot({ day, hour, minute, children }: CalendarSlotProps)
     },
   });
 
+  const handleDoubleClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    onDoubleClick?.(day, hour, minute);
+  };
+
   return (
     <div
       ref={setNodeRef}
+      onDoubleClick={handleDoubleClick}
       className={cn(
         "h-4 border-b border-border/50 transition-colors duration-150",
         minute === 0 && "border-b-2 border-border", // Thicker border for hour marks

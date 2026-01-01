@@ -198,8 +198,8 @@ export function ResizableTask({
           </span>
         </div>
       )}
-      {/* Due date badge at bottom left - only show on screens >= 1200px */}
-      {task.due_date && (() => {
+      {/* Due date badge at bottom left - only show on screens >= 1200px, and hide for tasks 30m or less */}
+      {task.due_date && (!task.duration || task.duration > 30) && (() => {
         const dateText = formatDateShort(task.due_date, timezone);
         const truncatedDate = dateText.length > 10 ? dateText.substring(0, 10) + "..." : dateText;
         return (

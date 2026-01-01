@@ -32,6 +32,7 @@ interface DayCalendarProps {
   desktopViewToggleButtons?: React.ReactNode;
   dayNote?: DayNote | null;
   onNoteClick?: (date: Date) => void;
+  onSlotDoubleClick?: (day: Date, hour: number, minute: number) => void;
 }
 
 const HOURS = Array.from({ length: 24 }, (_, i) => i); // 0-23 hours
@@ -61,6 +62,7 @@ export function DayCalendar({
   desktopViewToggleButtons,
   dayNote,
   onNoteClick,
+  onSlotDoubleClick,
 }: DayCalendarProps) {
   const [currentDate, setCurrentDate] = useState(externalCurrentDate || new Date());
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -294,7 +296,7 @@ export function DayCalendar({
             <div className="relative border-l" style={{ height: "1536px" }}>
               {/* 15-minute interval slots with drop zones */}
               {TIME_SLOTS.slice(1).map(({ hour, minute, slotIndex }) => (
-                <CalendarSlot key={slotIndex} day={currentDate} hour={hour} minute={minute} />
+                <CalendarSlot key={slotIndex} day={currentDate} hour={hour} minute={minute} onDoubleClick={onSlotDoubleClick} />
               ))}
 
               {/* Tasks overlay - explicitly positioned relative to parent */}
