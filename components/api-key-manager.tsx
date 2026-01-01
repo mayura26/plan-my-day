@@ -2,6 +2,7 @@
 
 import { CheckCircle2, Copy, Key, Plus, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -13,9 +14,11 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useConfirmDialog } from "@/components/ui/confirm-dialog";
 import type { APIKeyResponse } from "@/lib/types";
 
 export function APIKeyManager() {
+  const { confirm } = useConfirmDialog();
   const [keys, setKeys] = useState<APIKeyResponse[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
@@ -65,13 +68,14 @@ export function APIKeyManager() {
         setNewKeyName("");
         setShowCreateDialog(false);
         await fetchKeys();
+        toast.success("API key created successfully");
       } else {
         const error = await response.json();
-        alert(error.error || "Failed to create API key");
+        toast.error(error.error || "Failed to create API key");
       }
     } catch (error) {
       console.error("Error creating API key:", error);
-      alert("Failed to create API key");
+      toast.error("Failed to create API key");
     } finally {
       setIsCreating(false);
     }
@@ -79,7 +83,14 @@ export function APIKeyManager() {
 
   // Revoke API key
   const handleRevokeKey = async (keyId: string) => {
-    if (!confirm("Are you sure you want to revoke this API key? It will no longer be usable.")) {
+    const confirmed = await confirm({
+      title: "Revoke API Key",
+      description: "Are you sure you want to revoke this API key? It will no longer be usable.",
+      variant: "destructive",
+      confirmText: "Revoke",
+    });
+
+    if (!confirmed) {
       return;
     }
 
@@ -95,13 +106,14 @@ export function APIKeyManager() {
 
       if (response.ok) {
         await fetchKeys();
+        toast.success("API key revoked successfully");
       } else {
         const error = await response.json();
-        alert(error.error || "Failed to revoke API key");
+        toast.error(error.error || "Failed to revoke API key");
       }
     } catch (error) {
       console.error("Error revoking API key:", error);
-      alert("Failed to revoke API key");
+      toast.error("Failed to revoke API key");
     } finally {
       setIsRevoking(null);
     }
@@ -113,9 +125,10 @@ export function APIKeyManager() {
       await navigator.clipboard.writeText(key);
       setCopiedKeyId(keyId);
       setTimeout(() => setCopiedKeyId(null), 2000);
+      toast.success("API key copied to clipboard");
     } catch (error) {
       console.error("Failed to copy key:", error);
-      alert("Failed to copy key to clipboard");
+      toast.error("Failed to copy key to clipboard");
     }
   };
 

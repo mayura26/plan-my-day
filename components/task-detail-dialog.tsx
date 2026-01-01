@@ -17,11 +17,13 @@ import {
   Zap,
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
+import { toast } from "sonner";
 import { SubtaskManager } from "@/components/subtask-manager";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { useConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useUserTimezone } from "@/hooks/use-user-timezone";
 import { ENERGY_LABELS, PRIORITY_LABELS, TASK_TYPE_LABELS } from "@/lib/task-utils";
 import { formatDateTimeFull } from "@/lib/timezone-utils";
@@ -55,6 +57,7 @@ export function TaskDetailDialog({
   onTaskUpdate,
   onTaskRefresh,
 }: TaskDetailDialogProps) {
+  const { confirm } = useConfirmDialog();
   const [isDeleting, setIsDeleting] = useState(false);
   const [isUnscheduling, setIsUnscheduling] = useState(false);
   const [dependencies, setDependencies] = useState<DependencyInfo[]>([]);
@@ -100,14 +103,23 @@ export function TaskDetailDialog({
   };
 
   const handleDelete = async () => {
-    if (!confirm("Are you sure you want to delete this task?")) return;
+    const confirmed = await confirm({
+      title: "Delete Task",
+      description: "Are you sure you want to delete this task?",
+      variant: "destructive",
+      confirmText: "Delete",
+    });
+
+    if (!confirmed) return;
 
     setIsDeleting(true);
     try {
       await onDelete?.(task.id);
       handleDialogClose(false);
+      toast.success("Task deleted successfully");
     } catch (error) {
       console.error("Error deleting task:", error);
+      toast.error("Failed to delete task");
     } finally {
       setIsDeleting(false);
     }
@@ -120,19 +132,23 @@ export function TaskDetailDialog({
   };
 
   const handleUnschedule = async () => {
-    if (
-      !confirm(
-        "Are you sure you want to unschedule this task? It will be removed from the calendar."
-      )
-    )
-      return;
+    const confirmed = await confirm({
+      title: "Unschedule Task",
+      description: "Are you sure you want to unschedule this task? It will be removed from the calendar.",
+      variant: "default",
+      confirmText: "Unschedule",
+    });
+
+    if (!confirmed) return;
 
     setIsUnscheduling(true);
     try {
       await onUnschedule?.(task.id);
       setHasChanges(true);
+      toast.success("Task unscheduled successfully");
     } catch (error) {
       console.error("Error unscheduling task:", error);
+      toast.error("Failed to unschedule task");
     } finally {
       setIsUnscheduling(false);
     }

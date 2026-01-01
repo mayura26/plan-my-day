@@ -13,6 +13,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { useEffect, useState } from "react";
+import { toast } from "sonner";
 import { SlimTaskCard } from "@/components/slim-task-card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -33,6 +34,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useConfirmDialog } from "@/components/ui/confirm-dialog";
 import type { CreateTaskGroupRequest, Task, TaskGroup } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -235,6 +237,7 @@ export function TaskGroupManager({
   onShowAllTasksChange,
   onHiddenGroupsChange,
 }: TaskGroupManagerProps) {
+  const { confirm } = useConfirmDialog();
   const [groups, setGroups] = useState<TaskGroup[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
@@ -317,16 +320,17 @@ export function TaskGroupManager({
         setNewGroupName("");
         setNewGroupColor("#3B82F6");
         setIsCreateDialogOpen(false);
+        toast.success("Task group created successfully");
       } else {
         const errorData = await response
           .json()
           .catch(() => ({ error: "Failed to create task group" }));
         console.error("Failed to create task group:", errorData.error || "Unknown error");
-        alert(errorData.error || "Failed to create task group. Please try again.");
+        toast.error(errorData.error || "Failed to create task group. Please try again.");
       }
     } catch (error) {
       console.error("Error creating task group:", error);
-      alert("An error occurred while creating the task group. Please try again.");
+      toast.error("An error occurred while creating the task group. Please try again.");
     }
   };
 
@@ -345,16 +349,26 @@ export function TaskGroupManager({
         setGroups((prev) => prev.map((group) => (group.id === groupId ? data.group : group)));
         setIsEditDialogOpen(false);
         setEditingGroup(null);
+        toast.success("Task group updated successfully");
       } else {
         console.error("Failed to update task group");
+        toast.error("Failed to update task group");
       }
     } catch (error) {
       console.error("Error updating task group:", error);
+      toast.error("An error occurred while updating the task group");
     }
   };
 
   const deleteGroup = async (groupId: string) => {
-    if (!confirm("Are you sure you want to delete this group? This action cannot be undone.")) {
+    const confirmed = await confirm({
+      title: "Delete Task Group",
+      description: "Are you sure you want to delete this group? This action cannot be undone.",
+      variant: "destructive",
+      confirmText: "Delete",
+    });
+
+    if (!confirmed) {
       return;
     }
 
@@ -368,11 +382,14 @@ export function TaskGroupManager({
         if (selectedGroupId === groupId) {
           onGroupSelect?.(null);
         }
+        toast.success("Task group deleted successfully");
       } else {
         console.error("Failed to delete task group");
+        toast.error("Failed to delete task group");
       }
     } catch (error) {
       console.error("Error deleting task group:", error);
+      toast.error("An error occurred while deleting the task group");
     }
   };
 

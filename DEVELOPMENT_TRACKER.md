@@ -8,9 +8,6 @@
 
 ### ⏳ Pending
 - [ ] Process overdue tasks, and then we can show task as not complete bu t redsculed which will be a grey out but not crossed
-
-- [ ] Add toasts
-
 - [ ] PWA setup with service worker
 - [ ] Basic offline functionality
 ---

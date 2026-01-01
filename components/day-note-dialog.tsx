@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -43,9 +44,10 @@ export function DayNoteDialog({ open, onOpenChange, date, note, onSave }: DayNot
     try {
       await onSave(date, content.trim());
       onOpenChange(false);
+      toast.success("Note saved successfully");
     } catch (error) {
       console.error("Error saving day note:", error);
-      // Error handling - could show toast here
+      toast.error("Failed to save note");
     } finally {
       setIsSaving(false);
     }

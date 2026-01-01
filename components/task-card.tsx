@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
+import { useConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useUserTimezone } from "@/hooks/use-user-timezone";
 import {
   canExtendTask,
@@ -47,6 +48,7 @@ export function TaskCard({
   compact = false,
   groups = [],
 }: TaskCardProps) {
+  const { confirm } = useConfirmDialog();
   const [isUpdating, setIsUpdating] = useState(false);
   const [isUnscheduling, setIsUnscheduling] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -80,7 +82,14 @@ export function TaskCard({
   };
 
   const handleDelete = async () => {
-    if (!confirm("Are you sure you want to delete this task?")) return;
+    const confirmed = await confirm({
+      title: "Delete Task",
+      description: "Are you sure you want to delete this task?",
+      variant: "destructive",
+      confirmText: "Delete",
+    });
+
+    if (!confirmed) return;
 
     setIsDeleting(true);
     try {

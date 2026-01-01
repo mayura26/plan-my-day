@@ -2,6 +2,7 @@
 
 import { CheckCircle2, Circle, Clock, Plus, Trash2, Zap } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -13,6 +14,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useConfirmDialog } from "@/components/ui/confirm-dialog";
 import { ENERGY_LABELS, formatDuration, PRIORITY_LABELS } from "@/lib/task-utils";
 import type { Task } from "@/lib/types";
 
@@ -34,6 +36,7 @@ export function SubtaskManager({
   onSubtaskChange,
   readOnly = false,
 }: SubtaskManagerProps) {
+  const { confirm } = useConfirmDialog();
   const [subtasks, setSubtasks] = useState<Task[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isAdding, setIsAdding] = useState(false);
@@ -85,9 +88,13 @@ export function SubtaskManager({
         setShowAddForm(false);
         await fetchSubtasks();
         onSubtaskChange?.();
+        toast.success("Subtask added successfully");
+      } else {
+        toast.error("Failed to add subtask");
       }
     } catch (error) {
       console.error("Error adding subtask:", error);
+      toast.error("Failed to add subtask");
     } finally {
       setIsAdding(false);
     }
@@ -112,7 +119,14 @@ export function SubtaskManager({
   };
 
   const handleDeleteSubtask = async (subtaskId: string) => {
-    if (!confirm("Delete this subtask?")) return;
+    const confirmed = await confirm({
+      title: "Delete Subtask",
+      description: "Are you sure you want to delete this subtask?",
+      variant: "destructive",
+      confirmText: "Delete",
+    });
+
+    if (!confirmed) return;
 
     try {
       const response = await fetch(`/api/tasks/${subtaskId}`, {
@@ -122,9 +136,13 @@ export function SubtaskManager({
       if (response.ok) {
         await fetchSubtasks();
         onSubtaskChange?.();
+        toast.success("Subtask deleted successfully");
+      } else {
+        toast.error("Failed to delete subtask");
       }
     } catch (error) {
       console.error("Error deleting subtask:", error);
+      toast.error("Failed to delete subtask");
     }
   };
 

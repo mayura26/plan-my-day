@@ -2,9 +2,11 @@
 
 import { Edit2, Save, Trash2, X } from "lucide-react";
 import { useState } from "react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
+import { useConfirmDialog } from "@/components/ui/confirm-dialog";
 import type { DayNote } from "@/lib/types";
 
 interface DayNotesSectionProps {
@@ -14,6 +16,7 @@ interface DayNotesSectionProps {
 }
 
 export function DayNotesSection({ note, onUpdate, onDelete }: DayNotesSectionProps) {
+  const { confirm } = useConfirmDialog();
   const [isEditing, setIsEditing] = useState(false);
   const [content, setContent] = useState(note.content);
   const [isSaving, setIsSaving] = useState(false);
@@ -29,9 +32,10 @@ export function DayNotesSection({ note, onUpdate, onDelete }: DayNotesSectionPro
     try {
       await onUpdate(content.trim());
       setIsEditing(false);
+      toast.success("Note updated successfully");
     } catch (error) {
       console.error("Error updating day note:", error);
-      // Error handling - could show toast here
+      toast.error("Failed to update note");
     } finally {
       setIsSaving(false);
     }
@@ -43,16 +47,24 @@ export function DayNotesSection({ note, onUpdate, onDelete }: DayNotesSectionPro
   };
 
   const handleDelete = async () => {
-    if (!confirm("Are you sure you want to delete this note?")) {
+    const confirmed = await confirm({
+      title: "Delete Note",
+      description: "Are you sure you want to delete this note?",
+      variant: "destructive",
+      confirmText: "Delete",
+    });
+
+    if (!confirmed) {
       return;
     }
 
     setIsDeleting(true);
     try {
       await onDelete();
+      toast.success("Note deleted successfully");
     } catch (error) {
       console.error("Error deleting day note:", error);
-      // Error handling - could show toast here
+      toast.error("Failed to delete note");
     } finally {
       setIsDeleting(false);
     }

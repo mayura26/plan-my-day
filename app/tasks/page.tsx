@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { useEffect, useState } from "react";
+import { toast } from "sonner";
 import { GroupedTaskList } from "@/components/grouped-task-list";
 import { TaskForm } from "@/components/task-form";
 import { TaskImportDialog } from "@/components/task-import-dialog";
@@ -15,9 +16,11 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { useConfirmDialog } from "@/components/ui/confirm-dialog";
 import type { CreateTaskRequest, Task, TaskGroup } from "@/lib/types";
 
 export default function TasksPage() {
+  const { confirm } = useConfirmDialog();
   const { data: session, status } = useSession();
   const router = useRouter();
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -95,6 +98,7 @@ export default function TasksPage() {
         const data = await response.json();
         setTasks((prev) => [data.task, ...prev]);
         setShowCreateForm(false);
+        toast.success("Task created successfully");
       } else {
         const error = await response.json();
         console.error("Failed to create task:", error);
@@ -135,6 +139,7 @@ export default function TasksPage() {
         await fetchTasks();
         setEditingTask(null);
         setIsEditing(false);
+        toast.success("Task updated successfully");
       } else {
         const error = await response.json();
         console.error("Failed to update task:", error);
@@ -185,6 +190,7 @@ export default function TasksPage() {
         // Remove the deleted task and all its subtasks from the UI
         const deletedIds = data.deleted_task_ids || [taskId];
         setTasks((prev) => prev.filter((task) => !deletedIds.includes(task.id)));
+        toast.success("Task deleted successfully");
       } else {
         const error = await response.json();
         console.error("Failed to delete task:", error);
@@ -219,9 +225,11 @@ export default function TasksPage() {
       if (response.ok) {
         const data = await response.json();
         setTasks((prev) => prev.map((task) => (task.id === taskId ? data.task : task)));
+        toast.success("Task unscheduled successfully");
       } else {
         const error = await response.json();
         console.error("Failed to unschedule task:", error);
+        toast.error(error.error || "Failed to unschedule task");
         throw new Error(error.error || "Failed to unschedule task");
       }
     } catch (error) {
@@ -260,8 +268,10 @@ export default function TasksPage() {
         );
         setShowRenameDialog(false);
         setRenamingGroup(null);
+        toast.success("Task group updated successfully");
       } else {
         const error = await response.json();
+        toast.error(error.error || "Failed to update task group");
         console.error("Failed to update group:", error);
         throw new Error(error.error || "Failed to update group");
       }
@@ -273,9 +283,14 @@ export default function TasksPage() {
 
   // Delete group
   const handleDeleteGroup = async (groupId: string) => {
-    if (
-      !confirm("Are you sure you want to delete this group? Tasks in this group will be ungrouped.")
-    ) {
+    const confirmed = await confirm({
+      title: "Delete Task Group",
+      description: "Are you sure you want to delete this group? Tasks in this group will be ungrouped.",
+      variant: "destructive",
+      confirmText: "Delete",
+    });
+
+    if (!confirmed) {
       return;
     }
 
@@ -288,9 +303,11 @@ export default function TasksPage() {
         setGroups((prev) => prev.filter((group) => group.id !== groupId));
         // Refresh tasks to update group_id references
         await fetchTasks();
+        toast.success("Task group deleted successfully");
       } else {
         const error = await response.json();
         console.error("Failed to delete group:", error);
+        toast.error(error.error || "Failed to delete group");
         throw new Error(error.error || "Failed to delete group");
       }
     } catch (error) {
