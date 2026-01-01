@@ -119,6 +119,9 @@ export function ResizableTask({
   const isCompleted = task.status === "completed";
   const isOverdue = !isCompleted && isTaskOverdue(task);
   const isPastEvent = task.task_type === "event" && isTaskTimeExpired(task);
+  
+  // Check if task is very short (15 minutes or less)
+  const isShortTask = task.duration && task.duration <= 15;
 
   // Convert hex color to rgba for background
   const hexToRgba = (hex: string, alpha: number) => {
@@ -164,8 +167,9 @@ export function ResizableTask({
       {...(task.locked ? {} : listeners)}
       {...attributes}
       className={cn(
-        "rounded-md border-l-4 p-1.5 md:p-2 cursor-pointer pointer-events-auto",
-        "min-h-[44px] md:min-h-0", // Minimum touch target height on mobile
+        "rounded-md border-l-4 cursor-pointer pointer-events-auto",
+        isShortTask ? "p-0.5 md:p-1" : "p-1.5 md:p-2",
+        isShortTask ? "min-h-0 md:min-h-0" : "min-h-[44px] md:min-h-0", // Only apply min-height to longer tasks on mobile
         "hover:shadow-lg transition-shadow overflow-hidden group", // Removed 'relative' - using absolute positioning from style
         task.locked && "cursor-not-allowed opacity-75",
         !task.locked && "cursor-grab active:cursor-grabbing",
@@ -187,10 +191,10 @@ export function ResizableTask({
       />
       {/* Energy badge at top right */}
       {task.energy_level_required && (
-        <div className="absolute top-2 right-1 pointer-events-none">
-          <span className={cn("text-xs flex items-center gap-0.5", getEnergyLevelColor(task.energy_level_required))}>
-            <Zap className="w-3 h-3" />
-            <span className="text-[10px]">{task.energy_level_required}</span>
+        <div className={cn("absolute pointer-events-none", isShortTask ? "top-0.5 right-0.5 md:top-1 md:right-0.5" : "top-2 right-1")}>
+          <span className={cn("flex items-center gap-0.5", getEnergyLevelColor(task.energy_level_required), isShortTask ? "text-[8px] md:text-[9px]" : "text-xs")}>
+            <Zap className={isShortTask ? "w-2 h-2" : "w-3 h-3"} />
+            <span className={isShortTask ? "text-[7px] md:text-[8px]" : "text-[10px]"}>{task.energy_level_required}</span>
           </span>
         </div>
       )}
@@ -200,26 +204,30 @@ export function ResizableTask({
         const truncatedDate = dateText.length > 10 ? dateText.substring(0, 10) + "..." : dateText;
         return (
           <div
-            className="hidden min-[1200px]:block absolute bottom-1 left-1 px-0.5 py-0 rounded text-[9px] font-medium text-white pointer-events-none"
+            className={cn(
+              "hidden min-[1200px]:block absolute px-0.5 py-0 rounded font-medium text-white pointer-events-none",
+              isShortTask ? "bottom-0 left-0 text-[8px]" : "bottom-1 left-1 text-[9px]"
+            )}
             style={{
               backgroundColor: isOverdue
                 ? "rgba(239, 68, 68, 0.8)"
                 : "rgba(239, 68, 68, 0.6)",
             }}
           >
-            <Flag className="w-2 h-2 inline mr-0.5" />
+            <Flag className={cn("inline mr-0.5", isShortTask ? "w-1.5 h-1.5" : "w-2 h-2")} />
             {truncatedDate}
           </div>
         );
       })()}
       <div className={cn(
-        "text-xs font-medium text-white truncate pointer-events-none mt-1",
+        "font-medium text-white truncate pointer-events-none",
+        isShortTask ? "text-[8px] md:text-[9px] mt-0" : "text-xs mt-1",
         (isCompleted || isPastEvent) && "line-through"
       )}>
         {task.title}
       </div>
       {task.locked && (
-        <div className="text-xs text-white/90 mt-1 flex items-center gap-1">🔒 Locked</div>
+        <div className={cn("text-white/90 flex items-center gap-1", isShortTask ? "text-[7px] md:text-[8px] mt-0" : "text-xs mt-1")}>🔒 Locked</div>
       )}
       {/* Group badge in bottom right corner - hide for tasks < 45m to avoid blocking title, and hide on width < 1200px */}
       {group && task.duration && task.duration >= 45 && (() => {
