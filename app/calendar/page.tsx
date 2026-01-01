@@ -12,10 +12,10 @@ import {
   useSensors,
 } from "@dnd-kit/core";
 import { format, startOfMonth } from "date-fns";
-import { CheckSquare, ChevronDown, ChevronRight, Plus, X } from "lucide-react";
+import { CheckSquare, ChevronDown, ChevronRight, GripVertical, Plus, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { CalendarSkeleton } from "@/components/calendar-skeleton";
 import { DayCalendar } from "@/components/day-calendar";
 import { DayNoteDialog } from "@/components/day-note-dialog";
@@ -69,6 +69,15 @@ export default function CalendarPage() {
   const [noteDialogOpen, setNoteDialogOpen] = useState(false);
   const [noteDialogDate, setNoteDialogDate] = useState<Date | null>(null);
   const [quickAddInitialData, setQuickAddInitialData] = useState<Partial<CreateTaskRequest> | null>(null);
+  const [sidebarWidth, setSidebarWidth] = useState<number>(() => {
+    // Load from localStorage or default to 320px (w-80)
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("sidebar-width");
+      return saved ? parseInt(saved, 10) : 320;
+    }
+    return 320;
+  });
+  const [isResizing, setIsResizing] = useState(false);
 
   // Configure drag sensors
   const sensors = useSensors(
@@ -812,6 +821,50 @@ export default function CalendarPage() {
     </>
   );
 
+  // Sidebar resize handlers
+  const resizeRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isResizing) return;
+      
+      const newWidth = e.clientX;
+      const minWidth = 240; // Minimum width
+      const maxWidth = 600; // Maximum width
+      
+      const clampedWidth = Math.max(minWidth, Math.min(maxWidth, newWidth));
+      setSidebarWidth(clampedWidth);
+    };
+
+    const handleMouseUp = () => {
+      setIsResizing(false);
+      if (typeof window !== "undefined") {
+        localStorage.setItem("sidebar-width", sidebarWidth.toString());
+      }
+    };
+
+    if (isResizing) {
+      document.addEventListener("mousemove", handleMouseMove);
+      document.addEventListener("mouseup", handleMouseUp);
+      document.body.style.cursor = "col-resize";
+      document.body.style.userSelect = "none";
+    }
+
+    return () => {
+      document.removeEventListener("mousemove", handleMouseMove);
+      document.removeEventListener("mouseup", handleMouseUp);
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+    };
+  }, [isResizing, sidebarWidth]);
+
+  // Save sidebar width to localStorage when it changes
+  useEffect(() => {
+    if (typeof window !== "undefined" && !isResizing) {
+      localStorage.setItem("sidebar-width", sidebarWidth.toString());
+    }
+  }, [sidebarWidth, isResizing]);
+
   // Show skeleton while loading session, timezone, or tasks
   // Don't render calendar until timezone is loaded and stable
   const isReady = status === "authenticated" && !timezoneLoading && !isLoading && !!session;
@@ -839,9 +892,12 @@ export default function CalendarPage() {
         {/* Left Sidebar */}
         <div
           className={cn(
-            "fixed md:static inset-y-0 left-0 z-50 md:z-auto w-[85vw] max-w-sm md:w-80 border-r overflow-y-auto bg-background transform transition-transform duration-300 ease-in-out",
+            "fixed md:static inset-y-0 left-0 z-50 md:z-auto w-[85vw] max-w-sm border-r overflow-y-auto bg-background transform transition-transform duration-300 ease-in-out md:transition-none",
             sidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
           )}
+          style={{
+            width: typeof window !== "undefined" && window.innerWidth >= 768 ? `${sidebarWidth}px` : undefined,
+          }}
         >
           <div className="p-4 space-y-4">
             {/* Close button for mobile */}
@@ -977,6 +1033,28 @@ export default function CalendarPage() {
                 )}
               </Card>
             )}
+          </div>
+          
+          {/* Resize handle - only visible on desktop */}
+          <div
+            ref={resizeRef}
+            onMouseDown={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              setIsResizing(true);
+            }}
+            className="hidden md:block absolute top-0 right-0 w-1 h-full cursor-col-resize hover:w-1.5 transition-all z-10 group"
+            style={{
+              backgroundColor: isResizing ? "rgba(59, 130, 246, 0.5)" : "transparent",
+            }}
+            onMouseEnter={(e) => {
+              e.stopPropagation();
+            }}
+            onMouseLeave={(e) => {
+              e.stopPropagation();
+            }}
+          >
+            <div className="absolute top-1/2 right-0 -translate-y-1/2 translate-x-1/2 w-0.5 h-16 bg-primary/60 rounded-full opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
           </div>
         </div>
 
