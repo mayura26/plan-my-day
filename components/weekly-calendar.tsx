@@ -130,7 +130,7 @@ export function WeeklyCalendar({
 
     if (todayIndex >= 0) {
       // Calculate the width of one day column
-      // On mobile, the grid has min-w-[600px], so we need to account for that
+      // On mobile, each column is calc((100vw-60px)/3), so we calculate dynamically
       const gridContainer = calendarScrollRef.current.querySelector(".grid") as HTMLElement;
       if (gridContainer && headerScrollRef.current) {
         const gridWidth = gridContainer.scrollWidth;
@@ -291,7 +291,7 @@ export function WeeklyCalendar({
           ref={headerScrollRef}
           className="overflow-x-auto overflow-y-hidden border-b bg-muted/30 scrollbar-hide"
         >
-          <div className="grid grid-cols-[60px_repeat(7,1fr)] md:grid-cols-[80px_repeat(7,1fr)] min-w-[600px] md:min-w-0">
+          <div className="grid grid-cols-[60px_repeat(7,calc((100vw-60px)/3))] md:grid-cols-[80px_repeat(7,1fr)] md:min-w-0">
             <div className="p-2"></div>
             {weekDays.map((day, index) => {
               const dayDate = getDateInTimezone(day, timezone);
@@ -343,9 +343,9 @@ export function WeeklyCalendar({
 
         {/* Calendar Grid - horizontally and vertically scrollable */}
         <div ref={calendarScrollRef} className="flex-1 overflow-auto">
-          <div className="relative min-w-[600px] md:min-w-0">
+          <div className="relative md:min-w-0">
             {/* Time column and day columns */}
-            <div className="grid grid-cols-[60px_repeat(7,1fr)] md:grid-cols-[80px_repeat(7,1fr)]">
+            <div className="grid grid-cols-[60px_repeat(7,calc((100vw-60px)/3))] md:grid-cols-[80px_repeat(7,1fr)]">
               {/* Time labels */}
               <div className="border-r sticky left-0 z-10 bg-background">
                 {HOURS.map((hour) => (
