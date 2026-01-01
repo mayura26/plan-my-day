@@ -1,8 +1,9 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { db } from "@/lib/turso";
 import { sendPushNotification } from "@/lib/push-notification";
+import { db } from "@/lib/turso";
 
+// biome-ignore lint/correctness/noUnusedFunctionParameters: Next.js route handler requires request parameter
 export async function POST(request: NextRequest) {
   try {
     const session = await auth();
@@ -17,10 +18,7 @@ export async function POST(request: NextRequest) {
     );
 
     if (result.rows.length === 0) {
-      return NextResponse.json(
-        { error: "No push subscription found" },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: "No push subscription found" }, { status: 404 });
     }
 
     const subscription = result.rows[0];
@@ -48,10 +46,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Error sending test notification:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
-

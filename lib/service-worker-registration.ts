@@ -3,7 +3,7 @@
 /**
  * Service Worker Registration
  * Following Next.js PWA best practices: https://nextjs.org/docs/app/guides/progressive-web-apps
- * 
+ *
  * Manual registration with updateViaCache: 'none' to prevent caching issues
  * This prevents the reload loops caused by next-pwa's auto-registration
  */
@@ -48,4 +48,3 @@ export async function unregisterServiceWorker(): Promise<boolean> {
     return false;
   }
 }
-

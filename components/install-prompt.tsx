@@ -1,6 +1,6 @@
 "use client";
 
-import { Download, X, Share2 } from "lucide-react";
+import { Download, Share2, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 
@@ -12,20 +12,23 @@ interface BeforeInstallPromptEvent extends Event {
 // Detect iOS
 function isIOS(): boolean {
   if (typeof window === "undefined") return false;
-  return /iPad|iPhone|iPod/.test(navigator.userAgent) ||
-    (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  return (
+    /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+    (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1)
+  );
 }
 
 // Detect if already installed
 function isInstalled(): boolean {
   if (typeof window === "undefined") return false;
-  return window.matchMedia("(display-mode: standalone)").matches ||
-    (window.navigator as any).standalone === true;
+  return (
+    window.matchMedia("(display-mode: standalone)").matches ||
+    (window.navigator as any).standalone === true
+  );
 }
 
 export function InstallPrompt() {
-  const [deferredPrompt, setDeferredPrompt] =
-    useState<BeforeInstallPromptEvent | null>(null);
+  const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [isInstalling, setIsInstalling] = useState(false);
   const [isDismissed, setIsDismissed] = useState(false);
   const [isIOSDevice, setIsIOSDevice] = useState(false);
@@ -49,8 +52,7 @@ export function InstallPrompt() {
       const dismissed = localStorage.getItem("install-prompt-dismissed");
       if (dismissed) {
         const dismissedTime = parseInt(dismissed, 10);
-        const daysSinceDismissed =
-          (Date.now() - dismissedTime) / (1000 * 60 * 60 * 24);
+        const daysSinceDismissed = (Date.now() - dismissedTime) / (1000 * 60 * 60 * 24);
         // Show again after 7 days
         if (daysSinceDismissed < 7) {
           setIsDismissed(true);
@@ -76,8 +78,7 @@ export function InstallPrompt() {
     const dismissed = localStorage.getItem("install-prompt-dismissed");
     if (dismissed) {
       const dismissedTime = parseInt(dismissed, 10);
-      const daysSinceDismissed =
-        (Date.now() - dismissedTime) / (1000 * 60 * 60 * 24);
+      const daysSinceDismissed = (Date.now() - dismissedTime) / (1000 * 60 * 60 * 24);
       // Show again after 7 days
       if (daysSinceDismissed < 7) {
         setIsDismissed(true);
@@ -137,12 +138,7 @@ export function InstallPrompt() {
               </Button>
             </div>
           </div>
-          <Button
-            onClick={handleDismiss}
-            size="icon"
-            variant="ghost"
-            className="h-6 w-6 shrink-0"
-          >
+          <Button onClick={handleDismiss} size="icon" variant="ghost" className="h-6 w-6 shrink-0">
             <X className="h-4 w-4" />
           </Button>
         </div>
@@ -162,16 +158,10 @@ export function InstallPrompt() {
         <div className="flex-1 min-w-0">
           <h3 className="font-semibold text-sm">Install Plan My Day</h3>
           <p className="text-sm text-muted-foreground mt-1">
-            Install our app for a better experience. Get quick access and work
-            offline.
+            Install our app for a better experience. Get quick access and work offline.
           </p>
           <div className="flex gap-2 mt-3">
-            <Button
-              onClick={handleInstall}
-              size="sm"
-              disabled={isInstalling}
-              className="flex-1"
-            >
+            <Button onClick={handleInstall} size="sm" disabled={isInstalling} className="flex-1">
               {isInstalling ? "Installing..." : "Install"}
             </Button>
             <Button onClick={handleDismiss} size="sm" variant="outline">
@@ -179,16 +169,10 @@ export function InstallPrompt() {
             </Button>
           </div>
         </div>
-        <Button
-          onClick={handleDismiss}
-          size="icon"
-          variant="ghost"
-          className="h-6 w-6 shrink-0"
-        >
+        <Button onClick={handleDismiss} size="icon" variant="ghost" className="h-6 w-6 shrink-0">
           <X className="h-4 w-4" />
         </Button>
       </div>
     </div>
   );
 }
-

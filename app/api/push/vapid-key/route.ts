@@ -5,19 +5,12 @@ export async function GET() {
     const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || process.env.VAPID_PUBLIC_KEY;
 
     if (!publicKey) {
-      return NextResponse.json(
-        { error: "VAPID public key not configured" },
-        { status: 500 }
-      );
+      return NextResponse.json({ error: "VAPID public key not configured" }, { status: 500 });
     }
 
     return NextResponse.json({ publicKey });
   } catch (error) {
     console.error("Error getting VAPID key:", error);
-    return NextResponse.json(
-      { error: "Failed to get VAPID key" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Failed to get VAPID key" }, { status: 500 });
   }
 }
-

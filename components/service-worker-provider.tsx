@@ -7,7 +7,7 @@ import { registerServiceWorker } from "@/lib/service-worker-registration";
  * Service Worker Provider
  * Manually registers the service worker following Next.js best practices
  * https://nextjs.org/docs/app/guides/progressive-web-apps
- * 
+ *
  * Uses updateViaCache: 'none' to prevent caching issues in development
  */
 export function ServiceWorkerProvider() {
@@ -21,4 +21,3 @@ export function ServiceWorkerProvider() {
 
   return null; // This component doesn't render anything
 }
-

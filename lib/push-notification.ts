@@ -8,9 +8,7 @@ export function initializePushNotifications(): void {
   const subject = process.env.VAPID_SUBJECT || "mailto:your-email@example.com";
 
   if (!publicKey || !privateKey) {
-    console.warn(
-      "VAPID keys not configured. Push notifications will not work."
-    );
+    console.warn("VAPID keys not configured. Push notifications will not work.");
     return;
   }
 
@@ -106,4 +104,3 @@ export function createUpdateAvailablePayload(url?: string): NotificationPayload 
     requireInteraction: true,
   };
 }
-

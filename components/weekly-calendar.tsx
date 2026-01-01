@@ -18,9 +18,6 @@ interface WeeklyCalendarProps {
   tasks: Task[];
   timezone: string;
   onTaskClick?: (taskId: string) => void;
-  onTaskSchedule?: (taskId: string, day: Date, time: number) => void;
-  onTaskReschedule?: (taskId: string, day: Date, time: number) => void;
-  onTaskResize?: (taskId: string, newEndTime: Date) => void;
   activeDragId?: string | null;
   resizingTaskId?: string | null;
   selectedGroupId?: string | null;
@@ -47,9 +44,6 @@ export function WeeklyCalendar({
   tasks,
   timezone,
   onTaskClick,
-  onTaskSchedule,
-  onTaskReschedule,
-  onTaskResize,
   activeDragId,
   resizingTaskId,
   selectedGroupId,
@@ -334,11 +328,10 @@ export function WeeklyCalendar({
               const dayDate = getDateInTimezone(day, timezone);
               const todayDate = getDateInTimezone(new Date(), timezone);
               const isToday = isSameDay(dayDate, todayDate);
-              const dateKey = format(dayDate, "yyyy-MM-dd");
-              const _hasNote = dayNotes.has(dateKey);
+              const dayKey = `week-day-header-${day.getTime()}-${index}`;
               return (
                 <div
-                  key={index}
+                  key={dayKey}
                   className={cn("p-2 text-center border-l relative", isToday && "bg-primary/10")}
                 >
                   {onNoteClick && (
@@ -400,10 +393,12 @@ export function WeeklyCalendar({
               </div>
 
               {/* Day columns */}
-              {weekDays.map((day, dayIndex) => (
-                <div
-                  key={dayIndex}
-                  className="relative border-l"
+              {weekDays.map((day, dayIndex) => {
+                const dayColumnKey = `week-day-column-${day.getTime()}-${dayIndex}`;
+                return (
+                  <div
+                    key={dayColumnKey}
+                    className="relative border-l"
                   style={{ height: "1536px" }}
                   data-day-column={dayIndex}
                 >
@@ -462,7 +457,6 @@ export function WeeklyCalendar({
                             task={task}
                             position={position}
                             onTaskClick={onTaskClick}
-                            onResize={onTaskResize}
                             activeDragId={activeDragId}
                             resizingTaskId={resizingTaskId}
                             selectedGroupId={selectedGroupId}
@@ -473,7 +467,8 @@ export function WeeklyCalendar({
                       })}
                   </div>
                 </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         </div>

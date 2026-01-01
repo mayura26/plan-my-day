@@ -234,8 +234,11 @@ export function ProcessOverdueDialog({
             const isSelected = selectedTaskId === task.id;
 
             return (
+              // biome-ignore lint/a11y/useSemanticElements: Task container requires div for complex layout
               <div
                 key={task.id}
+                role="button"
+                tabIndex={0}
                 className={cn(
                   "border rounded-lg p-4 space-y-3",
                   isSelected && "ring-2 ring-primary"
@@ -243,6 +246,12 @@ export function ProcessOverdueDialog({
                 onClick={(e) => {
                   // Prevent clicks on the container from interfering
                   e.stopPropagation();
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    e.stopPropagation();
+                  }
                 }}
               >
                 {/* Task Info */}

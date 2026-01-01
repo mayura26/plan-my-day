@@ -214,7 +214,7 @@ export function TaskList({
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4 border-t">
                 {/* Status Filter */}
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Status</label>
+                  <div className="text-sm font-medium">Status</div>
                   <div className="space-y-1">
                     {(["pending", "in_progress", "completed", "cancelled"] as TaskStatus[]).map(
                       (status) => (
@@ -240,7 +240,7 @@ export function TaskList({
 
                 {/* Priority Filter */}
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Priority</label>
+                  <div className="text-sm font-medium">Priority</div>
                   <div className="space-y-1">
                     {[1, 2, 3, 4, 5].map((priority) => (
                       <label key={priority} className="flex items-center space-x-2">
@@ -266,7 +266,7 @@ export function TaskList({
 
                 {/* Type Filter */}
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Type</label>
+                  <div className="text-sm font-medium">Type</div>
                   <div className="space-y-1">
                     {(["task", "event"] as TaskType[]).map((type) => (
                       <label key={type} className="flex items-center space-x-2">
@@ -324,8 +324,6 @@ export function TaskList({
               onUpdate={onUpdateTask}
               onDelete={onDeleteTask}
               onEdit={onEditTask}
-              onExtend={onExtendTask}
-              showGroup={showGroup}
               compact={compact}
               groups={groups}
             />

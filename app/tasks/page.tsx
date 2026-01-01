@@ -80,7 +80,7 @@ export default function TasksPage() {
       fetchGroups();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session]);
+  }, [session, fetchGroups, fetchTasks]);
 
   // Create task
   const handleCreateTask = async (taskData: CreateTaskRequest) => {
@@ -437,8 +437,11 @@ export default function TasksPage() {
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <label className="text-sm font-medium">Group Name</label>
+              <label htmlFor="group-name-input" className="text-sm font-medium">
+                Group Name
+              </label>
               <Input
+                id="group-name-input"
                 value={newGroupName}
                 onChange={(e) => setNewGroupName(e.target.value)}
                 placeholder="Enter group name"
@@ -446,10 +449,13 @@ export default function TasksPage() {
               />
             </div>
             <div>
-              <label className="text-sm font-medium">Color</label>
+              <label htmlFor="group-color-input" className="text-sm font-medium">
+                Color
+              </label>
               <div className="mt-1 flex items-center gap-3">
                 <div className="relative">
                   <input
+                    id="group-color-input"
                     type="color"
                     value={newGroupColor}
                     onChange={(e) => setNewGroupColor(e.target.value)}

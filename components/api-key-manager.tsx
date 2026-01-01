@@ -45,8 +45,7 @@ export function APIKeyManager() {
 
   useEffect(() => {
     fetchKeys();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [fetchKeys]);
 
   // Create new API key
   const handleCreateKey = async () => {

@@ -1,6 +1,6 @@
 "use client";
 
-import { RefreshCw, CheckCircle2, AlertCircle } from "lucide-react";
+import { AlertCircle, CheckCircle2, RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -87,7 +87,7 @@ export function ForceUpdateButton() {
     }
 
     // Check both build-time env and runtime hostname to catch dev mode
-    const isDevelopment = 
+    const isDevelopment =
       process.env.NODE_ENV === "development" ||
       window.location.hostname === "localhost" ||
       window.location.hostname === "127.0.0.1";
@@ -173,7 +173,7 @@ export function ForceUpdateButton() {
           updateViaCache: "none",
         });
       }
-      
+
       if (registration) {
         await registration.update();
         await checkServiceWorker();
@@ -194,9 +194,7 @@ export function ForceUpdateButton() {
       // Clear all caches (like reference implementation)
       if ("caches" in window) {
         const cacheNames = await caches.keys();
-        await Promise.all(
-          cacheNames.map((cacheName) => caches.delete(cacheName))
-        );
+        await Promise.all(cacheNames.map((cacheName) => caches.delete(cacheName)));
         console.log("All caches cleared");
       }
 
@@ -261,12 +259,11 @@ export function ForceUpdateButton() {
   };
 
   // Check if we're in development mode
-  const isDevelopment = 
-    typeof window !== "undefined" && (
-      process.env.NODE_ENV === "development" ||
+  const isDevelopment =
+    typeof window !== "undefined" &&
+    (process.env.NODE_ENV === "development" ||
       window.location.hostname === "localhost" ||
-      window.location.hostname === "127.0.0.1"
-    );
+      window.location.hostname === "127.0.0.1");
 
   if (typeof window === "undefined" || !("serviceWorker" in navigator)) {
     return (
@@ -308,10 +305,12 @@ export function ForceUpdateButton() {
             : "Not Registered"}
         </span>
       </div>
-      
+
       {!swState.status && (
         <div className="rounded-md bg-muted p-3 text-sm text-muted-foreground">
-          Service worker is not registered. To enable PWA in development mode, run <code className="px-1 py-0.5 bg-background rounded text-xs">npm run dev:pwa</code> instead of <code className="px-1 py-0.5 bg-background rounded text-xs">npm run dev</code>.
+          Service worker is not registered. To enable PWA in development mode, run{" "}
+          <code className="px-1 py-0.5 bg-background rounded text-xs">npm run dev:pwa</code> instead
+          of <code className="px-1 py-0.5 bg-background rounded text-xs">npm run dev</code>.
         </div>
       )}
 
@@ -330,25 +329,18 @@ export function ForceUpdateButton() {
         <div>
           <h3 className="text-sm font-semibold mb-2">Force Update</h3>
           <p className="text-sm text-muted-foreground mb-4">
-            Clear cache and reload to get the newest app version. Use this if the app seems outdated.
+            Clear cache and reload to get the newest app version. Use this if the app seems
+            outdated.
           </p>
           <Button onClick={forceUpdate} disabled={isUpdating} className="w-full sm:w-auto">
-            <RefreshCw
-              className={`h-4 w-4 mr-2 ${isUpdating ? "animate-spin" : ""}`}
-            />
+            <RefreshCw className={`h-4 w-4 mr-2 ${isUpdating ? "animate-spin" : ""}`} />
             {isUpdating ? "Updating..." : "Force Update"}
           </Button>
         </div>
 
         <div className="flex flex-wrap gap-2">
-          <Button
-            onClick={checkForUpdates}
-            variant="outline"
-            disabled={isChecking || isUpdating}
-          >
-            <RefreshCw
-              className={`h-4 w-4 ${isChecking ? "animate-spin" : ""}`}
-            />
+          <Button onClick={checkForUpdates} variant="outline" disabled={isChecking || isUpdating}>
+            <RefreshCw className={`h-4 w-4 ${isChecking ? "animate-spin" : ""}`} />
             {isChecking ? "Checking..." : "Check for Updates"}
           </Button>
         </div>
@@ -356,4 +348,3 @@ export function ForceUpdateButton() {
     </div>
   );
 }
-

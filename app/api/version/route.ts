@@ -1,5 +1,5 @@
-import { readFileSync } from "fs";
-import { join } from "path";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { NextResponse } from "next/server";
 
 export async function GET() {
@@ -29,4 +29,3 @@ export async function GET() {
     return NextResponse.json({ version: "1" }, { status: 200 });
   }
 }
-

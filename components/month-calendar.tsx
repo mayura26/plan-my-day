@@ -24,7 +24,6 @@ interface MonthCalendarProps {
   tasks: Task[];
   timezone: string;
   onTaskClick?: (taskId: string) => void;
-  selectedGroupId?: string | null;
   groups?: TaskGroup[];
   onSidebarToggle?: () => void;
   currentDate?: Date;
@@ -40,7 +39,6 @@ export function MonthCalendar({
   tasks,
   timezone,
   onTaskClick,
-  selectedGroupId,
   groups = [],
   onSidebarToggle,
   currentDate: externalCurrentDate,
@@ -199,10 +197,14 @@ export function MonthCalendar({
             const isCurrentMonth = isSameMonth(dateInTimezone, currentDateInTimezone);
             const todayDate = getDateInTimezone(new Date(), timezone);
             const isCurrentDay = isSameDay(dateInTimezone, todayDate);
+            const dayKey = `month-day-${day.getTime()}-${index}`;
 
             return (
+              // biome-ignore lint/a11y/useSemanticElements: Calendar cell requires div for complex layout and interactions
               <div
-                key={index}
+                key={dayKey}
+                role="button"
+                tabIndex={0}
                 className={cn(
                   "min-h-[100px] md:min-h-[120px] border rounded-md p-1.5 md:p-2 cursor-pointer transition-colors",
                   !isCurrentMonth && "opacity-40 bg-muted/30",
@@ -210,6 +212,12 @@ export function MonthCalendar({
                   isCurrentDay && "ring-2 ring-primary"
                 )}
                 onClick={() => handleDateClick(dateInTimezone)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    handleDateClick(dateInTimezone);
+                  }
+                }}
               >
                 {/* Date Number */}
                 <div
@@ -233,8 +241,11 @@ export function MonthCalendar({
                     const _isOverdue = !isCompleted && isTaskOverdue(task);
 
                     return (
+                      // biome-ignore lint/a11y/useSemanticElements: Task item requires div for complex styling and layout
                       <div
                         key={task.id}
+                        role="button"
+                        tabIndex={0}
                         className={cn(
                           "text-[9px] md:text-xs p-0.5 md:p-1 rounded truncate cursor-pointer hover:opacity-80 transition-opacity",
                           "flex items-center gap-0.5 md:gap-1 relative",
@@ -249,6 +260,13 @@ export function MonthCalendar({
                           e.stopPropagation();
                           onTaskClick?.(task.id);
                         }}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            onTaskClick?.(task.id);
+                          }
+                        }}
                       >
                         <span
                           className={cn(
@@ -258,9 +276,11 @@ export function MonthCalendar({
                               : "w-1.5 h-1.5 md:w-2 md:h-2 bg-white rounded-full"
                           )}
                         />
-                        <span className="font-medium text-[8px] md:text-xs">
-                          {formatTimeShort(task.scheduled_start!, timezone)}
-                        </span>
+                        {task.scheduled_start && (
+                          <span className="font-medium text-[8px] md:text-xs">
+                            {formatTimeShort(task.scheduled_start, timezone)}
+                          </span>
+                        )}
                         <span className="truncate flex-1 text-[8px] md:text-xs">{task.title}</span>
                         {/* Energy indicator at right */}
                         {task.energy_level_required && (

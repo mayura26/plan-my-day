@@ -437,7 +437,6 @@ export function GroupedTaskList({
                             onUpdate={onUpdateTask}
                             onDelete={onDeleteTask}
                             onEdit={onEditTask}
-                            onExtend={onExtendTask}
                             onUnschedule={onUnscheduleTask}
                             groups={groups}
                           />
@@ -488,7 +487,6 @@ export function GroupedTaskList({
                         onUpdate={onUpdateTask}
                         onDelete={onDeleteTask}
                         onEdit={onEditTask}
-                        onExtend={onExtendTask}
                         onUnschedule={onUnscheduleTask}
                         groups={groups}
                       />
@@ -524,7 +522,19 @@ export function GroupedTaskList({
                       <CardTitle className="text-lg">{group.name}</CardTitle>
                       <Badge variant="secondary">{sectionTasks.length}</Badge>
                     </div>
-                    <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                    {/* biome-ignore lint/a11y/useSemanticElements: Container div for button group requires div layout */}
+                    <div
+                      className="flex items-center gap-2"
+                      onClick={(e) => e.stopPropagation()}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          e.stopPropagation();
+                        }
+                      }}
+                      role="button"
+                      tabIndex={0}
+                    >
                       {onRenameGroup && (
                         <Button
                           variant="ghost"
@@ -566,7 +576,6 @@ export function GroupedTaskList({
                           onUpdate={onUpdateTask}
                           onDelete={onDeleteTask}
                           onEdit={onEditTask}
-                          onExtend={onExtendTask}
                           onUnschedule={onUnscheduleTask}
                           groups={groups}
                         />
@@ -596,7 +605,6 @@ export function GroupedTaskList({
                 onUpdate={onUpdateTask}
                 onDelete={onDeleteTask}
                 onEdit={onEditTask}
-                onExtend={onExtendTask}
                 onUnschedule={onUnscheduleTask}
                 groups={groups}
               />

@@ -87,8 +87,8 @@ export function CalendarSkeleton() {
           {/* Days Header Skeleton */}
           <div className="grid grid-cols-[60px_repeat(7,1fr)] md:grid-cols-[80px_repeat(7,1fr)] border-b bg-muted/30">
             <div className="p-2"></div>
-            {Array.from({ length: 7 }).map((_, i) => (
-              <div key={i} className="p-2 text-center border-l">
+            {Array.from({ length: 7 }, (_, i) => `skeleton-day-header-${i}`).map((key) => (
+              <div key={key} className="p-2 text-center border-l">
                 <Skeleton className="h-4 w-12 mx-auto mb-2" />
                 <Skeleton className="h-8 w-8 md:h-10 md:w-10 mx-auto rounded-full" />
               </div>
@@ -101,21 +101,29 @@ export function CalendarSkeleton() {
               <div className="grid grid-cols-[60px_repeat(7,1fr)] md:grid-cols-[80px_repeat(7,1fr)]">
                 {/* Time labels skeleton */}
                 <div className="border-r sticky left-0 z-10 bg-background">
-                  {Array.from({ length: 24 }).map((_, i) => (
-                    <div key={i} className="h-16 border-b-2 border-border px-1 md:px-2">
+                  {Array.from({ length: 24 }, (_, i) => `skeleton-time-label-${i}`).map((key) => (
+                    <div key={key} className="h-16 border-b-2 border-border px-1 md:px-2">
                       <Skeleton className="h-4 w-10 mt-2" />
                     </div>
                   ))}
                 </div>
 
                 {/* Day columns skeleton */}
-                {Array.from({ length: 7 }).map((_, dayIndex) => (
-                  <div key={dayIndex} className="relative border-l">
-                    {Array.from({ length: 24 }).map((_, hourIndex) => (
-                      <div key={hourIndex} className="h-16 border-b-2 border-border" />
-                    ))}
-                  </div>
-                ))}
+                {Array.from({ length: 7 }, (_, dayIndex) => `skeleton-day-column-${dayIndex}`).map(
+                  (dayKey) => {
+                    const dayIndex = Number.parseInt(dayKey.split("-").pop() || "0", 10);
+                    return (
+                      <div key={dayKey} className="relative border-l">
+                        {Array.from(
+                          { length: 24 },
+                          (_, hourIndex) => `skeleton-day-${dayIndex}-hour-${hourIndex}`
+                        ).map((hourKey) => (
+                          <div key={hourKey} className="h-16 border-b-2 border-border" />
+                        ))}
+                      </div>
+                    );
+                  }
+                )}
               </div>
             </div>
           </div>

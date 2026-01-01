@@ -37,7 +37,10 @@ async function migrate() {
       `);
       console.log("✅ Added subscription_data column");
     } catch (error) {
-      if (!error.message.includes("duplicate column") && !error.message.includes("already exists")) {
+      if (
+        !error.message.includes("duplicate column") &&
+        !error.message.includes("already exists")
+      ) {
         console.log("ℹ️ subscription_data column may already exist");
       }
     }
@@ -48,7 +51,10 @@ async function migrate() {
       `);
       console.log("✅ Added device_name column");
     } catch (error) {
-      if (!error.message.includes("duplicate column") && !error.message.includes("already exists")) {
+      if (
+        !error.message.includes("duplicate column") &&
+        !error.message.includes("already exists")
+      ) {
         console.log("ℹ️ device_name column may already exist");
       }
     }
@@ -59,7 +65,10 @@ async function migrate() {
       `);
       console.log("✅ Added user_agent column");
     } catch (error) {
-      if (!error.message.includes("duplicate column") && !error.message.includes("already exists")) {
+      if (
+        !error.message.includes("duplicate column") &&
+        !error.message.includes("already exists")
+      ) {
         console.log("ℹ️ user_agent column may already exist");
       }
     }
@@ -70,7 +79,10 @@ async function migrate() {
       `);
       console.log("✅ Added last_seen column");
     } catch (error) {
-      if (!error.message.includes("duplicate column") && !error.message.includes("already exists")) {
+      if (
+        !error.message.includes("duplicate column") &&
+        !error.message.includes("already exists")
+      ) {
         console.log("ℹ️ last_seen column may already exist");
       }
     }
@@ -81,7 +93,10 @@ async function migrate() {
       `);
       console.log("✅ Added is_active column");
     } catch (error) {
-      if (!error.message.includes("duplicate column") && !error.message.includes("already exists")) {
+      if (
+        !error.message.includes("duplicate column") &&
+        !error.message.includes("already exists")
+      ) {
         console.log("ℹ️ is_active column may already exist");
       }
     }
@@ -94,4 +109,3 @@ async function migrate() {
 }
 
 migrate();
-

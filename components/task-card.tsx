@@ -27,9 +27,7 @@ interface TaskCardProps {
   onUpdate: (taskId: string, updates: Partial<Task>) => Promise<void>;
   onDelete: (taskId: string) => Promise<void>;
   onEdit?: (taskId: string) => void;
-  onExtend?: (taskId: string) => void;
   onUnschedule?: (taskId: string) => Promise<void>;
-  showGroup?: boolean;
   compact?: boolean;
   groups?: TaskGroup[];
 }
@@ -39,10 +37,7 @@ export function TaskCard({
   onUpdate,
   onDelete,
   onEdit,
-  onExtend,
   onUnschedule,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  showGroup = false,
   compact = false,
   groups = [],
 }: TaskCardProps) {
@@ -309,6 +304,8 @@ export function TaskCard({
           </div>
 
           {/* Actions - compact */}
+          {/* biome-ignore lint/a11y/noStaticElementInteractions: Container div for button group */}
+          {/* biome-ignore lint/a11y/useKeyWithClickEvents: Container div doesn't need keyboard interaction */}
           <div
             className="flex items-center gap-1 flex-shrink-0"
             onClick={(e) => e.stopPropagation()}

@@ -70,14 +70,12 @@ function getContrastColor(hexColor: string): string {
 }
 
 interface GroupCardProps {
-  groupId: string;
   groupName: string;
   groupColor: string;
   taskCount: number;
   tasks: Task[];
   isExpanded: boolean;
   isHidden: boolean;
-  isSelected: boolean;
   isOtherSelected: boolean;
   showAllTasks: boolean;
   onToggleExpand: () => void;
@@ -90,14 +88,12 @@ interface GroupCardProps {
 }
 
 function GroupCard({
-  groupId,
   groupName,
   groupColor,
   taskCount,
   tasks,
   isExpanded,
   isHidden,
-  isSelected,
   isOtherSelected,
   showAllTasks,
   onToggleExpand,
@@ -120,9 +116,17 @@ function GroupCard({
     >
       {/* Colored Header */}
       <div
+        role="button"
+        tabIndex={0}
         className="px-3 pt-[5px] pb-0.5 cursor-pointer"
         style={{ backgroundColor: groupColor }}
         onClick={onSelect}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            onSelect();
+          }
+        }}
       >
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2 flex-1 min-w-0">
@@ -284,7 +288,7 @@ export function TaskGroupManager({
       fetchGroups();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Empty deps - only run once on mount
+  }, [fetchGroups]); // Empty deps - only run once on mount
 
   // Auto-rotate color when create dialog opens
   useEffect(() => {
@@ -527,7 +531,7 @@ export function TaskGroupManager({
             </DialogHeader>
             <div className="space-y-4">
               <div>
-                <label className="text-sm font-medium">Group Name</label>
+                <div className="text-sm font-medium mb-1">Group Name</div>
                 <Input
                   value={newGroupName}
                   onChange={(e) => setNewGroupName(e.target.value)}
@@ -536,7 +540,7 @@ export function TaskGroupManager({
                 />
               </div>
               <div>
-                <label className="text-sm font-medium">Color</label>
+                <div className="text-sm font-medium mb-1">Color</div>
                 <Select value={newGroupColor} onValueChange={setNewGroupColor}>
                   <SelectTrigger className="mt-1">
                     <SelectValue />
@@ -602,14 +606,12 @@ export function TaskGroupManager({
         {groups.map((group) => (
           <GroupCard
             key={group.id}
-            groupId={group.id}
             groupName={group.name}
             groupColor={group.color}
             taskCount={getTaskCountForGroup(group.id)}
             tasks={getTasksForGroup(group.id)}
             isExpanded={expandedGroups.has(group.id)}
             isHidden={hiddenGroups.has(group.id)}
-            isSelected={selectedGroupId === group.id}
             isOtherSelected={selectedGroupId !== null && selectedGroupId !== group.id}
             showAllTasks={showAllTasks}
             onToggleExpand={() => toggleGroupExpansion(group.id)}
@@ -637,14 +639,12 @@ export function TaskGroupManager({
 
         {/* Ungrouped at the bottom */}
         <GroupCard
-          groupId="ungrouped"
           groupName="Ungrouped"
           groupColor="#6B7280"
           taskCount={getTaskCountForGroup(null)}
           tasks={getTasksForGroup(null)}
           isExpanded={expandedGroups.has("ungrouped")}
           isHidden={hiddenGroups.has("ungrouped")}
-          isSelected={selectedGroupId === "ungrouped"}
           isOtherSelected={selectedGroupId !== null && selectedGroupId !== "ungrouped"}
           showAllTasks={showAllTasks}
           onToggleExpand={() => toggleGroupExpansion("ungrouped")}
@@ -670,7 +670,7 @@ export function TaskGroupManager({
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <label className="text-sm font-medium">Group Name</label>
+              <div className="text-sm font-medium mb-1">Group Name</div>
               <Input
                 value={newGroupName}
                 onChange={(e) => setNewGroupName(e.target.value)}
@@ -679,7 +679,7 @@ export function TaskGroupManager({
               />
             </div>
             <div>
-              <label className="text-sm font-medium">Color</label>
+              <div className="text-sm font-medium mb-1">Color</div>
               <Select value={newGroupColor} onValueChange={setNewGroupColor}>
                 <SelectTrigger className="mt-1">
                   <SelectValue />

@@ -1,12 +1,4 @@
-import {
-  addToSyncQueue,
-  getSyncQueue,
-  removeFromSyncQueue,
-  getAllTasks,
-  getAllTaskGroups,
-  saveTask,
-  saveTaskGroup,
-} from "./offline-storage";
+import { addToSyncQueue, getSyncQueue, removeFromSyncQueue } from "./offline-storage";
 
 interface SyncResult {
   success: boolean;
@@ -32,9 +24,7 @@ export class SyncManager {
     try {
       // Process sync queue
       const queue = await getSyncQueue();
-      const results = await Promise.allSettled(
-        queue.map((item) => this.processQueueItem(item))
-      );
+      const results = await Promise.allSettled(queue.map((item) => this.processQueueItem(item)));
 
       // Remove successfully processed items
       for (let i = 0; i < results.length; i++) {
@@ -59,9 +49,7 @@ export class SyncManager {
     }
   }
 
-  private async processQueueItem(
-    item: Awaited<ReturnType<typeof getSyncQueue>>[0]
-  ): Promise<void> {
+  private async processQueueItem(item: Awaited<ReturnType<typeof getSyncQueue>>[0]): Promise<void> {
     try {
       const response = await fetch(item.url, {
         method: item.method,
@@ -134,4 +122,3 @@ if (typeof window !== "undefined") {
     syncManager.sync().catch(console.error);
   });
 }
-

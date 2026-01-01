@@ -1,9 +1,9 @@
 "use client";
 
-import { CloudOff, Cloud, RefreshCw } from "lucide-react";
+import { Cloud, CloudOff, RefreshCw } from "lucide-react";
 import { useEffect, useState } from "react";
-import { syncManager } from "@/lib/sync-manager";
 import { Button } from "@/components/ui/button";
+import { syncManager } from "@/lib/sync-manager";
 
 export function OfflineIndicator() {
   const [isOnline, setIsOnline] = useState(true);
@@ -11,12 +11,11 @@ export function OfflineIndicator() {
   const [pendingSyncCount, setPendingSyncCount] = useState(0);
 
   // Disable in development - service worker features don't work in dev
-  const isDevelopment = 
-    typeof window !== "undefined" && (
-      process.env.NODE_ENV === "development" ||
+  const isDevelopment =
+    typeof window !== "undefined" &&
+    (process.env.NODE_ENV === "development" ||
       window.location.hostname === "localhost" ||
-      window.location.hostname === "127.0.0.1"
-    );
+      window.location.hostname === "127.0.0.1");
 
   useEffect(() => {
     // Skip in development - offline sync requires service worker
@@ -64,7 +63,7 @@ export function OfflineIndicator() {
       unsubscribe();
       clearInterval(interval);
     };
-  }, []);
+  }, [isDevelopment]);
 
   if (isOnline && !isSyncing && pendingSyncCount === 0) {
     return null;
@@ -98,15 +97,8 @@ export function OfflineIndicator() {
       ) : pendingSyncCount > 0 ? (
         <>
           <Cloud className="h-4 w-4 text-blue-500" />
-          <span className="text-sm font-medium">
-            {pendingSyncCount} pending sync
-          </span>
-          <Button
-            onClick={handleSync}
-            size="sm"
-            variant="outline"
-            className="h-6 px-2 text-xs"
-          >
+          <span className="text-sm font-medium">{pendingSyncCount} pending sync</span>
+          <Button onClick={handleSync} size="sm" variant="outline" className="h-6 px-2 text-xs">
             Sync Now
           </Button>
         </>
@@ -119,4 +111,3 @@ export function OfflineIndicator() {
     </div>
   );
 }
-

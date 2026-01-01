@@ -1,29 +1,23 @@
 "use client";
 
-import { useState, useEffect } from "react";
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import {
-  Smartphone,
-  Monitor,
-  Tablet,
-  Trash2,
-  RefreshCw,
   AlertTriangle,
   CheckCircle,
-  XCircle,
+  Monitor,
+  RefreshCw,
+  Smartphone,
+  Tablet,
+  Trash2,
   Wifi,
   WifiOff,
+  XCircle,
 } from "lucide-react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 interface PushSubscription {
   id: string;
@@ -46,12 +40,11 @@ export function PushSubscriptionList({ className }: PushSubscriptionListProps) {
   const [isCleaning, setIsCleaning] = useState(false);
 
   // Check if we're in development mode
-  const isDevelopment = 
-    typeof window !== "undefined" && (
-      process.env.NODE_ENV === "development" ||
+  const isDevelopment =
+    typeof window !== "undefined" &&
+    (process.env.NODE_ENV === "development" ||
       window.location.hostname === "localhost" ||
-      window.location.hostname === "127.0.0.1"
-    );
+      window.location.hostname === "127.0.0.1");
 
   const fetchSubscriptions = async () => {
     try {
@@ -180,7 +173,7 @@ export function PushSubscriptionList({ className }: PushSubscriptionListProps) {
 
   useEffect(() => {
     fetchSubscriptions();
-  }, []);
+  }, [fetchSubscriptions]);
 
   // Show message in development that this requires production
   if (isDevelopment) {
@@ -199,8 +192,8 @@ export function PushSubscriptionList({ className }: PushSubscriptionListProps) {
           <div className="rounded-md bg-muted p-4 text-sm">
             <p className="font-medium mb-2">Push Subscriptions</p>
             <p className="text-muted-foreground">
-              Push subscription management requires service workers, which are disabled in development mode.
-              Build and run in production mode to manage subscriptions.
+              Push subscription management requires service workers, which are disabled in
+              development mode. Build and run in production mode to manage subscriptions.
             </p>
           </div>
         </CardContent>
@@ -247,8 +240,7 @@ export function PushSubscriptionList({ className }: PushSubscriptionListProps) {
           <Alert>
             <AlertTriangle className="h-4 w-4" />
             <AlertDescription>
-              No push subscriptions found. Enable notifications to create your
-              first subscription.
+              No push subscriptions found. Enable notifications to create your first subscription.
             </AlertDescription>
           </Alert>
         ) : (
@@ -301,21 +293,10 @@ export function PushSubscriptionList({ className }: PushSubscriptionListProps) {
                   </div>
 
                   <div className="flex items-center gap-2">
-                    <Badge
-                      variant={getStatusColor(
-                        subscription.isActive,
-                        subscription.lastSeen
-                      )}
-                    >
-                      {getStatusIcon(
-                        subscription.isActive,
-                        subscription.lastSeen
-                      )}
+                    <Badge variant={getStatusColor(subscription.isActive, subscription.lastSeen)}>
+                      {getStatusIcon(subscription.isActive, subscription.lastSeen)}
                       <span className="ml-1">
-                        {getStatusText(
-                          subscription.isActive,
-                          subscription.lastSeen
-                        )}
+                        {getStatusText(subscription.isActive, subscription.lastSeen)}
                       </span>
                     </Badge>
 
@@ -337,4 +318,3 @@ export function PushSubscriptionList({ className }: PushSubscriptionListProps) {
     </Card>
   );
 }
-

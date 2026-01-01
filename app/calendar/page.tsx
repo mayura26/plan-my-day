@@ -15,7 +15,7 @@ import { format, startOfMonth } from "date-fns";
 import { CheckSquare, ChevronDown, ChevronRight, Plus, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { CalendarSkeleton } from "@/components/calendar-skeleton";
 import { DayCalendar } from "@/components/day-calendar";
 import { DayNoteDialog } from "@/components/day-note-dialog";
@@ -172,7 +172,14 @@ export default function CalendarPage() {
       fetchedGroupsUserIdRef.current = null;
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [status, timezoneLoading]);
+  }, [
+    status,
+    timezoneLoading,
+    fetchGroups, // Fetch tasks
+    fetchTasks,
+    router.push,
+    session?.user?.id,
+  ]);
 
   // Helper function to format date to YYYY-MM-DD in user's timezone
   const formatDateKey = useCallback(
@@ -212,7 +219,7 @@ export default function CalendarPage() {
       }
       return null;
     },
-    [timezone]
+    [formatDateKey]
   );
 
   // Create or update day note
@@ -222,7 +229,7 @@ export default function CalendarPage() {
       // Try to get existing note first
       const existingNote = dayNotes.get(dateKey);
 
-      let response;
+      let response: Response;
       if (existingNote) {
         // Update existing note
         response = await fetch(`/api/day-notes?date=${dateKey}`, {
@@ -925,6 +932,8 @@ export default function CalendarPage() {
       <div className="flex h-[calc(100vh-4rem)] relative">
         {/* Backdrop overlay for mobile */}
         {sidebarOpen && (
+          // biome-ignore lint/a11y/noStaticElementInteractions: Backdrop overlay for mobile sidebar
+          // biome-ignore lint/a11y/useKeyWithClickEvents: Backdrop overlay doesn't need keyboard interaction
           <div
             className="fixed inset-0 bg-black/50 z-40 md:hidden"
             onClick={() => setSidebarOpen(false)}
@@ -989,7 +998,10 @@ export default function CalendarPage() {
 
             {/* Task Groups */}
             <div className="border rounded-lg overflow-hidden">
+              {/* biome-ignore lint/a11y/useSemanticElements: Collapsible section header requires div for layout */}
               <div
+                role="button"
+                tabIndex={0}
                 className="px-4 py-3 border-b cursor-pointer hover:bg-accent/50 transition-colors flex items-center justify-between bg-card"
                 onClick={() => {
                   const newSet = new Set(expandedSections);
@@ -999,6 +1011,18 @@ export default function CalendarPage() {
                     newSet.add("task-groups");
                   }
                   setExpandedSections(newSet);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    const newSet = new Set(expandedSections);
+                    if (newSet.has("task-groups")) {
+                      newSet.delete("task-groups");
+                    } else {
+                      newSet.add("task-groups");
+                    }
+                    setExpandedSections(newSet);
+                  }
                 }}
               >
                 <div className="flex items-center gap-2">
@@ -1085,12 +1109,22 @@ export default function CalendarPage() {
           </div>
 
           {/* Resize handle - only visible on desktop */}
+          {/* biome-ignore lint/a11y/useSemanticElements: Resize handle requires div for resize functionality */}
           <div
             ref={resizeRef}
+            role="button"
+            tabIndex={0}
             onMouseDown={(e) => {
               e.preventDefault();
               e.stopPropagation();
               setIsResizing(true);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                e.stopPropagation();
+                setIsResizing(true);
+              }
             }}
             className="hidden md:block absolute top-0 right-0 w-1 h-full cursor-col-resize hover:w-1.5 transition-all z-10 group"
             style={{
@@ -1114,9 +1148,6 @@ export default function CalendarPage() {
               tasks={calendarTasks}
               timezone={timezone}
               onTaskClick={handleTaskClick}
-              onTaskSchedule={handleScheduleTaskDrop}
-              onTaskReschedule={handleRescheduleTaskDrop}
-              onTaskResize={handleTaskResize}
               activeDragId={activeDragId}
               resizingTaskId={resizingTaskId}
               selectedGroupId={selectedGroupId}
@@ -1126,7 +1157,6 @@ export default function CalendarPage() {
               onDateChange={setCurrentDate}
               mobileViewToggleButtons={mobileViewToggleButtons}
               desktopViewToggleButtons={desktopViewToggleButtons}
-              dayNote={dayNotes.get(formatDateKey(currentDate)) || null}
               onNoteClick={handleNoteClick}
               onSlotDoubleClick={handleSlotDoubleClick}
             />
@@ -1136,9 +1166,6 @@ export default function CalendarPage() {
               tasks={calendarTasks}
               timezone={timezone}
               onTaskClick={handleTaskClick}
-              onTaskSchedule={handleScheduleTaskDrop}
-              onTaskReschedule={handleRescheduleTaskDrop}
-              onTaskResize={handleTaskResize}
               activeDragId={activeDragId}
               resizingTaskId={resizingTaskId}
               selectedGroupId={selectedGroupId}
@@ -1156,7 +1183,6 @@ export default function CalendarPage() {
               tasks={calendarTasks}
               timezone={timezone}
               onTaskClick={handleTaskClick}
-              selectedGroupId={selectedGroupId}
               groups={groups}
               onSidebarToggle={() => setSidebarOpen(!sidebarOpen)}
               currentDate={currentDate}

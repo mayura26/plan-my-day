@@ -70,16 +70,27 @@ export function SlimTaskCard({ task, onTaskClick }: SlimTaskCardProps) {
   };
 
   return (
+    // biome-ignore lint/a11y/useSemanticElements: Draggable task requires div for drag-and-drop functionality
     <div
       ref={setNodeRef}
       style={style}
       {...listeners}
       {...attributes}
+      role="button"
+      tabIndex={0}
       className={cn(
         "py-1.5 px-2 rounded border bg-card hover:bg-accent/50 transition-colors cursor-grab active:cursor-grabbing text-xs overflow-hidden",
         task.locked && "cursor-not-allowed opacity-75"
       )}
       onClick={handleClick}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          if (!isDragging) {
+            onTaskClick?.(task.id);
+          }
+        }
+      }}
     >
       {/* Line 1: Title */}
       <div className="font-medium truncate text-xs leading-tight flex items-center gap-1">

@@ -2,6 +2,7 @@ import { type NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/turso";
 
+// biome-ignore lint/correctness/noUnusedFunctionParameters: Next.js route handler requires request parameter
 export async function GET(request: NextRequest) {
   try {
     const session = await auth();
@@ -43,10 +44,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ subscriptions });
   } catch (error) {
     console.error("Error fetching push subscriptions:", error);
-    return NextResponse.json(
-      { error: "Failed to fetch push subscriptions" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Failed to fetch push subscriptions" }, { status: 500 });
   }
 }
 
@@ -61,27 +59,20 @@ export async function DELETE(request: NextRequest) {
     const { subscriptionId } = await request.json();
 
     if (!subscriptionId) {
-      return NextResponse.json(
-        { error: "Subscription ID is required" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "Subscription ID is required" }, { status: 400 });
     }
 
     // Delete the specific subscription
-    await db.execute(
-      "DELETE FROM push_subscriptions WHERE user_id = ? AND id = ?",
-      [session.user.id, subscriptionId]
-    );
+    await db.execute("DELETE FROM push_subscriptions WHERE user_id = ? AND id = ?", [
+      session.user.id,
+      subscriptionId,
+    ]);
 
     return NextResponse.json({
       message: "Push subscription removed successfully",
     });
   } catch (error) {
     console.error("Error removing push subscription:", error);
-    return NextResponse.json(
-      { error: "Failed to remove push subscription" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Failed to remove push subscription" }, { status: 500 });
   }
 }
-

@@ -35,12 +35,15 @@ export function PushNotificationManager() {
         setTimeout(() => reject(new Error("Service worker ready timeout")), 5000)
       );
 
-      const registrationReady = await Promise.race([readyPromise, timeoutPromise]) as ServiceWorkerRegistration;
-      
+      const registrationReady = (await Promise.race([
+        readyPromise,
+        timeoutPromise,
+      ])) as ServiceWorkerRegistration;
+
       const subscription = await registrationReady.pushManager.getSubscription();
       const newIsSubscribed = !!subscription;
       const newPermission = Notification.permission;
-      
+
       // Only update state if values changed
       setIsSubscribed((prev) => {
         if (prev === newIsSubscribed) return prev;
@@ -111,7 +114,7 @@ export function PushNotificationManager() {
           updateViaCache: "none", // Prevent caching issues per Next.js docs
         });
       }
-      
+
       // Wait for service worker to be ready
       await navigator.serviceWorker.ready;
 
@@ -131,12 +134,8 @@ export function PushNotificationManager() {
         body: JSON.stringify({
           endpoint: subscription.endpoint,
           keys: {
-            p256dh: arrayBufferToBase64(
-              subscription.getKey("p256dh") || new ArrayBuffer(0)
-            ),
-            auth: arrayBufferToBase64(
-              subscription.getKey("auth") || new ArrayBuffer(0)
-            ),
+            p256dh: arrayBufferToBase64(subscription.getKey("p256dh") || new ArrayBuffer(0)),
+            auth: arrayBufferToBase64(subscription.getKey("auth") || new ArrayBuffer(0)),
           },
         }),
       });
@@ -204,12 +203,11 @@ export function PushNotificationManager() {
   };
 
   // Check if we're in development mode
-  const isDevelopment = 
-    typeof window !== "undefined" && (
-      process.env.NODE_ENV === "development" ||
+  const isDevelopment =
+    typeof window !== "undefined" &&
+    (process.env.NODE_ENV === "development" ||
       window.location.hostname === "localhost" ||
-      window.location.hostname === "127.0.0.1"
-    );
+      window.location.hostname === "127.0.0.1");
 
   if (typeof window === "undefined" || !("serviceWorker" in navigator)) {
     return (
@@ -226,8 +224,8 @@ export function PushNotificationManager() {
         <div className="rounded-md bg-muted p-4 text-sm">
           <p className="font-medium mb-2">Push Notifications</p>
           <p className="text-muted-foreground">
-            Push notifications require service workers, which are disabled in development mode to prevent reload loops.
-            Build and run in production mode to test push notifications.
+            Push notifications require service workers, which are disabled in development mode to
+            prevent reload loops. Build and run in production mode to test push notifications.
           </p>
         </div>
       </div>
@@ -240,7 +238,6 @@ export function PushNotificationManager() {
 
   return (
     <div className="space-y-4">
-      
       <div className="flex items-center gap-2">
         {isSubscribed ? (
           <CheckCircle2 className="h-5 w-5 text-green-500" />
@@ -253,7 +250,12 @@ export function PushNotificationManager() {
       </div>
 
       <div className="text-sm text-muted-foreground">
-        Permission: {permission === "granted" ? "Granted" : permission === "denied" ? "Denied" : "Not Requested"}
+        Permission:{" "}
+        {permission === "granted"
+          ? "Granted"
+          : permission === "denied"
+            ? "Denied"
+            : "Not Requested"}
       </div>
 
       <div className="flex flex-wrap gap-2">
@@ -268,11 +270,7 @@ export function PushNotificationManager() {
               <BellOff className="h-4 w-4" />
               Disable Push Notifications
             </Button>
-            <Button
-              onClick={testNotification}
-              variant="outline"
-              disabled={isTesting}
-            >
+            <Button onClick={testNotification} variant="outline" disabled={isTesting}>
               {isTesting ? "Sending..." : "Test Notification"}
             </Button>
           </>
@@ -281,8 +279,8 @@ export function PushNotificationManager() {
 
       {permission === "denied" && (
         <p className="text-sm text-destructive">
-          Notification permission was denied. Please enable it in your browser
-          settings to receive push notifications.
+          Notification permission was denied. Please enable it in your browser settings to receive
+          push notifications.
         </p>
       )}
     </div>
@@ -311,4 +309,3 @@ function arrayBufferToBase64(buffer: ArrayBuffer): string {
   }
   return window.btoa(binary);
 }
-

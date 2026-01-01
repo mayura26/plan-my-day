@@ -1,11 +1,11 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import { InstallPrompt } from "@/components/install-prompt";
 import { Navigation } from "@/components/navigation";
+import { OfflineIndicator } from "@/components/offline-indicator";
 import { Providers } from "@/components/providers";
 import { UpdatePrompt } from "@/components/update-prompt";
-import { InstallPrompt } from "@/components/install-prompt";
-import { OfflineIndicator } from "@/components/offline-indicator";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",

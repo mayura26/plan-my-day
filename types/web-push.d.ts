@@ -18,11 +18,7 @@ declare module "web-push" {
     headers: Record<string, string>;
   }
 
-  function setVapidDetails(
-    subject: string,
-    publicKey: string,
-    privateKey: string
-  ): void;
+  function setVapidDetails(subject: string, publicKey: string, privateKey: string): void;
 
   function generateVAPIDKeys(): VapidKeys;
 
@@ -38,4 +34,3 @@ declare module "web-push" {
 
   export { setVapidDetails, generateVAPIDKeys, sendNotification };
 }
-

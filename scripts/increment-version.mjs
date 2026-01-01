@@ -1,5 +1,5 @@
-import { readFileSync, writeFileSync } from "fs";
-import { join } from "path";
+import { readFileSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 
 const VERSION_FILE = join(process.cwd(), "VERSION");
 const VERSION_JSON = join(process.cwd(), "public", "version.json");
@@ -36,8 +36,7 @@ const currentVersion = getCurrentVersion();
 const newVersion = incrementVersion(currentVersion);
 
 // Write to both files
-writeFileSync(VERSION_FILE, newVersion + "\n", "utf-8");
-writeFileSync(VERSION_JSON, JSON.stringify({ version: newVersion }, null, 2) + "\n", "utf-8");
+writeFileSync(VERSION_FILE, `${newVersion}\n`, "utf-8");
+writeFileSync(VERSION_JSON, `${JSON.stringify({ version: newVersion }, null, 2)}\n`, "utf-8");
 
 console.log(`Version incremented: ${currentVersion} → ${newVersion}`);
-

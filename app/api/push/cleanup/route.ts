@@ -1,8 +1,9 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { db } from "@/lib/turso";
 import { initializePushNotifications, sendPushNotification } from "@/lib/push-notification";
+import { db } from "@/lib/turso";
 
+// biome-ignore lint/correctness/noUnusedFunctionParameters: Next.js route handler requires request parameter
 export async function POST(request: NextRequest) {
   try {
     const session = await auth();
@@ -34,15 +35,12 @@ export async function POST(request: NextRequest) {
         };
 
         // Send a test notification to validate the subscription
-        await sendPushNotification(
-          subscription,
-          {
-            title: "Test",
-            body: "Validating subscription...",
-            icon: "/web-app-manifest-192x192.png",
-            tag: "validation",
-          }
-        );
+        await sendPushNotification(subscription, {
+          title: "Test",
+          body: "Validating subscription...",
+          icon: "/web-app-manifest-192x192.png",
+          tag: "validation",
+        });
 
         validSubscriptions.push(row.id);
       } catch (error: any) {
@@ -68,10 +66,6 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error("Error cleaning up push subscriptions:", error);
-    return NextResponse.json(
-      { error: "Failed to cleanup push subscriptions" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Failed to cleanup push subscriptions" }, { status: 500 });
   }
 }
-

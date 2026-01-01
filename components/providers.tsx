@@ -2,9 +2,9 @@
 
 import { SessionProvider } from "next-auth/react";
 import { Toaster } from "sonner";
+import { ServiceWorkerProvider } from "@/components/service-worker-provider";
 import { ThemeProvider } from "@/components/theme-provider";
 import { ConfirmDialogProvider } from "@/components/ui/confirm-dialog";
-import { ServiceWorkerProvider } from "@/components/service-worker-provider";
 
 interface ProvidersProps {
   children: React.ReactNode;

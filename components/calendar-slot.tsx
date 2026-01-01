@@ -34,9 +34,18 @@ export function CalendarSlot({ day, hour, minute, children, onDoubleClick }: Cal
   };
 
   return (
+    // biome-ignore lint/a11y/useSemanticElements: Droppable area requires div for drag-and-drop functionality
     <div
       ref={setNodeRef}
+      role="button"
+      tabIndex={0}
       onDoubleClick={handleDoubleClick}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onDoubleClick?.(day, hour, minute);
+        }
+      }}
       className={cn(
         "h-4 border-b border-border/50 transition-colors duration-150",
         minute === 0 && "border-b-2 border-border", // Thicker border for hour marks

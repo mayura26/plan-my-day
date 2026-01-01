@@ -17,11 +17,11 @@ export function UpdatePrompt() {
     }
 
     // Check if we're in development mode - if so, don't do anything
-    const isDevelopment = 
+    const isDevelopment =
       process.env.NODE_ENV === "development" ||
       window.location.hostname === "localhost" ||
       window.location.hostname === "127.0.0.1";
-    
+
     // Completely skip all service worker logic in development
     if (isDevelopment) {
       return;
@@ -62,13 +62,15 @@ export function UpdatePrompt() {
               if (newWorker.state === "installed" && navigator.serviceWorker.controller) {
                 // Check version before showing prompt to avoid false positives
                 try {
-                  const response = await fetch('/api/version');
+                  const response = await fetch("/api/version");
                   if (response.ok) {
                     const data = await response.json();
-                    const currentVersion = data.version || '1';
+                    const currentVersion = data.version || "1";
                     const cacheNames = await caches.keys();
-                    const versionCache = cacheNames.find(name => name.startsWith('planmyday-v') || name.includes('v'));
-                    
+                    const versionCache = cacheNames.find(
+                      (name) => name.startsWith("planmyday-v") || name.includes("v")
+                    );
+
                     // Only show if version actually changed
                     if (!versionCache || !versionCache.includes(currentVersion)) {
                       setShowPrompt((prev) => {
@@ -79,7 +81,7 @@ export function UpdatePrompt() {
                   }
                 } catch (error) {
                   // If version check fails, don't show prompt to be safe
-                  console.error('Error checking version:', error);
+                  console.error("Error checking version:", error);
                 }
               }
             };
@@ -111,18 +113,20 @@ export function UpdatePrompt() {
       if (isDevelopment) {
         return;
       }
-      
+
       if (userRequestedReload) {
         // Check version before reloading to ensure it actually changed
         try {
-          const response = await fetch('/api/version');
+          const response = await fetch("/api/version");
           if (response.ok) {
             const data = await response.json();
-            const currentVersion = data.version || '1';
+            const currentVersion = data.version || "1";
             // Get cache names to check service worker version
             const cacheNames = await caches.keys();
-            const versionCache = cacheNames.find(name => name.startsWith('planmyday-v') || name.includes('v'));
-            
+            const versionCache = cacheNames.find(
+              (name) => name.startsWith("planmyday-v") || name.includes("v")
+            );
+
             // Only reload if we can confirm version changed, or if we can't check (assume it did)
             if (!versionCache || !versionCache.includes(currentVersion)) {
               userRequestedReload = false;
@@ -137,7 +141,7 @@ export function UpdatePrompt() {
           }
         } catch (error) {
           // If version check fails, don't reload to be safe
-          console.error('Error checking version before reload:', error);
+          console.error("Error checking version before reload:", error);
           userRequestedReload = false;
         }
       }
@@ -192,36 +196,22 @@ export function UpdatePrompt() {
         <div className="flex-1">
           <h3 className="font-semibold text-sm">Update Available</h3>
           <p className="text-sm text-muted-foreground mt-1">
-            A new version of Plan My Day is available. Update now to get the
-            latest features and improvements.
+            A new version of Plan My Day is available. Update now to get the latest features and
+            improvements.
           </p>
           <div className="flex gap-2 mt-3">
-            <Button
-              onClick={handleUpdate}
-              size="sm"
-              disabled={isUpdating}
-            >
+            <Button onClick={handleUpdate} size="sm" disabled={isUpdating}>
               {isUpdating ? "Updating..." : "Update Now"}
             </Button>
-            <Button
-              onClick={handleDismiss}
-              size="sm"
-              variant="outline"
-            >
+            <Button onClick={handleDismiss} size="sm" variant="outline">
               Later
             </Button>
           </div>
         </div>
-        <Button
-          onClick={handleDismiss}
-          size="icon"
-          variant="ghost"
-          className="h-6 w-6"
-        >
+        <Button onClick={handleDismiss} size="icon" variant="ghost" className="h-6 w-6">
           <X className="h-4 w-4" />
         </Button>
       </div>
     </div>
   );
 }
-

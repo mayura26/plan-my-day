@@ -53,7 +53,10 @@ async function wouldCreateCircularDependency(
   const stack: string[] = [newDependencyId];
 
   while (stack.length > 0) {
-    const currentId = stack.pop()!;
+    const currentId = stack.pop();
+    if (!currentId) {
+      continue;
+    }
 
     if (currentId === taskId) {
       // Found a path back to the original task - circular dependency!

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 
 export function VersionIndicator() {
@@ -28,4 +28,3 @@ export function VersionIndicator() {
     </Badge>
   );
 }
-

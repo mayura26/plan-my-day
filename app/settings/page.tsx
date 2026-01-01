@@ -5,10 +5,10 @@ import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { useEffect } from "react";
 import { APIKeyManager } from "@/components/api-key-manager";
-import { TimezoneSelector } from "@/components/timezone-selector";
+import { ForceUpdateButton } from "@/components/force-update-button";
 import { PushNotificationManager } from "@/components/push-notification-manager";
 import { PushSubscriptionList } from "@/components/push-subscription-list";
-import { ForceUpdateButton } from "@/components/force-update-button";
+import { TimezoneSelector } from "@/components/timezone-selector";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 

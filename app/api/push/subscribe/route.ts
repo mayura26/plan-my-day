@@ -52,22 +52,21 @@ export async function POST(request: NextRequest) {
     }
 
     const body: PushSubscriptionData = await request.json();
-    
-    // Support both formats: {subscription: {...}} and {endpoint, keys}
-    const subscription = body.subscription || {
-      endpoint: body.endpoint!,
-      keys: body.keys!,
-    };
 
-    if (
-      !subscription.endpoint ||
-      !subscription.keys?.p256dh ||
-      !subscription.keys?.auth
-    ) {
-      return NextResponse.json(
-        { error: "Invalid subscription data" },
-        { status: 400 }
-      );
+    // Support both formats: {subscription: {...}} and {endpoint, keys}
+    let subscription = body.subscription;
+    if (!subscription) {
+      if (!body.endpoint || !body.keys) {
+        return NextResponse.json({ error: "Invalid subscription data" }, { status: 400 });
+      }
+      subscription = {
+        endpoint: body.endpoint,
+        keys: body.keys,
+      };
+    }
+
+    if (!subscription.endpoint || !subscription.keys?.p256dh || !subscription.keys?.auth) {
+      return NextResponse.json({ error: "Invalid subscription data" }, { status: 400 });
     }
 
     const userAgent = body.userAgent || request.headers.get("user-agent") || "";
@@ -75,10 +74,9 @@ export async function POST(request: NextRequest) {
     const subscriptionData = JSON.stringify(subscription);
 
     // Check if subscription already exists
-    const existing = await db.execute(
-      "SELECT id FROM push_subscriptions WHERE endpoint = ?",
-      [subscription.endpoint]
-    );
+    const existing = await db.execute("SELECT id FROM push_subscriptions WHERE endpoint = ?", [
+      subscription.endpoint,
+    ]);
 
     if (existing.rows.length > 0) {
       // Update existing subscription
@@ -127,10 +125,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Error subscribing to push notifications:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
-

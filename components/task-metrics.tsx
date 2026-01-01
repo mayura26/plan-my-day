@@ -48,12 +48,25 @@ function MetricSection({
 
   return (
     <div className="border-b last:border-b-0">
+      {/* biome-ignore lint/a11y/noStaticElementInteractions: Conditionally interactive element based on count */}
       <div
+        role={count > 0 ? "button" : undefined}
+        tabIndex={count > 0 ? 0 : undefined}
         className={cn(
           "flex items-center justify-between py-2 px-2 rounded-md transition-colors",
           count > 0 && "cursor-pointer hover:bg-accent/50"
         )}
         onClick={count > 0 ? onToggle : undefined}
+        onKeyDown={
+          count > 0
+            ? (e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  onToggle();
+                }
+              }
+            : undefined
+        }
       >
         <div className="flex items-center gap-2 flex-1">
           <span className="flex-shrink-0">

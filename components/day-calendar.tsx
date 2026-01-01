@@ -12,15 +12,12 @@ import {
   getDateInTimezone,
   getHoursAndMinutesInTimezone,
 } from "@/lib/timezone-utils";
-import type { DayNote, Task, TaskGroup } from "@/lib/types";
+import type { Task, TaskGroup } from "@/lib/types";
 
 interface DayCalendarProps {
   tasks: Task[];
   timezone: string;
   onTaskClick?: (taskId: string) => void;
-  onTaskSchedule?: (taskId: string, day: Date, time: number) => void;
-  onTaskReschedule?: (taskId: string, day: Date, time: number) => void;
-  onTaskResize?: (taskId: string, newEndTime: Date) => void;
   activeDragId?: string | null;
   resizingTaskId?: string | null;
   selectedGroupId?: string | null;
@@ -30,7 +27,6 @@ interface DayCalendarProps {
   onDateChange?: (date: Date) => void;
   mobileViewToggleButtons?: React.ReactNode;
   desktopViewToggleButtons?: React.ReactNode;
-  dayNote?: DayNote | null;
   onNoteClick?: (date: Date) => void;
   onSlotDoubleClick?: (day: Date, hour: number, minute: number) => void;
 }
@@ -48,9 +44,6 @@ export function DayCalendar({
   tasks,
   timezone,
   onTaskClick,
-  onTaskSchedule,
-  onTaskReschedule,
-  onTaskResize,
   activeDragId,
   resizingTaskId,
   selectedGroupId,
@@ -60,7 +53,6 @@ export function DayCalendar({
   onDateChange,
   mobileViewToggleButtons,
   desktopViewToggleButtons,
-  dayNote,
   onNoteClick,
   onSlotDoubleClick,
 }: DayCalendarProps) {
@@ -335,7 +327,6 @@ export function DayCalendar({
                         task={task}
                         position={position}
                         onTaskClick={onTaskClick}
-                        onResize={onTaskResize}
                         activeDragId={activeDragId}
                         resizingTaskId={resizingTaskId}
                         selectedGroupId={selectedGroupId}

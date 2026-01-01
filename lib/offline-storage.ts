@@ -1,4 +1,4 @@
-import { openDB, DBSchema, IDBPDatabase } from "idb";
+import { type DBSchema, type IDBPDatabase, openDB } from "idb";
 
 interface TaskData {
   id: string;
@@ -163,10 +163,7 @@ export async function saveDayNote(note: DayNote): Promise<void> {
   await db.put("dayNotes", note);
 }
 
-export async function getDayNote(
-  userId: string,
-  date: string
-): Promise<DayNote | undefined> {
+export async function getDayNote(userId: string, date: string): Promise<DayNote | undefined> {
   const db = await getDB();
   const index = db.transaction("dayNotes").store.index("by-date");
   const notes = await index.getAll(date);
@@ -229,4 +226,3 @@ export async function clearUserData(userId: string): Promise<void> {
 
   await tx.done;
 }
-

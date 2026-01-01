@@ -30,7 +30,6 @@ interface ResizableTaskProps {
   task: Task;
   position: { top: string; height: string };
   onTaskClick?: (taskId: string) => void;
-  onResize?: (taskId: string, newEndTime: Date) => void;
   activeDragId?: string | null;
   resizingTaskId?: string | null;
   selectedGroupId?: string | null;
@@ -42,7 +41,6 @@ export function ResizableTask({
   task,
   position,
   onTaskClick,
-  onResize,
   activeDragId,
   resizingTaskId,
   selectedGroupId,
@@ -169,11 +167,14 @@ export function ResizableTask({
   };
 
   return (
+    // biome-ignore lint/a11y/noStaticElementInteractions: Draggable task requires div for drag-and-drop functionality
     <div
       ref={setNodeRef}
       style={style}
       {...(task.locked ? {} : listeners)}
       {...attributes}
+      role={attributes.role || "button"}
+      tabIndex={attributes.tabIndex ?? 0}
       className={cn(
         "rounded-md border-l-4 cursor-pointer pointer-events-auto",
         isShortTask ? "p-0.5 md:p-1" : "p-1.5 md:p-2",
@@ -190,6 +191,14 @@ export function ResizableTask({
         (isCompleted || isPastEvent) && "opacity-50"
       )}
       onClick={handleTaskClick}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          if (!isDragging && !isResizing) {
+            onTaskClick?.(task.id);
+          }
+        }
+      }}
     >
       {/* Priority top bar */}
       <div
@@ -285,10 +294,13 @@ export function ResizableTask({
       {!task.locked && (
         <>
           {/* Top resize handle */}
+          {/* biome-ignore lint/a11y/noStaticElementInteractions: Resize handle requires div for resize functionality */}
           <div
             ref={setTopResizeRef}
             {...topResizeListeners}
             {...topResizeAttributes}
+            role={topResizeAttributes.role || "button"}
+            tabIndex={topResizeAttributes.tabIndex ?? 0}
             className={cn(
               "absolute top-0 left-0 right-0 h-3 md:h-2 cursor-ns-resize bg-white/20 hover:bg-white/30 transition-opacity flex items-center justify-center touch-none",
               isTopResizing
@@ -296,14 +308,23 @@ export function ResizableTask({
                 : "opacity-50 md:opacity-0 md:group-hover:opacity-100"
             )}
             onMouseDown={(e) => e.stopPropagation()}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                e.stopPropagation();
+              }
+            }}
           >
             <GripVertical className="h-3 w-3 text-white" />
           </div>
           {/* Bottom resize handle */}
+          {/* biome-ignore lint/a11y/noStaticElementInteractions: Resize handle requires div for resize functionality */}
           <div
             ref={setBottomResizeRef}
             {...bottomResizeListeners}
             {...bottomResizeAttributes}
+            role={bottomResizeAttributes.role || "button"}
+            tabIndex={bottomResizeAttributes.tabIndex ?? 0}
             className={cn(
               "absolute bottom-0 left-0 right-0 h-3 md:h-2 cursor-ns-resize bg-white/20 hover:bg-white/30 transition-opacity flex items-center justify-center touch-none",
               isBottomResizing
@@ -311,6 +332,12 @@ export function ResizableTask({
                 : "opacity-50 md:opacity-0 md:group-hover:opacity-100"
             )}
             onMouseDown={(e) => e.stopPropagation()}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                e.stopPropagation();
+              }
+            }}
           >
             <GripVertical className="h-3 w-3 text-white" />
           </div>
