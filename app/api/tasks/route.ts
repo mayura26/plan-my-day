@@ -96,10 +96,22 @@ export async function GET(request: NextRequest) {
     const result = await db.execute(query, params);
     const tasks = result.rows.map(mapRowToTask);
 
-    // Optionally include subtasks for each task
-    if (include_subtasks === "true") {
-      const tasksWithSubtasks = await Promise.all(
-        tasks.map(async (task) => {
+    // Get subtask counts for all tasks (for filtering purposes)
+    const tasksWithSubtaskCounts = await Promise.all(
+      tasks.map(async (task) => {
+        // Only check subtask count for parent tasks (tasks without parent_task_id)
+        if (task.parent_task_id) {
+          return { ...task, subtask_count: 0 };
+        }
+
+        const subtaskCountResult = await db.execute(
+          `SELECT COUNT(*) as count FROM tasks WHERE parent_task_id = ?`,
+          [task.id]
+        );
+        const subtaskCount = subtaskCountResult.rows[0]?.count || 0;
+
+        // Optionally include full subtask details
+        if (include_subtasks === "true") {
           const subtasksResult = await db.execute(
             `SELECT * FROM tasks WHERE parent_task_id = ? ORDER BY priority ASC, created_at ASC`,
             [task.id]
@@ -107,17 +119,18 @@ export async function GET(request: NextRequest) {
           return {
             ...task,
             subtasks: subtasksResult.rows.map(mapRowToTask),
-            subtask_count: subtasksResult.rows.length,
+            subtask_count: Number(subtaskCount),
             completed_subtask_count: subtasksResult.rows.filter(
               (r) => r.status === "completed"
             ).length,
           };
-        })
-      );
-      return NextResponse.json({ tasks: tasksWithSubtasks });
-    }
+        }
 
-    return NextResponse.json({ tasks });
+        return { ...task, subtask_count: Number(subtaskCount) };
+      })
+    );
+
+    return NextResponse.json({ tasks: tasksWithSubtaskCounts });
   } catch (error) {
     console.error("Error fetching tasks:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
@@ -177,6 +190,10 @@ export async function POST(request: NextRequest) {
       3;
     const dueDate = body.due_date || (body.parent_task_id ? parentTaskData?.due_date : null) || null;
 
+    // Default duration to 30 minutes for tasks, todos, and subtasks (not events)
+    const defaultDuration = taskType === "event" ? null : 30;
+    const duration = body.duration !== undefined ? body.duration : defaultDuration;
+
     const task: Task = {
       id: taskId,
       user_id: session.user.id,
@@ -184,7 +201,7 @@ export async function POST(request: NextRequest) {
       description: body.description || null,
       priority,
       status: "pending",
-      duration: body.duration || null,
+      duration,
       scheduled_start: body.scheduled_start || null,
       scheduled_end: body.scheduled_end || null,
       due_date: dueDate,

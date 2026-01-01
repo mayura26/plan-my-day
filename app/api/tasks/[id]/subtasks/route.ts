@@ -126,7 +126,7 @@ export async function POST(
       description: body.description || null,
       priority: body.priority || parentTask.priority || 3,
       status: "pending",
-      duration: body.duration || null,
+      duration: body.duration !== undefined ? body.duration : 30, // Default to 30 minutes
       scheduled_start: body.scheduled_start || null,
       scheduled_end: body.scheduled_end || null,
       due_date: body.due_date || parentTask.due_date || null,
@@ -181,10 +181,28 @@ export async function POST(
     );
 
     // If parent task was completed, set it back to in_progress since we added a new subtask
+    // Also unschedule the parent task since it now has subtasks (only subtasks should be scheduled)
+    const parentUpdates: string[] = [];
+    const parentUpdateValues: any[] = [];
+
     if (parentTask.status === "completed") {
+      parentUpdates.push("status = ?");
+      parentUpdateValues.push("in_progress");
+    }
+
+    // Always unschedule parent task when subtasks exist (only subtasks should be scheduled)
+    parentUpdates.push("scheduled_start = ?");
+    parentUpdates.push("scheduled_end = ?");
+    parentUpdateValues.push(null, null);
+
+    if (parentUpdates.length > 0) {
+      parentUpdates.push("updated_at = ?");
+      parentUpdateValues.push(now);
+      parentUpdateValues.push(parentId);
+
       await db.execute(
-        `UPDATE tasks SET status = 'in_progress', updated_at = ? WHERE id = ?`,
-        [now, parentId]
+        `UPDATE tasks SET ${parentUpdates.join(", ")} WHERE id = ?`,
+        parentUpdateValues
       );
     }
 

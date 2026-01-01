@@ -35,7 +35,8 @@ interface TaskDetailDialogProps {
   onDelete?: (taskId: string) => void;
   onStatusChange?: (taskId: string, status: Task["status"]) => void;
   onUnschedule?: (taskId: string) => void;
-  onTaskUpdate?: () => void;
+  onTaskUpdate?: () => void | Promise<void>;
+  onTaskRefresh?: (task: Task) => void; // Callback to refresh the task prop from parent
 }
 
 interface DependencyInfo extends TaskDependency {
@@ -52,6 +53,7 @@ export function TaskDetailDialog({
   onStatusChange,
   onUnschedule,
   onTaskUpdate,
+  onTaskRefresh,
 }: TaskDetailDialogProps) {
   const [isDeleting, setIsDeleting] = useState(false);
   const [isUnscheduling, setIsUnscheduling] = useState(false);
@@ -83,13 +85,22 @@ export function TaskDetailDialog({
 
   if (!task) return null;
 
+  // Handle dialog close - refresh task list when dialog is closed
+  const handleDialogClose = (newOpen: boolean) => {
+    if (!newOpen) {
+      // Dialog is being closed, refresh the task list
+      onTaskUpdate?.();
+    }
+    onOpenChange(newOpen);
+  };
+
   const handleDelete = async () => {
     if (!confirm("Are you sure you want to delete this task?")) return;
 
     setIsDeleting(true);
     try {
       await onDelete?.(task.id);
-      onOpenChange(false);
+      handleDialogClose(false);
     } catch (error) {
       console.error("Error deleting task:", error);
     } finally {
@@ -99,7 +110,7 @@ export function TaskDetailDialog({
 
   const handleEdit = () => {
     onEdit?.(task.id);
-    onOpenChange(false);
+    handleDialogClose(false);
   };
 
   const handleUnschedule = async () => {
@@ -120,8 +131,21 @@ export function TaskDetailDialog({
     }
   };
 
-  const handleSubtaskChange = () => {
-    onTaskUpdate?.();
+  const handleSubtaskChange = async () => {
+    // Refresh the task data in the dialog itself (parent task may have been unscheduled)
+    // But don't refresh the full list until dialog closes for smoother UX
+    if (task) {
+      try {
+        const response = await fetch(`/api/tasks/${task.id}`);
+        if (response.ok) {
+          const data = await response.json();
+          // Update the task in parent component so dialog shows fresh data
+          onTaskRefresh?.(data.task);
+        }
+      } catch (error) {
+        console.error("Error refreshing task:", error);
+      }
+    }
   };
 
   const getStatusColor = (status: Task["status"]) => {
@@ -171,7 +195,7 @@ export function TaskDetailDialog({
   const isCarryover = !!task.continued_from_task_id;
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleDialogClose}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto w-[95vw] md:w-full mx-2 md:mx-auto">
         <DialogHeader>
           <DialogTitle className="text-2xl">{task.title}</DialogTitle>

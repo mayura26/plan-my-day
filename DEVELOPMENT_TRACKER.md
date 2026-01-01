@@ -7,8 +7,9 @@
 - [x] Carryover task links to original via continued_from_task_id
 
 ### ⏳ Pending
-- [ ] PWA setup with service worker
-- [ ] Basic offline functionality
+- [ ] Add notes for the day where user can put prioritys. and when in day view show this
+
+- [ ] Mobile day view should just fit screen
 
 - [ ] Add toasts
 
@@ -20,6 +21,16 @@
 
 - [ ] Allow API push of data
 
+- [ ] Rework task view to be nicer
+
+- [ ] Allow import of tasks, csv with Type, group, name, description, time, due date
+
+- [ ] Process overdue tasks
+
+- [ ] when task is completed on calender we need to show grey-d or corssed out. and then for overdue task which is not rescheduled we show with border to get attenito. events we also cross out after the time
+
+- [ ] PWA setup with service worker
+- [ ] Basic offline functionality
 ---
 
 ## Phase 2: AI Scheduling & Notifications (Weeks 5-8)

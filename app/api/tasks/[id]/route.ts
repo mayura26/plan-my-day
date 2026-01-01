@@ -171,6 +171,26 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     const existingTask = mapRowToTask(existingTaskResult.rows[0]);
     const now = new Date().toISOString();
 
+    // Check if trying to schedule a parent task that has subtasks
+    if (
+      (body.scheduled_start !== undefined || body.scheduled_end !== undefined) &&
+      !existingTask.parent_task_id
+    ) {
+      // Check if this parent task has subtasks
+      const subtaskCountResult = await db.execute(
+        `SELECT COUNT(*) as count FROM tasks WHERE parent_task_id = ? AND user_id = ?`,
+        [id, session.user.id]
+      );
+      const subtaskCount = Number(subtaskCountResult.rows[0]?.count || 0);
+
+      if (subtaskCount > 0) {
+        // Parent tasks with subtasks cannot be scheduled - only subtasks should be scheduled
+        // Automatically unschedule the parent task
+        body.scheduled_start = null;
+        body.scheduled_end = null;
+      }
+    }
+
     // Build dynamic update query
     const updateFields: string[] = [];
     const values: any[] = [];
