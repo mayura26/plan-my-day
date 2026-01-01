@@ -14,11 +14,10 @@ const pwaConfig = withPWA({
   // See: https://nextjs.org/docs/app/guides/progressive-web-apps
   register: false, // Manual registration with updateViaCache: 'none'
   skipWaiting: true,
-  // Disable PWA in development by default - enable with ENABLE_PWA_DEV=true
-  // Service workers can cause issues with hot reloading, but can be enabled for testing
+  // Disable PWA in development - service workers cause reload loops with hot reloading
+  // PWA features are only enabled in production builds
   // Note: The "GenerateSW has been called multiple times" warning in dev is harmless
-  // It occurs because webpack watch mode rebuilds multiple times
-  disable: process.env.NODE_ENV === "development" && process.env.ENABLE_PWA_DEV !== "true",
+  disable: process.env.NODE_ENV === "development",
   sw: "sw.js",
   runtimeCaching: [
     {
