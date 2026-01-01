@@ -115,7 +115,8 @@ export function ResizableTask({
 
   // Check task states
   const isCompleted = task.status === "completed";
-  const isOverdue = !isCompleted && isTaskOverdue(task);
+  const isRescheduled = task.status === "rescheduled";
+  const isOverdue = !isCompleted && !isRescheduled && isTaskOverdue(task);
   const isPastEvent = task.task_type === "event" && isTaskTimeExpired(task);
 
   // Check if task is very short (15 minutes or less)
@@ -140,7 +141,15 @@ export function ResizableTask({
     height: position.height,
     ...(transformString && { transform: transformString }), // Only include transform if it exists
     opacity:
-      isDragging || isTaskResizing ? 0.7 : shouldFade ? 0.3 : isCompleted || isPastEvent ? 0.5 : 1,
+      isDragging || isTaskResizing
+        ? 0.7
+        : shouldFade
+          ? 0.3
+          : isRescheduled
+            ? 0.4
+            : isCompleted || isPastEvent
+              ? 0.5
+              : 1,
     transition: isDragging || isTaskResizing ? "none" : "all 0.2s ease-in-out",
     zIndex: isActiveDrag ? 50 : 10,
     ...(groupColor && {
@@ -177,6 +186,7 @@ export function ResizableTask({
         belongsToSelectedGroup && selectedGroupId !== null && "ring-2 ring-primary ring-offset-1",
         !groupColor && "bg-gray-500/40 border-gray-500",
         isOverdue && "ring-2 ring-red-500 ring-offset-0",
+        isRescheduled && "opacity-40",
         (isCompleted || isPastEvent) && "opacity-50"
       )}
       onClick={handleTaskClick}
@@ -235,7 +245,8 @@ export function ResizableTask({
         className={cn(
           "font-medium text-white truncate pointer-events-none",
           isShortTask ? "text-[8px] md:text-[9px] mt-0" : "text-xs mt-1",
-          (isCompleted || isPastEvent) && "line-through"
+          (isCompleted || isPastEvent) && "line-through",
+          isRescheduled && "opacity-60"
         )}
       >
         {task.title}

@@ -94,7 +94,7 @@ export function parseDuration(duration: string): number {
 }
 
 export function isTaskOverdue(task: Task): boolean {
-  if (task.status === "completed" || task.status === "cancelled") {
+  if (task.status === "completed" || task.status === "cancelled" || task.status === "rescheduled" || task.ignored) {
     return false;
   }
   const now = new Date();
@@ -277,12 +277,12 @@ export function filterTasksByDateRange(tasks: Task[], startDate: string, endDate
 // Metric helper functions for task insights
 
 /**
- * Get all overdue tasks (due_date or scheduled_end is in the past and not completed/cancelled)
+ * Get all overdue tasks (due_date or scheduled_end is in the past and not completed/cancelled/rescheduled/ignored)
  */
 export function getOverdueTasks(tasks: Task[]): Task[] {
   const now = new Date();
   return tasks.filter((task) => {
-    if (task.status === "completed" || task.status === "cancelled") return false;
+    if (task.status === "completed" || task.status === "cancelled" || task.status === "rescheduled" || task.ignored) return false;
     // Check if due_date has passed
     if (task.due_date && new Date(task.due_date) < now) {
       return true;

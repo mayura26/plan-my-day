@@ -259,6 +259,7 @@ export async function POST(request: NextRequest) {
           energy_level_required: energyLevel,
           parent_task_id: null,
           continued_from_task_id: null,
+          ignored: false,
           created_at: now,
           updated_at: now,
         };
@@ -269,8 +270,8 @@ export async function POST(request: NextRequest) {
             scheduled_start, scheduled_end, due_date, locked, group_id, template_id,
             task_type, google_calendar_event_id, notification_sent,
             depends_on_task_id, energy_level_required, parent_task_id, continued_from_task_id,
-            created_at, updated_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            ignored, created_at, updated_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           [
             task.id,
             task.user_id,
@@ -292,6 +293,7 @@ export async function POST(request: NextRequest) {
             task.energy_level_required,
             task.parent_task_id || null,
             task.continued_from_task_id || null,
+            task.ignored,
             task.created_at,
             task.updated_at,
           ]

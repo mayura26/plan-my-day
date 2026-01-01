@@ -89,6 +89,7 @@ async function initDatabase() {
         energy_level_required INTEGER DEFAULT 3,
         parent_task_id TEXT,
         continued_from_task_id TEXT,
+        ignored BOOLEAN DEFAULT FALSE,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,

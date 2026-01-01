@@ -26,6 +26,7 @@ function mapRowToTask(row: any): Task {
     energy_level_required: row.energy_level_required as number,
     parent_task_id: row.parent_task_id as string | null,
     continued_from_task_id: row.continued_from_task_id as string | null,
+    ignored: Boolean(row.ignored ?? false),
     created_at: row.created_at as string,
     updated_at: row.updated_at as string,
   };
@@ -60,6 +61,27 @@ async function completeAllSubtasks(parentTaskId: string, userId: string): Promis
   await db.execute(
     `UPDATE tasks SET status = 'completed', updated_at = ? WHERE parent_task_id = ? AND user_id = ? AND status != 'completed'`,
     [now, parentTaskId, userId]
+  );
+}
+
+// Helper to check and complete original task when carryover is completed
+async function checkAndCompleteOriginalTask(carryoverTaskId: string, userId: string): Promise<void> {
+  // Get the carryover task to find the original
+  const carryoverResult = await db.execute(
+    `SELECT continued_from_task_id FROM tasks WHERE id = ? AND user_id = ?`,
+    [carryoverTaskId, userId]
+  );
+
+  if (carryoverResult.rows.length === 0) return;
+  const originalTaskId = carryoverResult.rows[0].continued_from_task_id as string | null;
+
+  if (!originalTaskId) return;
+
+  // Mark the original task as completed
+  const now = new Date().toISOString();
+  await db.execute(
+    `UPDATE tasks SET status = 'completed', updated_at = ? WHERE id = ? AND user_id = ?`,
+    [now, originalTaskId, userId]
   );
 }
 
@@ -251,6 +273,10 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       updateFields.push("due_date = ?");
       values.push(body.due_date);
     }
+    if (body.ignored !== undefined) {
+      updateFields.push("ignored = ?");
+      values.push(body.ignored);
+    }
 
     updateFields.push("updated_at = ?");
     values.push(now);
@@ -314,6 +340,11 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       // If this is a parent task being completed, complete all subtasks
       if (body.status === "completed" && !existingTask.parent_task_id) {
         await completeAllSubtasks(id, session.user.id);
+      }
+
+      // If this is a carryover task being completed, mark the original task as completed
+      if (body.status === "completed" && existingTask.continued_from_task_id) {
+        await checkAndCompleteOriginalTask(id, session.user.id);
       }
     }
 

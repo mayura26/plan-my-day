@@ -25,6 +25,7 @@ import { SlimTaskCard } from "@/components/slim-task-card";
 import { TaskDetailDialog } from "@/components/task-detail-dialog";
 import { TaskForm } from "@/components/task-form";
 import { TaskGroupManager } from "@/components/task-group-manager";
+import { ProcessOverdueDialog } from "@/components/process-overdue-dialog";
 import { TaskMetrics } from "@/components/task-metrics";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -72,6 +73,7 @@ export default function CalendarPage() {
   const [dayNotes, setDayNotes] = useState<Map<string, DayNote>>(new Map());
   const [noteDialogOpen, setNoteDialogOpen] = useState(false);
   const [noteDialogDate, setNoteDialogDate] = useState<Date | null>(null);
+  const [processOverdueOpen, setProcessOverdueOpen] = useState(false);
   const [quickAddInitialData, setQuickAddInitialData] = useState<Partial<CreateTaskRequest> | null>(
     null
   );
@@ -990,7 +992,11 @@ export default function CalendarPage() {
             </div>
 
             {/* Task Metrics */}
-            <TaskMetrics tasks={filteredTasks} onTaskClick={handleTaskClick} />
+            <TaskMetrics
+              tasks={filteredTasks}
+              onTaskClick={handleTaskClick}
+              onProcessOverdue={() => setProcessOverdueOpen(true)}
+            />
 
             {/* Unscheduled Tasks */}
             {unscheduledTasks.length > 0 && (
@@ -1233,6 +1239,14 @@ export default function CalendarPage() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Process Overdue Dialog */}
+      <ProcessOverdueDialog
+        tasks={tasks}
+        open={processOverdueOpen}
+        onOpenChange={setProcessOverdueOpen}
+        onTasksUpdated={fetchTasks}
+      />
 
       {/* Drag Overlay - renders dragged item in a portal to avoid overflow clipping */}
       <DragOverlay>

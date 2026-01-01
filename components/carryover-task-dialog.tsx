@@ -153,7 +153,8 @@ export function CarryoverTaskDialog({
             <ul className="list-disc list-inside space-y-0.5">
               <li>A new task "{task.title} (continued)" will be created</li>
               <li>It will inherit priority, energy level, and group</li>
-              <li>The original task will be marked as cancelled</li>
+              <li>The original task will be marked as rescheduled (greyed out on calendar)</li>
+              <li>When the carryover task is completed, the original will be marked complete</li>
               <li>You can schedule the new task whenever you like</li>
             </ul>
           </div>

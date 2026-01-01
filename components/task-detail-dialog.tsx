@@ -14,6 +14,7 @@ import {
   Lock,
   Tag,
   Trash2,
+  XCircle,
   Zap,
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
@@ -60,6 +61,7 @@ export function TaskDetailDialog({
   const { confirm } = useConfirmDialog();
   const [isDeleting, setIsDeleting] = useState(false);
   const [isUnscheduling, setIsUnscheduling] = useState(false);
+  const [isUnignoring, setIsUnignoring] = useState(false);
   const [dependencies, setDependencies] = useState<DependencyInfo[]>([]);
   const [blockedBy, setBlockedBy] = useState<Task[]>([]);
   const [isBlocked, setIsBlocked] = useState(false);
@@ -88,6 +90,24 @@ export function TaskDetailDialog({
       setHasChanges(false);
     }
   }, [open, task, fetchDependencies]);
+
+  // Refresh task data when dialog opens or task ID changes to ensure we have the latest state
+  useEffect(() => {
+    if (open && task?.id) {
+      const refreshTask = async () => {
+        try {
+          const response = await fetch(`/api/tasks/${task.id}`);
+          if (response.ok) {
+            const data = await response.json();
+            onTaskRefresh?.(data.task);
+          }
+        } catch (error) {
+          console.error("Error refreshing task:", error);
+        }
+      };
+      refreshTask();
+    }
+  }, [open, task?.id, onTaskRefresh]);
 
   if (!task) return null;
 
@@ -154,6 +174,33 @@ export function TaskDetailDialog({
     }
   };
 
+  const handleUnignore = async () => {
+    if (!task) return;
+
+    setIsUnignoring(true);
+    try {
+      const response = await fetch(`/api/tasks/${task.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ignored: false }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to update task");
+      }
+
+      const updatedTask = await response.json();
+      onTaskRefresh?.(updatedTask.task);
+      setHasChanges(true);
+      toast.success("Task is no longer ignored");
+    } catch (error) {
+      console.error("Error un-ignoring task:", error);
+      toast.error("Failed to un-ignore task");
+    } finally {
+      setIsUnignoring(false);
+    }
+  };
+
   const handleSubtaskChange = async () => {
     // Mark that changes were made
     setHasChanges(true);
@@ -181,6 +228,8 @@ export function TaskDetailDialog({
         return "bg-blue-500";
       case "cancelled":
         return "bg-red-500";
+      case "rescheduled":
+        return "bg-slate-500";
       default:
         return "bg-gray-500";
     }
@@ -194,6 +243,8 @@ export function TaskDetailDialog({
         return "In Progress";
       case "cancelled":
         return "Cancelled";
+      case "rescheduled":
+        return "Rescheduled";
       default:
         return "Pending";
     }
@@ -264,6 +315,23 @@ export function TaskDetailDialog({
                 Continued
               </Badge>
             )}
+            {task.ignored && (
+              <div className="flex items-center gap-2">
+                <Badge variant="outline" className="opacity-60">
+                  <XCircle className="h-3 w-3 mr-1" />
+                  Ignored
+                </Badge>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleUnignore}
+                  disabled={isUnignoring}
+                  className="h-7 text-xs"
+                >
+                  {isUnignoring ? "Removing..." : "Remove Ignore"}
+                </Button>
+              </div>
+            )}
           </div>
 
           {/* Blocked By Warning */}
@@ -303,7 +371,7 @@ export function TaskDetailDialog({
             <SubtaskManager
               parentTaskId={task.id}
               onSubtaskChange={handleSubtaskChange}
-              readOnly={task.status === "completed" || task.status === "cancelled"}
+              readOnly={task.status === "completed" || task.status === "cancelled" || task.status === "rescheduled"}
             />
           )}
 
@@ -430,7 +498,7 @@ export function TaskDetailDialog({
           </Card>
 
           {/* Quick Status Change */}
-          {task.status !== "completed" && task.status !== "cancelled" && (
+          {task.status !== "completed" && task.status !== "cancelled" && task.status !== "rescheduled" && (
             <Card>
               <CardContent className="pt-6">
                 <h3 className="text-sm font-semibold mb-3">Quick Actions</h3>

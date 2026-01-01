@@ -7,7 +7,6 @@
 - [x] Carryover task links to original via continued_from_task_id
 
 ### ⏳ Pending
-- [ ] Process overdue tasks, and then we can show task as not complete bu t redsculed which will be a grey out but not crossed
 - [ ] PWA setup with service worker
 - [ ] Basic offline functionality
 ---

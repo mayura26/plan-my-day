@@ -3,6 +3,7 @@
 import { AlertTriangle, ChevronDown, ChevronRight, Clock, PlayCircle, Star } from "lucide-react";
 import { useState } from "react";
 import { SlimTaskCard } from "@/components/slim-task-card";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   getHighPriorityUnscheduledTasks,
@@ -18,6 +19,7 @@ export type MetricType = "overdue" | "upcoming" | "in_progress" | "high_priority
 interface TaskMetricsProps {
   tasks: Task[];
   onTaskClick?: (taskId: string) => void;
+  onProcessOverdue?: () => void;
   className?: string;
 }
 
@@ -29,6 +31,7 @@ interface MetricSectionProps {
   isExpanded: boolean;
   onToggle: () => void;
   onTaskClick?: (taskId: string) => void;
+  actionButton?: React.ReactNode;
 }
 
 function MetricSection({
@@ -39,6 +42,7 @@ function MetricSection({
   isExpanded,
   onToggle,
   onTaskClick,
+  actionButton,
 }: MetricSectionProps) {
   const count = tasks.length;
 
@@ -46,11 +50,12 @@ function MetricSection({
     <div className="border-b last:border-b-0">
       <div
         className={cn(
-          "flex items-center justify-between py-2 px-2 rounded-md transition-colors cursor-pointer hover:bg-accent/50"
+          "flex items-center justify-between py-2 px-2 rounded-md transition-colors",
+          count > 0 && "cursor-pointer hover:bg-accent/50"
         )}
-        onClick={onToggle}
+        onClick={count > 0 ? onToggle : undefined}
       >
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-1">
           <span className="flex-shrink-0">
             {isExpanded ? (
               <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
@@ -61,11 +66,14 @@ function MetricSection({
           <span className={cn("flex-shrink-0", colorClass)}>{icon}</span>
           <span className="text-sm">{label}</span>
         </div>
-        <span
-          className={cn("font-semibold text-sm", count > 0 ? colorClass : "text-muted-foreground")}
-        >
-          {count}
-        </span>
+        <div className="flex items-center gap-2">
+          {actionButton}
+          <span
+            className={cn("font-semibold text-sm", count > 0 ? colorClass : "text-muted-foreground")}
+          >
+            {count}
+          </span>
+        </div>
       </div>
 
       {/* Expanded task list */}
@@ -86,7 +94,7 @@ function MetricSection({
   );
 }
 
-export function TaskMetrics({ tasks, onTaskClick, className }: TaskMetricsProps) {
+export function TaskMetrics({ tasks, onTaskClick, onProcessOverdue, className }: TaskMetricsProps) {
   const [expandedSections, setExpandedSections] = useState<Set<MetricType>>(new Set());
 
   const overdueTasks = getOverdueTasks(tasks);
@@ -106,6 +114,11 @@ export function TaskMetrics({ tasks, onTaskClick, className }: TaskMetricsProps)
     });
   };
 
+  const handleProcessOverdueClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onProcessOverdue?.();
+  };
+
   return (
     <Card className={className}>
       <CardHeader className="pb-2 pt-3 px-3">
@@ -120,6 +133,18 @@ export function TaskMetrics({ tasks, onTaskClick, className }: TaskMetricsProps)
           isExpanded={expandedSections.has("overdue")}
           onToggle={() => toggleSection("overdue")}
           onTaskClick={onTaskClick}
+          actionButton={
+            overdueTasks.length > 0 && onProcessOverdue ? (
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-6 text-xs px-2"
+                onClick={handleProcessOverdueClick}
+              >
+                Process
+              </Button>
+            ) : undefined
+          }
         />
         <MetricSection
           icon={<Clock className="h-4 w-4" />}

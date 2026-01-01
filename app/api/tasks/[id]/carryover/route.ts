@@ -27,6 +27,7 @@ function mapRowToTask(row: any): Task {
     energy_level_required: row.energy_level_required as number,
     parent_task_id: row.parent_task_id as string | null,
     continued_from_task_id: row.continued_from_task_id as string | null,
+    ignored: Boolean(row.ignored ?? false),
     created_at: row.created_at as string,
     updated_at: row.updated_at as string,
   };
@@ -112,6 +113,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       energy_level_required: originalTask.energy_level_required,
       parent_task_id: null,
       continued_from_task_id: originalTaskId, // Link to original task
+      ignored: false,
       created_at: now,
       updated_at: now,
     };
@@ -123,8 +125,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         scheduled_start, scheduled_end, due_date, locked, group_id, template_id,
         task_type, google_calendar_event_id, notification_sent,
         depends_on_task_id, energy_level_required, parent_task_id, continued_from_task_id,
-        created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ignored, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `,
       [
         carryoverTask.id,
@@ -147,6 +149,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         carryoverTask.energy_level_required,
         carryoverTask.parent_task_id ?? null,
         carryoverTask.continued_from_task_id ?? null,
+        carryoverTask.ignored,
         carryoverTask.created_at,
         carryoverTask.updated_at,
       ]
@@ -169,8 +172,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       );
     }
 
-    // Mark the original task as cancelled (overrun)
-    await db.execute(`UPDATE tasks SET status = 'cancelled', updated_at = ? WHERE id = ?`, [
+    // Mark the original task as rescheduled (not cancelled, so it remains visible)
+    await db.execute(`UPDATE tasks SET status = 'rescheduled', updated_at = ? WHERE id = ?`, [
       now,
       originalTaskId,
     ]);
@@ -179,8 +182,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     return NextResponse.json(
       {
         carryover_task: carryoverTask,
-        original_task: { ...originalTask, status: "cancelled" as TaskStatus, updated_at: now },
-        message: "Carryover task created successfully. Original task marked as cancelled.",
+        original_task: { ...originalTask, status: "rescheduled" as TaskStatus, updated_at: now },
+        message: "Carryover task created successfully. Original task marked as rescheduled.",
       },
       { status: 201 }
     );

@@ -227,26 +227,6 @@ export function WeeklyCalendar({
     // Debug logging for future dates
     const today = new Date();
     const isFutureDate = taskStartUTC > today;
-    if (isFutureDate && task.title.includes("Include -1 in invoice for cygnus")) {
-      // Calculate what percentage 6:45 PM would be
-      const wrongTimeMinutes = 18 * 60 + 45; // 6:45 PM
-      const wrongPercentage = (wrongTimeMinutes / (24 * 60)) * 100;
-
-      console.log("getTaskPosition - future date calculation:", {
-        taskTitle: task.title,
-        scheduled_start: task.scheduled_start,
-        taskStartUTC: taskStartUTC.toISOString(),
-        userTimezone,
-        calculatedHour: startHour,
-        calculatedMinute: startMinute,
-        calculatedTime: `${startHour}:${startMinute.toString().padStart(2, "0")}`,
-        startTotalMinutes,
-        topPercentage: `${topPercentage.toFixed(2)}%`,
-        expectedPosition: "71.875% (for 5:15 PM)",
-        wrongPosition: `${wrongPercentage.toFixed(2)}% (for 6:45 PM - what user sees)`,
-        difference: `${(wrongPercentage - topPercentage).toFixed(2)}%`,
-      });
-    }
 
     return {
       top: `${topPercentage}%`,
@@ -469,23 +449,6 @@ export function WeeklyCalendar({
                         const taskStartDate = getDateInTimezone(taskStartUTC, timezone);
                         const dayDate = getDateInTimezone(day, timezone);
                         const matches = isSameDay(taskStartDate, dayDate);
-
-                        // Debug logging for the problematic task
-                        if (task.title.includes("Include -1 in invoice for cygnus")) {
-                          console.log("Task day matching:", {
-                            taskTitle: task.title,
-                            taskStartUTC: taskStartUTC.toISOString(),
-                            taskStartDate: taskStartDate.toISOString(),
-                            day: day.toISOString(),
-                            dayDate: dayDate.toISOString(),
-                            matches,
-                            dayIndex,
-                            dayLabel: formatDateInTimezone(day, timezone, {
-                              weekday: "short",
-                              day: "numeric",
-                            }),
-                          });
-                        }
 
                         return matches;
                       })

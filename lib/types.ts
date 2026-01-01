@@ -32,11 +32,12 @@ export interface Task {
   parent_task_id?: string | null; // For subtasks - links to parent task
   continued_from_task_id?: string | null; // For carryover tasks - links to original task
   subtask_count?: number; // Number of subtasks (for filtering - parent tasks with subtasks should be hidden in unscheduled view)
+  ignored: boolean; // Whether this task has been ignored in overdue processing
   created_at: string;
   updated_at: string;
 }
 
-export type TaskStatus = "pending" | "in_progress" | "completed" | "cancelled";
+export type TaskStatus = "pending" | "in_progress" | "completed" | "cancelled" | "rescheduled";
 export type TaskType = "task" | "event" | "todo" | "subtask";
 
 // Task with additional computed properties for UI
@@ -166,6 +167,7 @@ export interface UpdateTaskRequest extends Partial<CreateTaskRequest> {
   scheduled_start?: string;
   scheduled_end?: string;
   locked?: boolean;
+  ignored?: boolean;
 }
 
 // API Key types
