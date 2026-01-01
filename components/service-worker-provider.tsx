@@ -6,17 +6,14 @@ import { registerServiceWorker } from "@/lib/service-worker-registration";
 /**
  * Service Worker Provider
  * Manually registers the service worker following Next.js best practices
- * ONLY registers in production - completely disabled in development
+ * https://nextjs.org/docs/app/guides/progressive-web-apps
+ * 
+ * Uses updateViaCache: 'none' to prevent caching issues in development
  */
 export function ServiceWorkerProvider() {
   useEffect(() => {
-    // Only register service worker in production
-    // Completely disabled in development to avoid reload loops and issues
-    if (process.env.NODE_ENV !== "production") {
-      return;
-    }
-
-    // Register service worker manually (not auto-registered by next-pwa)
+    // Register service worker in all environments
+    // updateViaCache: 'none' prevents reload loops in development
     registerServiceWorker().catch((error) => {
       console.error("Failed to register service worker:", error);
     });

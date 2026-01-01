@@ -1,6 +1,4 @@
 ### ⏳ Pending
-- [ ] PWA setup with service worker
-- [ ] Basic offline functionality
 ---
 
 ## Phase 2: AI Scheduling & Notifications (Weeks 5-8)
