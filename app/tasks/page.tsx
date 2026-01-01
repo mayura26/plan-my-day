@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { GroupedTaskList } from "@/components/grouped-task-list";
 import { TaskForm } from "@/components/task-form";
@@ -46,7 +46,7 @@ export default function TasksPage() {
   }, [status, router]);
 
   // Fetch tasks
-  const fetchTasks = async () => {
+  const fetchTasks = useCallback(async () => {
     try {
       const response = await fetch("/api/tasks");
       if (response.ok) {
@@ -60,9 +60,9 @@ export default function TasksPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
-  const fetchGroups = async () => {
+  const fetchGroups = useCallback(async () => {
     try {
       const response = await fetch("/api/task-groups");
       if (response.ok) {
@@ -72,7 +72,7 @@ export default function TasksPage() {
     } catch (error) {
       console.error("Error fetching groups:", error);
     }
-  };
+  }, []);
 
   useEffect(() => {
     if (session) {
@@ -80,7 +80,7 @@ export default function TasksPage() {
       fetchGroups();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session, fetchGroups, fetchTasks]);
+  }, [session]);
 
   // Create task
   const handleCreateTask = async (taskData: CreateTaskRequest) => {

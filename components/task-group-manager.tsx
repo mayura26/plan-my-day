@@ -12,7 +12,7 @@ import {
   Plus,
   Trash2,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { SlimTaskCard } from "@/components/slim-task-card";
 import { Badge } from "@/components/ui/badge";
@@ -114,12 +114,13 @@ function GroupCard({
     <Card
       className={cn(
         "transition-opacity duration-200 overflow-hidden",
+        "pt-0 pb-[5px] gap-0",
         isOtherSelected && "opacity-40"
       )}
     >
       {/* Colored Header */}
       <div
-        className="px-3 py-2 cursor-pointer"
+        className="px-3 pt-[5px] pb-0.5 cursor-pointer"
         style={{ backgroundColor: groupColor }}
         onClick={onSelect}
       >
@@ -141,7 +142,7 @@ function GroupCard({
 
       {/* Buttons Row - Shown when collapsed */}
       {!isExpanded && (
-        <div className="flex items-center gap-1 px-2 py-1.5 border-t bg-muted/30">
+        <div className="flex items-center gap-1 px-2 py-1 bg-muted/30">
           <Button
             size="sm"
             variant="ghost"
@@ -247,8 +248,18 @@ export function TaskGroupManager({
   const [newGroupColor, setNewGroupColor] = useState("#3B82F6");
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const [hiddenGroups, setHiddenGroups] = useState<Set<string>>(new Set());
+  
+  const isFetchingRef = useRef<boolean>(false);
+  const hasFetchedRef = useRef<boolean>(false);
 
-  const fetchGroups = async () => {
+  const fetchGroups = useCallback(async () => {
+    // Prevent concurrent fetches
+    if (isFetchingRef.current) {
+      return;
+    }
+    
+    isFetchingRef.current = true;
+    
     try {
       setIsLoading(true);
       const response = await fetch("/api/task-groups");
@@ -262,13 +273,18 @@ export function TaskGroupManager({
       console.error("Error fetching task groups:", error);
     } finally {
       setIsLoading(false);
+      isFetchingRef.current = false;
     }
-  };
+  }, []);
 
   useEffect(() => {
-    fetchGroups();
+    // Only fetch once on mount
+    if (!hasFetchedRef.current) {
+      hasFetchedRef.current = true;
+      fetchGroups();
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fetchGroups]);
+  }, []); // Empty deps - only run once on mount
 
   // Auto-rotate color when create dialog opens
   useEffect(() => {

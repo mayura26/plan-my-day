@@ -15,7 +15,7 @@ import { format, startOfMonth } from "date-fns";
 import { CheckSquare, ChevronDown, ChevronRight, Plus, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CalendarSkeleton } from "@/components/calendar-skeleton";
 import { DayCalendar } from "@/components/day-calendar";
 import { DayNoteDialog } from "@/components/day-note-dialog";
@@ -48,6 +48,7 @@ export default function CalendarPage() {
   const { data: session, status } = useSession();
   const { timezone, isLoading: timezoneLoading } = useUserTimezone();
   const router = useRouter();
+  
   const [tasks, setTasks] = useState<Task[]>([]);
   const [groups, setGroups] = useState<TaskGroup[]>([]);
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
@@ -86,6 +87,9 @@ export default function CalendarPage() {
     return 320;
   });
   const [isResizing, setIsResizing] = useState(false);
+  const fetchedGroupsUserIdRef = useRef<string | null>(null);
+  const isFetchingGroupsRef = useRef<boolean>(false);
+  const hasFetchedInitialDataRef = useRef<boolean>(false);
 
   // Configure drag sensors
   const sensors = useSensors(
@@ -96,7 +100,7 @@ export default function CalendarPage() {
     })
   );
 
-  const fetchTasks = async () => {
+  const fetchTasks = useCallback(async () => {
     try {
       setIsLoading(true);
       const response = await fetch("/api/tasks");
@@ -111,19 +115,28 @@ export default function CalendarPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
-  const fetchGroups = async () => {
+  const fetchGroups = useCallback(async () => {
+    // Prevent concurrent fetches
+    if (isFetchingGroupsRef.current) {
+      return;
+    }
+    isFetchingGroupsRef.current = true;
     try {
       const response = await fetch("/api/task-groups");
       if (response.ok) {
         const data = await response.json();
         setGroups(data.groups || []);
+      } else {
+        console.error("Failed to fetch task groups");
       }
     } catch (error) {
-      console.error("Error fetching groups:", error);
+      console.error("Error fetching task groups:", error);
+    } finally {
+      isFetchingGroupsRef.current = false;
     }
-  };
+  }, []);
 
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -131,28 +144,39 @@ export default function CalendarPage() {
       return;
     }
 
-    // Only fetch tasks once authenticated AND timezone is loaded
-    if (status === "authenticated" && !timezoneLoading) {
+    // Only fetch tasks and groups once authenticated AND timezone is loaded
+    // Use a ref to ensure we only fetch once, even if the effect runs multiple times
+    if (status === "authenticated" && !timezoneLoading && session?.user?.id && !hasFetchedInitialDataRef.current) {
+      const currentUserId = session.user.id;
+      
+      hasFetchedInitialDataRef.current = true;
+      
+      // Fetch tasks
       fetchTasks();
+      
+      // Fetch groups only once per user
+      if (fetchedGroupsUserIdRef.current !== currentUserId && !isFetchingGroupsRef.current) {
+        fetchedGroupsUserIdRef.current = currentUserId;
+        fetchGroups();
+      }
+    }
+    
+    // Reset the ref if user logs out (but only if we actually had data fetched)
+    if (status !== "authenticated" && hasFetchedInitialDataRef.current) {
+      hasFetchedInitialDataRef.current = false;
+      fetchedGroupsUserIdRef.current = null;
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [status, router, timezoneLoading, fetchTasks]);
-
-  useEffect(() => {
-    if (session) {
-      fetchGroups();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session, fetchGroups]);
+  }, [status, timezoneLoading]);
 
   // Helper function to format date to YYYY-MM-DD in user's timezone
-  const formatDateKey = (date: Date): string => {
+  const formatDateKey = useCallback((date: Date): string => {
     const dateInTimezone = getDateInTimezone(date, timezone);
     return format(dateInTimezone, "yyyy-MM-dd");
-  };
+  }, [timezone]);
 
   // Fetch day note for a specific date
-  const fetchDayNote = async (date: Date) => {
+  const fetchDayNote = useCallback(async (date: Date) => {
     try {
       const dateKey = formatDateKey(date);
       const response = await fetch(`/api/day-notes?date=${dateKey}`);
@@ -178,7 +202,7 @@ export default function CalendarPage() {
       console.error("Error fetching day note:", error);
     }
     return null;
-  };
+  }, [timezone]);
 
   // Create or update day note
   const createOrUpdateDayNote = async (date: Date, content: string) => {
@@ -276,7 +300,6 @@ export default function CalendarPage() {
     };
 
     fetchVisibleNotes();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [viewMode, currentDate, status, timezoneLoading, fetchDayNote]);
 
   const handleTaskClick = (taskId: string) => {

@@ -1,7 +1,7 @@
 "use client";
 
 import { CheckCircle2, Copy, Key, Plus, Trash2 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { useConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -29,7 +29,7 @@ export function APIKeyManager() {
   const [isRevoking, setIsRevoking] = useState<string | null>(null);
 
   // Fetch API keys
-  const fetchKeys = async () => {
+  const fetchKeys = useCallback(async () => {
     try {
       const response = await fetch("/api/api-keys");
       if (response.ok) {
@@ -41,12 +41,12 @@ export function APIKeyManager() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     fetchKeys();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fetchKeys]);
+  }, []);
 
   // Create new API key
   const handleCreateKey = async () => {
