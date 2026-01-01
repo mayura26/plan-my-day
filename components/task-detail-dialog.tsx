@@ -110,7 +110,8 @@ export function TaskDetailDialog({
 
   const handleEdit = () => {
     onEdit?.(task.id);
-    handleDialogClose(false);
+    // Close dialog without refreshing - refresh will happen when edit dialog closes
+    onOpenChange(false);
   };
 
   const handleUnschedule = async () => {

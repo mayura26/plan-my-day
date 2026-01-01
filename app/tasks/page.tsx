@@ -125,8 +125,8 @@ export default function TasksPage() {
       });
 
       if (response.ok) {
-        const data = await response.json();
-        setTasks((prev) => prev.map((task) => (task.id === editingTask.id ? data.task : task)));
+        // Refresh tasks to ensure all updates are reflected
+        await fetchTasks();
         setEditingTask(null);
         setIsEditing(false);
       } else {

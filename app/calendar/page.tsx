@@ -295,6 +295,8 @@ export default function CalendarPage() {
         setTasks((prev) => prev.map((task) => (task.id === editingTask.id ? data.task : task)));
         setEditingTask(null);
         setIsEditing(false);
+        // Refresh tasks after successful update
+        await fetchTasks();
       } else {
         const error = await response.json();
         console.error("Failed to update task:", error);
@@ -1045,7 +1047,15 @@ export default function CalendarPage() {
       </Dialog>
 
       {/* Edit Task Dialog */}
-      <Dialog open={isEditing} onOpenChange={setIsEditing}>
+      <Dialog 
+        open={isEditing} 
+        onOpenChange={(open) => {
+          setIsEditing(open);
+          if (!open) {
+            setEditingTask(null);
+          }
+        }}
+      >
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto w-[95vw] md:w-full mx-2 md:mx-auto">
           <DialogHeader>
             <DialogTitle>Edit Task</DialogTitle>

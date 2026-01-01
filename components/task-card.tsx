@@ -1,6 +1,6 @@
 "use client";
 
-import { Calendar, CalendarX, Clock, Lock, MoreHorizontal, Zap } from "lucide-react";
+import { Calendar, CalendarX, Clock, Flag, Lock, Zap } from "lucide-react";
 import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -19,7 +19,7 @@ import {
   STATUS_LABELS,
   TASK_TYPE_LABELS,
 } from "@/lib/task-utils";
-import { formatDateShort, formatTimeRange } from "@/lib/timezone-utils";
+import { formatDateShort, formatTimeShort, formatTimeRange } from "@/lib/timezone-utils";
 import type { Task, TaskGroup, TaskStatus } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -156,192 +156,173 @@ export function TaskCard({
               </Badge>
             </div>
           </div>
+          {/* Group badge in bottom right corner */}
+          {group && (
+            <Badge
+              variant="outline"
+              className="absolute bottom-2 right-2 text-[10px] px-1.5 py-0.5"
+              style={groupColor ? { borderColor: groupColor, color: groupColor } : undefined}
+            >
+              {group.name}
+            </Badge>
+          )}
         </CardContent>
       </Card>
     );
   }
 
+  // Determine border color
+  const borderStyle = groupColor && !isOverdue && !isDueSoon 
+    ? { borderLeftColor: groupColor } 
+    : undefined;
+
+  const handleCardClick = (e: React.MouseEvent) => {
+    // Don't trigger edit if clicking on checkbox, buttons, or badges
+    const target = e.target as HTMLElement;
+    if (
+      target.closest('button') ||
+      target.closest('[role="checkbox"]') ||
+      target.closest('input[type="checkbox"]')
+    ) {
+      return;
+    }
+    onEdit?.(task.id);
+  };
+
   return (
     <Card
       className={cn(
-        "transition-all hover:shadow-md relative",
-        isOverdue && "border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/20",
-        isDueSoon && "border-yellow-200 dark:border-yellow-800 bg-yellow-50 dark:bg-yellow-950/20",
-        groupColor && "border-l-4"
+        "transition-all hover:shadow-sm relative border-l-2 cursor-pointer",
+        isOverdue && "border-red-500 bg-red-50/50 dark:bg-red-950/10",
+        isDueSoon && !isOverdue && "border-yellow-500 bg-yellow-50/50 dark:bg-yellow-950/10",
+        !groupColor && !isOverdue && !isDueSoon && "border-l-gray-300 dark:border-l-gray-700",
+        onEdit && "hover:bg-accent/50"
       )}
-      style={groupColor ? { borderLeftColor: groupColor } : undefined}
+      style={borderStyle}
+      onClick={handleCardClick}
     >
-      {/* Priority top bar */}
-      <div
-        className={cn(
-          "absolute top-0 left-0 right-0 h-1 rounded-t-lg",
-          getPriorityBarColor(task.priority)
-        )}
-      />
-      <CardHeader className="pb-3 pt-4 px-4 md:px-6">
-        <div className="flex items-start justify-between gap-2">
-          <div className="flex items-start space-x-3 flex-1 min-w-0">
-            <Checkbox
-              checked={task.status === "completed"}
-              onCheckedChange={handleToggleComplete}
-              disabled={isUpdating}
-              className="mt-1 h-5 w-5 md:h-4 md:w-4"
-            />
+      <CardContent className="px-3 pt-0.5 pb-1.5">
+        <div className="flex items-center gap-3">
+          {/* Checkbox */}
+          <Checkbox
+            checked={task.status === "completed"}
+            onCheckedChange={handleToggleComplete}
+            disabled={isUpdating}
+            className="h-4 w-4 flex-shrink-0"
+            onClick={(e) => e.stopPropagation()}
+          />
+          
+          {/* Main content - horizontal layout */}
+          <div className="flex-1 min-w-0 flex items-center gap-3 flex-wrap">
+            {/* Title */}
             <div className="flex-1 min-w-0">
-              <CardTitle
-                className={`text-base md:text-lg ${task.status === "completed" ? "line-through text-muted-foreground" : ""}`}
+              <h4
+                className={cn(
+                  "text-sm font-medium truncate",
+                  task.status === "completed" && "line-through text-muted-foreground"
+                )}
               >
                 {task.title}
-              </CardTitle>
+              </h4>
+              {/* Description on second line if exists */}
               {task.description && (
-                <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
+                <p className="text-xs text-muted-foreground truncate mt-0.5">
                   {task.description}
                 </p>
               )}
             </div>
+
+            {/* Key info badges - inline */}
+            <div className="flex items-center gap-2 flex-wrap">
+              {/* Priority badge */}
+              <Badge variant="outline" className={`text-xs h-5 px-1.5 ${priorityColor}`}>
+                P{task.priority}
+              </Badge>
+              
+              {/* Status badge */}
+              <Badge variant="outline" className={`text-xs h-5 px-1.5 ${statusColor}`}>
+                {STATUS_LABELS[task.status]}
+              </Badge>
+
+              {/* Duration */}
+              {task.duration && (
+                <span className="text-xs text-muted-foreground flex items-center gap-1">
+                  <Clock className="w-3 h-3" />
+                  {formatDuration(task.duration)}
+                </span>
+              )}
+
+              {/* Start time */}
+              {task.scheduled_start && (
+                <span className="text-xs text-muted-foreground flex items-center gap-1">
+                  <Clock className="w-3 h-3" />
+                  {formatDateShort(task.scheduled_start, timezone)} {formatTimeShort(task.scheduled_start, timezone)}
+                </span>
+              )}
+
+              {/* Due date */}
+              {task.due_date && (
+                <span className="text-xs text-muted-foreground flex items-center gap-1">
+                  <Flag className="w-3 h-3" />
+                  {formatDateShort(task.due_date, timezone)}
+                </span>
+              )}
+
+              {/* Energy level */}
+              <span className={`text-xs flex items-center gap-1 ${energyColor}`}>
+                <Zap className="w-3 h-3" />
+                {task.energy_level_required}
+              </span>
+
+              {/* Lock indicator */}
+              {task.locked && <Lock className="w-3 h-3 text-muted-foreground" />}
+
+              {/* Overdue indicator */}
+              {isOverdue && (
+                <span className="text-xs text-red-600 dark:text-red-400 font-medium">⚠ Overdue</span>
+              )}
+            </div>
           </div>
-          <div className="flex items-center space-x-2 flex-shrink-0">
-            {task.locked && <Lock className="w-4 h-4 text-muted-foreground" />}
-            {onEdit && (
+
+          {/* Actions - compact */}
+          <div className="flex items-center gap-1 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+            {task.status === "pending" && (
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => onEdit(task.id)}
-                title="Edit task"
-                className="h-11 w-11 md:h-9 md:w-9 p-0"
-              >
-                <MoreHorizontal className="w-4 h-4" />
-              </Button>
-            )}
-          </div>
-        </div>
-      </CardHeader>
-
-      <CardContent className="pt-0 px-4 md:px-6 pb-4 md:pb-6">
-        {/* Task Details */}
-        <div className="space-y-3">
-          {/* Priority and Status */}
-          <div className="flex flex-wrap items-center gap-2">
-            <Badge variant="outline" className={`${priorityColor} text-xs`}>
-              {task.priority}. {PRIORITY_LABELS[task.priority as keyof typeof PRIORITY_LABELS]}
-            </Badge>
-            <Badge variant="outline" className={`${statusColor} text-xs`}>
-              {STATUS_LABELS[task.status]}
-            </Badge>
-            <Badge variant="outline" className="text-xs">
-              {TASK_TYPE_LABELS[task.task_type]}
-            </Badge>
-          </div>
-
-          {/* Timing Information */}
-          <div className="flex items-center space-x-4 text-sm text-muted-foreground">
-            {task.duration && (
-              <div className="flex items-center">
-                <Clock className="w-4 h-4 mr-1" />
-                {formatDuration(task.duration)}
-              </div>
-            )}
-            {task.scheduled_start && (
-              <div className="flex items-center">
-                <Calendar className="w-4 h-4 mr-1" />
-                {formatDateShort(task.scheduled_start, timezone)}
-                {task.scheduled_start && task.scheduled_end && (
-                  <span className="ml-1">
-                    {formatTimeRange(task.scheduled_start, task.scheduled_end, timezone)}
-                  </span>
-                )}
-              </div>
-            )}
-            <div className="flex items-center">
-              <Zap className={`w-4 h-4 mr-1 ${energyColor}`} />
-              {task.energy_level_required}.{" "}
-              {task.energy_level_required <= 2
-                ? "Low"
-                : task.energy_level_required >= 4
-                  ? "High"
-                  : "Medium"}{" "}
-              Energy
-            </div>
-          </div>
-
-          {/* Alerts */}
-          {isOverdue && (
-            <div className="text-sm text-red-600 dark:text-red-400 font-medium">
-              ⚠️ This task is overdue
-            </div>
-          )}
-          {isDueSoon && !isOverdue && (
-            <div className="text-sm text-yellow-600 dark:text-yellow-400 font-medium">
-              ⏰ This task is due soon
-            </div>
-          )}
-
-          {/* Action Buttons */}
-          <div className="flex flex-wrap items-center gap-2 pt-2">
-            {onEdit && (
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => onEdit(task.id)}
-                className="h-11 px-4 md:h-9 md:px-3"
-              >
-                Edit
-              </Button>
-            )}
-            {task.scheduled_start && onUnschedule && (
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={handleUnschedule}
-                disabled={isUnscheduling}
-                className="h-11 px-4 md:h-9 md:px-3"
-              >
-                <CalendarX className="w-4 h-4 mr-1" />
-                {isUnscheduling ? "Unscheduling..." : "Unschedule"}
-              </Button>
-            )}
-            {task.status === "in_progress" && onExtend && canExtendTask(task) && (
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => onExtend(task.id)}
-                className="h-11 px-4 md:h-9 md:px-3"
-              >
-                Extend
-              </Button>
-            )}
-            {task.status === "pending" && (
-              <Button
-                size="sm"
-                variant="outline"
                 onClick={() => handleStatusChange("in_progress")}
                 disabled={isUpdating}
-                className="h-11 px-4 md:h-9 md:px-3"
+                className="h-8 px-2 text-xs"
+                title="Start"
               >
                 Start
               </Button>
             )}
             {task.status === "in_progress" && (
               <Button
+                variant="ghost"
                 size="sm"
-                variant="outline"
                 onClick={() => handleStatusChange("completed")}
                 disabled={isUpdating}
-                className="h-11 px-4 md:h-9 md:px-3"
+                className="h-8 px-2 text-xs"
+                title="Complete"
               >
-                Complete
+                Done
               </Button>
             )}
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => onDelete(task.id)}
-              className="text-red-600 hover:text-red-700 h-11 px-4 md:h-9 md:px-3"
-            >
-              Delete
-            </Button>
           </div>
         </div>
+        
+        {/* Group badge in bottom right corner */}
+        {group && (
+          <Badge
+            variant="outline"
+            className="absolute bottom-2 right-2 text-[10px] px-1.5 py-0.5 h-4"
+            style={groupColor ? { borderColor: groupColor, color: groupColor } : undefined}
+          >
+            {group.name}
+          </Badge>
+        )}
       </CardContent>
     </Card>
   );

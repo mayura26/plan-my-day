@@ -48,6 +48,7 @@ export function GroupedTaskList({
   const [filter, setFilter] = useState<FilterOption>("all");
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set());
   const [sortBy, setSortBy] = useState<"priority" | "scheduled" | "created">("priority");
+  const [showCompleted, setShowCompleted] = useState(false);
 
   // Initialize with all sections expanded
   useEffect(() => {
@@ -67,6 +68,11 @@ export function GroupedTaskList({
       !task.title.toLowerCase().includes(searchQuery.toLowerCase()) &&
       !task.description?.toLowerCase().includes(searchQuery.toLowerCase())
     ) {
+      return false;
+    }
+
+    // Hide completed tasks by default (unless showCompleted is true)
+    if (!showCompleted && task.status === "completed") {
       return false;
     }
 
@@ -329,6 +335,14 @@ export function GroupedTaskList({
               </div>
 
               <div className="flex flex-wrap items-center gap-2 md:gap-4 md:ml-auto">
+                <Button
+                  variant={showCompleted ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setShowCompleted(!showCompleted)}
+                  className="h-11 px-4 md:h-9 md:px-3 text-sm"
+                >
+                  {showCompleted ? "Hide Completed" : "Show Completed"}
+                </Button>
                 {onShowAllTasksChange && (
                   <Button
                     variant={showAllTasks ? "default" : "outline"}
@@ -460,6 +474,7 @@ export function GroupedTaskList({
                         onEdit={onEditTask}
                         onExtend={onExtendTask}
                         onUnschedule={onUnscheduleTask}
+                        groups={groups}
                       />
                     ))
                   )}
@@ -507,6 +522,7 @@ export function GroupedTaskList({
                           onEdit={onEditTask}
                           onExtend={onExtendTask}
                           onUnschedule={onUnscheduleTask}
+                          groups={groups}
                         />
                       ))}
                     </div>
@@ -536,6 +552,7 @@ export function GroupedTaskList({
                 onEdit={onEditTask}
                 onExtend={onExtendTask}
                 onUnschedule={onUnscheduleTask}
+                groups={groups}
               />
             ))
           )}

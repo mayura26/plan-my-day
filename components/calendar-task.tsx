@@ -5,6 +5,7 @@ import { CSS } from "@dnd-kit/utilities";
 import { GripVertical } from "lucide-react";
 import { useUserTimezone } from "@/hooks/use-user-timezone";
 import { formatTimeShort } from "@/lib/timezone-utils";
+import { isTaskOverdue, isTaskTimeExpired } from "@/lib/task-utils";
 import type { Task, TaskGroup } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -112,6 +113,11 @@ export function ResizableTask({
   const group = task.group_id ? groups.find((g) => g.id === task.group_id) : null;
   const groupColor = group?.color || null;
 
+  // Check task states
+  const isCompleted = task.status === "completed";
+  const isOverdue = !isCompleted && isTaskOverdue(task);
+  const isPastEvent = task.task_type === "event" && isTaskTimeExpired(task);
+
   // Convert hex color to rgba for background
   const hexToRgba = (hex: string, alpha: number) => {
     const r = parseInt(hex.slice(1, 3), 16);
@@ -124,7 +130,7 @@ export function ResizableTask({
     top: position.top,
     height: position.height,
     transform: CSS.Translate.toString(transform),
-    opacity: isDragging || isTaskResizing ? 0.7 : shouldFade ? 0.3 : 1,
+    opacity: isDragging || isTaskResizing ? 0.7 : shouldFade ? 0.3 : isCompleted || isPastEvent ? 0.5 : 1,
     transition: isDragging || isTaskResizing ? "none" : "all 0.2s ease-in-out",
     zIndex: isActiveDrag ? 50 : 10,
     ...(groupColor && {
@@ -152,13 +158,15 @@ export function ResizableTask({
       className={cn(
         "absolute left-1 right-1 rounded-md border-l-4 p-1.5 md:p-2 cursor-pointer pointer-events-auto",
         "min-h-[44px] md:min-h-0", // Minimum touch target height on mobile
-        "hover:shadow-lg transition-shadow overflow-hidden group",
+        "hover:shadow-lg transition-shadow overflow-hidden group relative",
         task.locked && "cursor-not-allowed opacity-75",
         !task.locked && "cursor-grab active:cursor-grabbing",
         isActiveDrag && "shadow-xl ring-2 ring-primary/50",
         isTaskResizing && "ring-2 ring-primary/50",
         belongsToSelectedGroup && selectedGroupId !== null && "ring-2 ring-primary ring-offset-1",
-        !groupColor && "bg-gray-500/40 border-gray-500"
+        !groupColor && "bg-gray-500/40 border-gray-500",
+        isOverdue && "ring-2 ring-red-500 ring-offset-0",
+        (isCompleted || isPastEvent) && "opacity-50"
       )}
       onClick={handleTaskClick}
     >
@@ -169,7 +177,10 @@ export function ResizableTask({
           getPriorityBarColor(task.priority)
         )}
       />
-      <div className="text-xs font-medium text-white truncate pointer-events-none mt-1">
+      <div className={cn(
+        "text-xs font-medium text-white truncate pointer-events-none mt-1",
+        (isCompleted || isPastEvent) && "line-through"
+      )}>
         {task.title}
       </div>
       <div className="text-xs text-white/90 mt-1">
@@ -177,6 +188,17 @@ export function ResizableTask({
       </div>
       {task.locked && (
         <div className="text-xs text-white/90 mt-1 flex items-center gap-1">🔒 Locked</div>
+      )}
+      {/* Group badge in bottom right corner - hide for tasks < 45m to avoid blocking title, and hide on mobile/width < 1000px */}
+      {group && task.duration && task.duration >= 45 && (
+        <div
+          className="hidden lg:block absolute bottom-1 right-1 px-1 py-0.5 rounded text-[10px] font-medium text-white pointer-events-none"
+          style={{
+            backgroundColor: groupColor ? hexToRgba(groupColor, 0.8) : "rgba(107, 114, 128, 0.8)",
+          }}
+        >
+          {group.name}
+        </div>
       )}
       {!task.locked && (
         <>
