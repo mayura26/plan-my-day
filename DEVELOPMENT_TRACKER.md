@@ -1,11 +1,3 @@
-### ✅ Completed - Task System Streamlining
-- [x] Tasks support subtasks (parent task owns them, auto-completes when all subs done)
-- [x] Subtasks have duration, priority, energy - can be scheduled independently (no group)
-- [x] Handle task dependencies (blocked by other tasks, with circular dependency detection)
-- [x] Support multiple dependencies per task via task_dependencies table
-- [x] Task carryover flow (create new task for remaining work when time ends)
-- [x] Carryover task links to original via continued_from_task_id
-
 ### ⏳ Pending
 - [ ] PWA setup with service worker
 - [ ] Basic offline functionality

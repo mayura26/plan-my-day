@@ -477,25 +477,22 @@ export function TaskForm({ onSubmit, onCancel, initialData, isLoading = false }:
       )}
 
       {/* Dependencies Section */}
-      {showDependencyOption && (
-        <>
-          {!showDependencies ? (
-            <button
-              type="button"
-              onClick={() => setShowDependencies(true)}
-              className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-            >
-              + Add dependencies
-            </button>
-          ) : (
-            <DependencySelector
-              taskId={initialData?.id}
-              selectedIds={formData.dependency_ids || []}
-              onChange={(ids) => handleInputChange("dependency_ids", ids)}
-            />
-          )}
-        </>
-      )}
+      {showDependencyOption &&
+        (!showDependencies ? (
+          <button
+            type="button"
+            onClick={() => setShowDependencies(true)}
+            className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+          >
+            + Add dependencies
+          </button>
+        ) : (
+          <DependencySelector
+            taskId={initialData?.id}
+            selectedIds={formData.dependency_ids || []}
+            onChange={(ids) => handleInputChange("dependency_ids", ids)}
+          />
+        ))}
 
       {/* Schedule Section */}
       <div className="pt-3 border-t space-y-3">

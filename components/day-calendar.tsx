@@ -111,7 +111,7 @@ export function DayCalendar({
     const taskEndUTC = parseISO(task.scheduled_end);
 
     // Verify the Date objects are valid
-    if (isNaN(taskStartUTC.getTime()) || isNaN(taskEndUTC.getTime())) {
+    if (Number.isNaN(taskStartUTC.getTime()) || Number.isNaN(taskEndUTC.getTime())) {
       console.error("Invalid date for task:", task.id, task.scheduled_start, task.scheduled_end);
       return null;
     }

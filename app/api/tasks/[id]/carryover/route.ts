@@ -88,7 +88,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     if (body.notes) {
       carryoverDescription =
         body.notes +
-        (carryoverDescription ? "\n\n---\nOriginal description:\n" + carryoverDescription : "");
+        (carryoverDescription ? `\n\n---\nOriginal description:\n${carryoverDescription}` : "");
     }
 
     // Create the carryover task with the same properties but new duration

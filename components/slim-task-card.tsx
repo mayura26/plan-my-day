@@ -45,6 +45,8 @@ export function SlimTaskCard({ task, onTaskClick }: SlimTaskCardProps) {
         return "bg-green-100 text-green-700 dark:bg-green-900/50 dark:text-green-300";
       case "cancelled":
         return "bg-red-100 text-red-700 dark:bg-red-900/50 dark:text-red-300";
+      case "rescheduled":
+        return "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300";
       default:
         return "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300";
     }

@@ -1,14 +1,6 @@
 "use client";
 
-import {
-  AlertTriangle,
-  Calendar,
-  CalendarClock,
-  Clock,
-  RotateCcw,
-  X,
-  XCircle,
-} from "lucide-react";
+import { AlertTriangle, Calendar, CalendarClock, Clock, RotateCcw, X, XCircle } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -71,7 +63,6 @@ export function ProcessOverdueDialog({
     return "due-date";
   };
 
-
   const handleSelectAction = (taskId: string, action: TaskAction, e?: React.MouseEvent) => {
     if (e) {
       e.preventDefault();
@@ -90,11 +81,14 @@ export function ProcessOverdueDialog({
         setSelectedTaskId(null);
       } else {
         // Set new action, preserving existing duration/notes if switching actions
-        const preservedState = existing && existing.action !== action ? {
-          additionalDuration: existing.additionalDuration,
-          notes: existing.notes,
-          newDueDate: existing.newDueDate,
-        } : {};
+        const preservedState =
+          existing && existing.action !== action
+            ? {
+                additionalDuration: existing.additionalDuration,
+                notes: existing.notes,
+                newDueDate: existing.newDueDate,
+              }
+            : {};
         newActions.set(taskId, { action, ...preservedState });
         setSelectedTaskId(taskId);
       }
@@ -329,7 +323,9 @@ export function ProcessOverdueDialog({
                       <div className="space-y-2 pt-2 border-t">
                         <div className="border rounded-lg p-4 space-y-3 bg-muted/30">
                           <div>
-                            <Label htmlFor={`duration-${task.id}`}>Additional Duration (minutes)</Label>
+                            <Label htmlFor={`duration-${task.id}`}>
+                              Additional Duration (minutes)
+                            </Label>
                             <Input
                               id={`duration-${task.id}`}
                               type="number"
@@ -357,49 +353,59 @@ export function ProcessOverdueDialog({
                             />
                           </div>
                           <Button
-                          onClick={async () => {
-                            const duration = actionState.additionalDuration || task.duration || 30;
-                            if (!duration || duration <= 0) {
-                              setError("Please enter a valid duration");
-                              return;
-                            }
-
-                            setProcessingTaskId(task.id);
-                            setError(null);
-
-                            try {
-                              const response = await fetch(`/api/tasks/${task.id}/carryover`, {
-                                method: "POST",
-                                headers: { "Content-Type": "application/json" },
-                                body: JSON.stringify({
-                                  additional_duration: duration,
-                                  notes: actionState.notes,
-                                }),
-                              });
-
-                              if (!response.ok) {
-                                const data = await response.json();
-                                throw new Error(data.error || `Failed to create carryover for ${task.title}`);
+                            onClick={async () => {
+                              const duration =
+                                actionState.additionalDuration || task.duration || 30;
+                              if (!duration || duration <= 0) {
+                                setError("Please enter a valid duration");
+                                return;
                               }
 
-                              const responseData = await response.json();
+                              setProcessingTaskId(task.id);
+                              setError(null);
 
-                              // Remove this task from the actions map
-                              const newActions = new Map(taskActions);
-                              newActions.delete(task.id);
-                              setTaskActions(newActions);
-                              setSelectedTaskId(null);
+                              try {
+                                const response = await fetch(`/api/tasks/${task.id}/carryover`, {
+                                  method: "POST",
+                                  headers: { "Content-Type": "application/json" },
+                                  body: JSON.stringify({
+                                    additional_duration: duration,
+                                    notes: actionState.notes,
+                                  }),
+                                });
 
-                              // Refresh tasks to update the list (this will filter out rescheduled tasks)
-                              // The task should now be filtered out by getOverdueTasks since it's rescheduled
-                              onTasksUpdated();
-                            } catch (err) {
-                              setError(err instanceof Error ? err.message : "Failed to create carryover task");
-                            } finally {
-                              setProcessingTaskId(null);
+                                if (!response.ok) {
+                                  const data = await response.json();
+                                  throw new Error(
+                                    data.error || `Failed to create carryover for ${task.title}`
+                                  );
+                                }
+
+                                const _responseData = await response.json();
+
+                                // Remove this task from the actions map
+                                const newActions = new Map(taskActions);
+                                newActions.delete(task.id);
+                                setTaskActions(newActions);
+                                setSelectedTaskId(null);
+
+                                // Refresh tasks to update the list (this will filter out rescheduled tasks)
+                                // The task should now be filtered out by getOverdueTasks since it's rescheduled
+                                onTasksUpdated();
+                              } catch (err) {
+                                setError(
+                                  err instanceof Error
+                                    ? err.message
+                                    : "Failed to create carryover task"
+                                );
+                              } finally {
+                                setProcessingTaskId(null);
+                              }
+                            }}
+                            disabled={
+                              processingTaskId === task.id ||
+                              !(actionState.additionalDuration || task.duration || 30)
                             }
-                          }}
-                            disabled={processingTaskId === task.id || !(actionState.additionalDuration || task.duration || 30)}
                             className="w-full"
                             size="sm"
                           >
@@ -466,7 +472,9 @@ export function ProcessOverdueDialog({
                               timezone
                             )
                           }
-                          onChange={(e) => updateTaskAction(task.id, { newDueDate: e.target.value })}
+                          onChange={(e) =>
+                            updateTaskAction(task.id, { newDueDate: e.target.value })
+                          }
                           className="h-9"
                           min={formatDateTimeLocalForTimezone(new Date().toISOString(), timezone)}
                         />
@@ -495,4 +503,3 @@ export function ProcessOverdueDialog({
     </Dialog>
   );
 }
-

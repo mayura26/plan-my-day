@@ -171,7 +171,7 @@ export function TaskImportDialog({ open, onOpenChange, groups, onImport }: TaskI
 
       // Try to parse as general date
       const parsedDate = new Date(trimmed);
-      if (!isNaN(parsedDate.getTime())) {
+      if (!Number.isNaN(parsedDate.getTime())) {
         const year = parsedDate.getFullYear();
         const month = parsedDate.getMonth();
         const day = parsedDate.getDate();
@@ -210,7 +210,7 @@ export function TaskImportDialog({ open, onOpenChange, groups, onImport }: TaskI
     }
 
     // Validate duration if provided
-    if (task.duration !== null && (isNaN(task.duration) || task.duration < 0)) {
+    if (task.duration !== null && (Number.isNaN(task.duration) || task.duration < 0)) {
       errors.push("Duration must be a valid positive number");
     }
 
@@ -228,7 +228,7 @@ export function TaskImportDialog({ open, onOpenChange, groups, onImport }: TaskI
         task.type = normalized || (task.type as TaskType);
       } else if (field === "duration") {
         const parsed = value === "" || value === null ? null : parseFloat(value);
-        task.duration = isNaN(parsed as number) ? null : parsed;
+        task.duration = Number.isNaN(parsed as number) ? null : parsed;
       } else if (field === "dueDate") {
         // If value is already an ISO string (from datetime-local input), use it directly
         // Otherwise parse it (from CSV parsing)
@@ -255,7 +255,7 @@ export function TaskImportDialog({ open, onOpenChange, groups, onImport }: TaskI
     if (!isoString) return "";
     const formatted = formatDateTimeLocalForTimezone(isoString, timezone);
     // If the formatted time is 00:00, change it to 17:00 (5pm)
-    if (formatted && formatted.match(/T00:00$/)) {
+    if (formatted?.match(/T00:00$/)) {
       return formatted.replace(/T00:00$/, "T17:00");
     }
     return formatted;
@@ -322,7 +322,7 @@ export function TaskImportDialog({ open, onOpenChange, groups, onImport }: TaskI
       let duration: number | null = null;
       if (durationStr) {
         const parsed = parseFloat(durationStr);
-        if (isNaN(parsed) || parsed < 0) {
+        if (Number.isNaN(parsed) || parsed < 0) {
           errors.push("Duration must be a valid positive number");
         } else {
           duration = parsed;
@@ -344,7 +344,7 @@ export function TaskImportDialog({ open, onOpenChange, groups, onImport }: TaskI
       let priority: number | null = null;
       if (priorityStr) {
         const parsed = parseInt(priorityStr, 10);
-        if (isNaN(parsed) || parsed < 1 || parsed > 5) {
+        if (Number.isNaN(parsed) || parsed < 1 || parsed > 5) {
           errors.push("Priority must be a number between 1 and 5");
         } else {
           priority = parsed;
@@ -355,7 +355,7 @@ export function TaskImportDialog({ open, onOpenChange, groups, onImport }: TaskI
       let energyLevel: number | null = null;
       if (energyStr) {
         const parsed = parseInt(energyStr, 10);
-        if (isNaN(parsed) || parsed < 1 || parsed > 5) {
+        if (Number.isNaN(parsed) || parsed < 1 || parsed > 5) {
           errors.push("Energy level must be a number between 1 and 5");
         } else {
           energyLevel = parsed;
@@ -689,7 +689,7 @@ Todo,Home,Buy groceries,Get milk and eggs,30,2025-12-20,2,2`}
                               onBlur={(e) => {
                                 // On blur, if time is still 00:00, default to 17:00
                                 const value = e.target.value;
-                                if (value && value.match(/T00:00$/)) {
+                                if (value?.match(/T00:00$/)) {
                                   const dateTimeValue = value.replace(/T00:00$/, "T17:00");
                                   const utcDate = parseDateTimeLocalToUTC(dateTimeValue, timezone);
                                   updateTaskField(index, "dueDate", utcDate || null);

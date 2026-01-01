@@ -8,6 +8,7 @@ import { GroupedTaskList } from "@/components/grouped-task-list";
 import { TaskForm } from "@/components/task-form";
 import { TaskImportDialog } from "@/components/task-import-dialog";
 import { Button } from "@/components/ui/button";
+import { useConfirmDialog } from "@/components/ui/confirm-dialog";
 import {
   Dialog,
   DialogContent,
@@ -16,7 +17,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { useConfirmDialog } from "@/components/ui/confirm-dialog";
 import type { CreateTaskRequest, Task, TaskGroup } from "@/lib/types";
 
 export default function TasksPage() {
@@ -80,7 +80,7 @@ export default function TasksPage() {
       fetchGroups();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session]);
+  }, [session, fetchGroups, fetchTasks]);
 
   // Create task
   const handleCreateTask = async (taskData: CreateTaskRequest) => {
@@ -285,7 +285,8 @@ export default function TasksPage() {
   const handleDeleteGroup = async (groupId: string) => {
     const confirmed = await confirm({
       title: "Delete Task Group",
-      description: "Are you sure you want to delete this group? Tasks in this group will be ungrouped.",
+      description:
+        "Are you sure you want to delete this group? Tasks in this group will be ungrouped.",
       variant: "destructive",
       confirmText: "Delete",
     });

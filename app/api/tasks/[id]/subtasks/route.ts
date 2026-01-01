@@ -135,6 +135,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       energy_level_required: body.energy_level_required || parentTask.energy_level_required || 3,
       parent_task_id: parentId,
       continued_from_task_id: null,
+      ignored: false,
       created_at: now,
       updated_at: now,
     };
@@ -146,8 +147,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         scheduled_start, scheduled_end, due_date, locked, group_id, template_id,
         task_type, google_calendar_event_id, notification_sent,
         depends_on_task_id, energy_level_required, parent_task_id, continued_from_task_id,
-        created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ignored, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `,
       [
         subtask.id,
@@ -170,6 +171,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         subtask.energy_level_required,
         subtask.parent_task_id ?? null,
         subtask.continued_from_task_id ?? null,
+        subtask.ignored,
         subtask.created_at,
         subtask.updated_at,
       ]

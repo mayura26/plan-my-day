@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -14,7 +15,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useConfirmDialog } from "@/components/ui/confirm-dialog";
 import { ENERGY_LABELS, formatDuration, PRIORITY_LABELS } from "@/lib/task-utils";
 import type { Task } from "@/lib/types";
 
@@ -239,114 +239,111 @@ export function SubtaskManager({
         )}
 
         {/* Add Subtask Form */}
-        {!readOnly && (
-          <>
-            {showAddForm ? (
-              <form onSubmit={handleAddSubtask} className="space-y-3 pt-2 border-t">
+        {!readOnly &&
+          (showAddForm ? (
+            <form onSubmit={handleAddSubtask} className="space-y-3 pt-2 border-t">
+              <div>
+                <Input
+                  placeholder="Subtask title..."
+                  value={formData.title}
+                  onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                  autoFocus
+                />
+              </div>
+              <div className="grid grid-cols-3 gap-2">
                 <div>
+                  <Label className="text-xs text-muted-foreground flex items-center gap-1">
+                    <Clock className="h-3 w-3" />
+                    Time
+                  </Label>
                   <Input
-                    placeholder="Subtask title..."
-                    value={formData.title}
-                    onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                    autoFocus
+                    type="number"
+                    placeholder="mins"
+                    min="1"
+                    value={formData.duration || ""}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        duration: e.target.value ? parseInt(e.target.value, 10) : undefined,
+                      })
+                    }
+                    className="h-8 text-sm"
                   />
                 </div>
-                <div className="grid grid-cols-3 gap-2">
-                  <div>
-                    <Label className="text-xs text-muted-foreground flex items-center gap-1">
-                      <Clock className="h-3 w-3" />
-                      Time
-                    </Label>
-                    <Input
-                      type="number"
-                      placeholder="mins"
-                      min="1"
-                      value={formData.duration || ""}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          duration: e.target.value ? parseInt(e.target.value, 10) : undefined,
-                        })
-                      }
-                      className="h-8 text-sm"
-                    />
-                  </div>
-                  <div>
-                    <Label className="text-xs text-muted-foreground">Priority</Label>
-                    <Select
-                      value={formData.priority.toString()}
-                      onValueChange={(v) => setFormData({ ...formData, priority: parseInt(v, 10) })}
-                    >
-                      <SelectTrigger className="h-8 text-sm">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {Object.entries(PRIORITY_LABELS).map(([value, label]) => (
-                          <SelectItem key={value} value={value}>
-                            {label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div>
-                    <Label className="text-xs text-muted-foreground flex items-center gap-1">
-                      <Zap className="h-3 w-3" />
-                      Energy
-                    </Label>
-                    <Select
-                      value={formData.energy_level_required.toString()}
-                      onValueChange={(v) =>
-                        setFormData({ ...formData, energy_level_required: parseInt(v, 10) })
-                      }
-                    >
-                      <SelectTrigger className="h-8 text-sm">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {Object.entries(ENERGY_LABELS).map(([value, label]) => (
-                          <SelectItem key={value} value={value}>
-                            {label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-                <div className="flex gap-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setShowAddForm(false)}
-                    className="flex-1"
+                <div>
+                  <Label className="text-xs text-muted-foreground">Priority</Label>
+                  <Select
+                    value={formData.priority.toString()}
+                    onValueChange={(v) => setFormData({ ...formData, priority: parseInt(v, 10) })}
                   >
-                    Cancel
-                  </Button>
-                  <Button
-                    type="submit"
-                    size="sm"
-                    disabled={isAdding || !formData.title.trim()}
-                    className="flex-1"
-                  >
-                    {isAdding ? "Adding..." : "Add"}
-                  </Button>
+                    <SelectTrigger className="h-8 text-sm">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Object.entries(PRIORITY_LABELS).map(([value, label]) => (
+                        <SelectItem key={value} value={value}>
+                          {label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
-              </form>
-            ) : (
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => setShowAddForm(true)}
-                className="w-full"
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Add Subtask
-              </Button>
-            )}
-          </>
-        )}
+                <div>
+                  <Label className="text-xs text-muted-foreground flex items-center gap-1">
+                    <Zap className="h-3 w-3" />
+                    Energy
+                  </Label>
+                  <Select
+                    value={formData.energy_level_required.toString()}
+                    onValueChange={(v) =>
+                      setFormData({ ...formData, energy_level_required: parseInt(v, 10) })
+                    }
+                  >
+                    <SelectTrigger className="h-8 text-sm">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Object.entries(ENERGY_LABELS).map(([value, label]) => (
+                        <SelectItem key={value} value={value}>
+                          {label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowAddForm(false)}
+                  className="flex-1"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  size="sm"
+                  disabled={isAdding || !formData.title.trim()}
+                  className="flex-1"
+                >
+                  {isAdding ? "Adding..." : "Add"}
+                </Button>
+              </div>
+            </form>
+          ) : (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setShowAddForm(true)}
+              className="w-full"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Add Subtask
+            </Button>
+          ))}
 
         {subtasks.length === 0 && !showAddForm && (
           <p className="text-sm text-muted-foreground text-center py-2">No subtasks yet</p>

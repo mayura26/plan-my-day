@@ -1,8 +1,8 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { db } from "@/lib/turso";
 import { findNearestAvailableSlot } from "@/lib/scheduler-utils";
 import { getUserTimezone } from "@/lib/timezone-utils";
+import { db } from "@/lib/turso";
 import type { Task, TaskStatus, TaskType } from "@/lib/types";
 
 // Helper to map database row to Task object
@@ -35,7 +35,7 @@ function mapRowToTask(row: any): Task {
 }
 
 // POST /api/tasks/[id]/schedule-now - Auto-schedule a task to the nearest available slot
-export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function POST(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const session = await auth();
     if (!session?.user?.id) {
@@ -81,9 +81,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     // Determine start time - use due_date if it's in the future, otherwise use now
     const now = new Date();
-    const startFrom = task.due_date && new Date(task.due_date) > now
-      ? new Date(task.due_date)
-      : now;
+    const startFrom =
+      task.due_date && new Date(task.due_date) > now ? new Date(task.due_date) : now;
 
     // Find nearest available slot (pass timezone so it works in user's timezone)
     const slot = findNearestAvailableSlot(task, allTasks, startFrom, 9, 17, 7, userTimezone);
@@ -119,4 +118,3 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
-

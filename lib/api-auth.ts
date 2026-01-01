@@ -1,5 +1,5 @@
+import crypto from "node:crypto";
 import bcrypt from "bcryptjs";
-import crypto from "crypto";
 import type { NextRequest } from "next/server";
 import { db } from "@/lib/turso";
 

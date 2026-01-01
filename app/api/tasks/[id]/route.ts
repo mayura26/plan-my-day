@@ -65,7 +65,10 @@ async function completeAllSubtasks(parentTaskId: string, userId: string): Promis
 }
 
 // Helper to check and complete original task when carryover is completed
-async function checkAndCompleteOriginalTask(carryoverTaskId: string, userId: string): Promise<void> {
+async function checkAndCompleteOriginalTask(
+  carryoverTaskId: string,
+  userId: string
+): Promise<void> {
   // Get the carryover task to find the original
   const carryoverResult = await db.execute(
     `SELECT continued_from_task_id FROM tasks WHERE id = ? AND user_id = ?`,

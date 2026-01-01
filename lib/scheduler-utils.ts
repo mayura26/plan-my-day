@@ -51,7 +51,9 @@ export function findNearestAvailableSlot(
     .sort((a, b) => a.start.getTime() - b.start.getTime());
 
   // Helper to get what a date represents in the user's timezone
-  const getDateInTimezone = (date: Date): { year: number; month: number; day: number; hour: number; minute: number } => {
+  const getDateInTimezone = (
+    date: Date
+  ): { year: number; month: number; day: number; hour: number; minute: number } => {
     const formatter = new Intl.DateTimeFormat("en-US", {
       timeZone: timezone,
       year: "numeric",
@@ -73,7 +75,7 @@ export function findNearestAvailableSlot(
   };
 
   // Helper to create a date at a specific hour in user's timezone using the existing utility
-  const createDateAtHour = (day: Date, hour: number, minute: number): Date => {
+  const _createDateAtHour = (day: Date, hour: number, minute: number): Date => {
     return createDateInTimezone(day, hour, minute, timezone);
   };
 
@@ -84,10 +86,10 @@ export function findNearestAvailableSlot(
   // Use today's date and the current hour/minute in the timezone
   const today = new Date();
   const nowDate = createDateInTimezone(today, nowInTz.hour, nowInTz.minute, timezone);
-  
+
   // Start searching from the provided start time, but ensure we don't start in the past
   let currentTime = new Date(startFrom);
-  
+
   // Always start from "now" (in user's timezone) if startFrom is in the past
   // This ensures we check today first before moving to tomorrow
   if (currentTime < nowDate) {
@@ -95,14 +97,16 @@ export function findNearestAvailableSlot(
   }
 
   // Get initial date components in user's timezone
-  let currentInTz = getDateInTimezone(currentTime);
+  let _currentInTz = getDateInTimezone(currentTime);
 
   // Helper to check if a date is "today" in user's timezone
   const isTodayInTimezone = (date: Date): boolean => {
     const dateInTz = getDateInTimezone(date);
-    return dateInTz.year === nowInTz.year &&
-           dateInTz.month === nowInTz.month &&
-           dateInTz.day === nowInTz.day;
+    return (
+      dateInTz.year === nowInTz.year &&
+      dateInTz.month === nowInTz.month &&
+      dateInTz.day === nowInTz.day
+    );
   };
 
   // Search day by day
@@ -133,7 +137,7 @@ export function findNearestAvailableSlot(
           const tomorrow = new Date(currentTime);
           tomorrow.setDate(tomorrow.getDate() + 1);
           currentTime = createDateInTimezone(tomorrow, workingHoursStart, 0, timezone);
-          currentInTz = getDateInTimezone(currentTime);
+          _currentInTz = getDateInTimezone(currentTime);
           continue;
         }
       } else {
@@ -141,7 +145,7 @@ export function findNearestAvailableSlot(
         const tomorrow = new Date(currentTime);
         tomorrow.setDate(tomorrow.getDate() + 1);
         currentTime = createDateInTimezone(tomorrow, workingHoursStart, 0, timezone);
-        currentInTz = getDateInTimezone(currentTime);
+        _currentInTz = getDateInTimezone(currentTime);
         continue;
       }
     }
@@ -152,7 +156,7 @@ export function findNearestAvailableSlot(
     const slotStartInTz = getDateInTimezone(slotStart);
     const currentMinutes = slotStartInTz.minute;
     const currentSeconds = slotStart.getSeconds(); // Seconds are the same regardless of timezone
-    
+
     if (currentMinutes % 15 !== 0 || currentSeconds > 0) {
       const roundedMinutes = Math.ceil(currentMinutes / 15) * 15;
       // Recreate the slot start with rounded minutes in user's timezone
@@ -170,16 +174,17 @@ export function findNearestAvailableSlot(
 
     // Check if we can fit the task in the remaining day
     // Use 11 PM as the end of day if we're scheduling after hours today, otherwise use dayEnd
-    const effectiveDayEnd = isStillToday && slotStart >= dayEnd 
-      ? createDateInTimezone(now, 23, 0, timezone) // 11 PM today (use "now" to get today's date)
-      : dayEnd;
-    
+    const effectiveDayEnd =
+      isStillToday && slotStart >= dayEnd
+        ? createDateInTimezone(now, 23, 0, timezone) // 11 PM today (use "now" to get today's date)
+        : dayEnd;
+
     if (slotStart.getTime() + durationMs > effectiveDayEnd.getTime()) {
       // Move to next day
       const tomorrow = new Date(currentTime);
       tomorrow.setDate(tomorrow.getDate() + 1);
       currentTime = createDateInTimezone(tomorrow, workingHoursStart, 0, timezone);
-      currentInTz = getDateInTimezone(currentTime);
+      _currentInTz = getDateInTimezone(currentTime);
       continue;
     }
 
@@ -216,4 +221,3 @@ export function findNearestAvailableSlot(
   // No slot found within the search window
   return null;
 }
-

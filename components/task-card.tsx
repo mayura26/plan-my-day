@@ -1,15 +1,14 @@
 "use client";
 
-import { Calendar, CalendarX, Clock, Flag, Lock, Trash2, Zap } from "lucide-react";
+import { Clock, Flag, Lock, Trash2, Zap } from "lucide-react";
 import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useUserTimezone } from "@/hooks/use-user-timezone";
 import {
-  canExtendTask,
   formatDuration,
   getEnergyLevelColor,
   getTaskPriorityColor,
@@ -18,9 +17,8 @@ import {
   isTaskOverdue,
   PRIORITY_LABELS,
   STATUS_LABELS,
-  TASK_TYPE_LABELS,
 } from "@/lib/task-utils";
-import { formatDateShort, formatTimeRange, formatTimeShort } from "@/lib/timezone-utils";
+import { formatDateShort, formatTimeShort } from "@/lib/timezone-utils";
 import type { Task, TaskGroup, TaskStatus } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -50,7 +48,7 @@ export function TaskCard({
 }: TaskCardProps) {
   const { confirm } = useConfirmDialog();
   const [isUpdating, setIsUpdating] = useState(false);
-  const [isUnscheduling, setIsUnscheduling] = useState(false);
+  const [_isUnscheduling, setIsUnscheduling] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const { timezone } = useUserTimezone();
 
@@ -69,7 +67,7 @@ export function TaskCard({
     await handleStatusChange(completed ? "completed" : "pending");
   };
 
-  const handleUnschedule = async () => {
+  const _handleUnschedule = async () => {
     if (!onUnschedule) return;
     setIsUnscheduling(true);
     try {

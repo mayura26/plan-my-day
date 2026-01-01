@@ -1,6 +1,7 @@
 "use client";
 
-import { createContext, useContext, useState, useCallback, ReactNode } from "react";
+import { createContext, type ReactNode, useCallback, useContext, useState } from "react";
+import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -9,7 +10,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
 
 interface ConfirmOptions {
   title?: string;
@@ -24,7 +24,9 @@ type ConfirmFunction = (options: ConfirmOptions) => Promise<boolean>;
 const ConfirmDialogContext = createContext<ConfirmFunction | null>(null);
 
 export function ConfirmDialogProvider({ children }: { children: ReactNode }) {
-  const [state, setState] = useState<ConfirmOptions & { open: boolean; resolve: ((value: boolean) => void) | null }>({
+  const [state, setState] = useState<
+    ConfirmOptions & { open: boolean; resolve: ((value: boolean) => void) | null }
+  >({
     open: false,
     description: "",
     resolve: null,
@@ -63,11 +65,7 @@ export function ConfirmDialogProvider({ children }: { children: ReactNode }) {
             <Button variant="outline" onClick={handleCancel}>
               {state.cancelText || "Cancel"}
             </Button>
-            <Button
-              variant={state.variant || "default"}
-              onClick={handleConfirm}
-              autoFocus
-            >
+            <Button variant={state.variant || "default"} onClick={handleConfirm} autoFocus>
               {state.confirmText || "Confirm"}
             </Button>
           </DialogFooter>

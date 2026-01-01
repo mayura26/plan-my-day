@@ -12,7 +12,7 @@ import {
   useSensors,
 } from "@dnd-kit/core";
 import { format, startOfMonth } from "date-fns";
-import { CheckSquare, ChevronDown, ChevronRight, GripVertical, Plus, X } from "lucide-react";
+import { CheckSquare, ChevronDown, ChevronRight, Plus, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { useEffect, useRef, useState } from "react";
@@ -21,11 +21,11 @@ import { DayCalendar } from "@/components/day-calendar";
 import { DayNoteDialog } from "@/components/day-note-dialog";
 import { DayNotesSection } from "@/components/day-notes-section";
 import { MonthCalendar } from "@/components/month-calendar";
+import { ProcessOverdueDialog } from "@/components/process-overdue-dialog";
 import { SlimTaskCard } from "@/components/slim-task-card";
 import { TaskDetailDialog } from "@/components/task-detail-dialog";
 import { TaskForm } from "@/components/task-form";
 import { TaskGroupManager } from "@/components/task-group-manager";
-import { ProcessOverdueDialog } from "@/components/process-overdue-dialog";
 import { TaskMetrics } from "@/components/task-metrics";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -136,14 +136,14 @@ export default function CalendarPage() {
       fetchTasks();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [status, router, timezoneLoading]);
+  }, [status, router, timezoneLoading, fetchTasks]);
 
   useEffect(() => {
     if (session) {
       fetchGroups();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session]);
+  }, [session, fetchGroups]);
 
   // Helper function to format date to YYYY-MM-DD in user's timezone
   const formatDateKey = (date: Date): string => {
@@ -277,7 +277,7 @@ export default function CalendarPage() {
 
     fetchVisibleNotes();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [viewMode, currentDate, status, timezoneLoading, timezone]);
+  }, [viewMode, currentDate, status, timezoneLoading, fetchDayNote]);
 
   const handleTaskClick = (taskId: string) => {
     const task = tasks.find((t) => t.id === taskId);

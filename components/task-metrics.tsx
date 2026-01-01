@@ -69,7 +69,10 @@ function MetricSection({
         <div className="flex items-center gap-2">
           {actionButton}
           <span
-            className={cn("font-semibold text-sm", count > 0 ? colorClass : "text-muted-foreground")}
+            className={cn(
+              "font-semibold text-sm",
+              count > 0 ? colorClass : "text-muted-foreground"
+            )}
           >
             {count}
           </span>

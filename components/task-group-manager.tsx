@@ -18,6 +18,7 @@ import { SlimTaskCard } from "@/components/slim-task-card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { useConfirmDialog } from "@/components/ui/confirm-dialog";
 import {
   Dialog,
   DialogContent,
@@ -34,7 +35,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useConfirmDialog } from "@/components/ui/confirm-dialog";
 import type { CreateTaskGroupRequest, Task, TaskGroup } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -268,7 +268,7 @@ export function TaskGroupManager({
   useEffect(() => {
     fetchGroups();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [fetchGroups]);
 
   // Auto-rotate color when create dialog opens
   useEffect(() => {

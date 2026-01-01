@@ -230,7 +230,7 @@ export function MonthCalendar({
                     const groupColor = group?.color || null;
                     const isEvent = task.task_type === "event";
                     const isCompleted = task.status === "completed";
-                    const isOverdue = !isCompleted && isTaskOverdue(task);
+                    const _isOverdue = !isCompleted && isTaskOverdue(task);
 
                     return (
                       <div

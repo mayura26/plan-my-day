@@ -32,6 +32,7 @@ export const STATUS_LABELS = {
   in_progress: "In Progress",
   completed: "Completed",
   cancelled: "Cancelled",
+  rescheduled: "Rescheduled",
 } as const;
 
 export const STATUS_COLORS = {
@@ -43,6 +44,8 @@ export const STATUS_COLORS = {
     "text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-800",
   cancelled:
     "text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-800",
+  rescheduled:
+    "text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-700",
 } as const;
 
 // Task type helpers
@@ -94,7 +97,12 @@ export function parseDuration(duration: string): number {
 }
 
 export function isTaskOverdue(task: Task): boolean {
-  if (task.status === "completed" || task.status === "cancelled" || task.status === "rescheduled" || task.ignored) {
+  if (
+    task.status === "completed" ||
+    task.status === "cancelled" ||
+    task.status === "rescheduled" ||
+    task.ignored
+  ) {
     return false;
   }
   const now = new Date();
@@ -282,7 +290,13 @@ export function filterTasksByDateRange(tasks: Task[], startDate: string, endDate
 export function getOverdueTasks(tasks: Task[]): Task[] {
   const now = new Date();
   return tasks.filter((task) => {
-    if (task.status === "completed" || task.status === "cancelled" || task.status === "rescheduled" || task.ignored) return false;
+    if (
+      task.status === "completed" ||
+      task.status === "cancelled" ||
+      task.status === "rescheduled" ||
+      task.ignored
+    )
+      return false;
     // Check if due_date has passed
     if (task.due_date && new Date(task.due_date) < now) {
       return true;

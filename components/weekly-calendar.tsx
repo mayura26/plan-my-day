@@ -156,7 +156,7 @@ export function WeeklyCalendar({
     }
 
     hasAutoScrolledRef.current = true;
-  }, [timezone]);
+  }, [timezone, weekStart]);
 
   const getWeekDays = () => {
     // Create days - these represent dates as the user sees them
@@ -196,7 +196,7 @@ export function WeeklyCalendar({
     const taskEndUTC = parseISO(task.scheduled_end);
 
     // Verify the Date objects are valid
-    if (isNaN(taskStartUTC.getTime()) || isNaN(taskEndUTC.getTime())) {
+    if (Number.isNaN(taskStartUTC.getTime()) || Number.isNaN(taskEndUTC.getTime())) {
       console.error("Invalid date for task:", task.id, task.scheduled_start, task.scheduled_end);
       return null;
     }
@@ -226,7 +226,7 @@ export function WeeklyCalendar({
 
     // Debug logging for future dates
     const today = new Date();
-    const isFutureDate = taskStartUTC > today;
+    const _isFutureDate = taskStartUTC > today;
 
     return {
       top: `${topPercentage}%`,
@@ -335,7 +335,7 @@ export function WeeklyCalendar({
               const todayDate = getDateInTimezone(new Date(), timezone);
               const isToday = isSameDay(dayDate, todayDate);
               const dateKey = format(dayDate, "yyyy-MM-dd");
-              const hasNote = dayNotes.has(dateKey);
+              const _hasNote = dayNotes.has(dateKey);
               return (
                 <div
                   key={index}

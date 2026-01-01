@@ -187,6 +187,8 @@ export function GroupedTaskList({
         return "Completed";
       case "cancelled":
         return "Cancelled";
+      case "rescheduled":
+        return "Rescheduled";
     }
   };
 
@@ -425,7 +427,7 @@ export function GroupedTaskList({
                     <div className="space-y-3">
                       {sectionTasks.length === 0 ? (
                         <p className="text-sm text-muted-foreground py-4 text-center">
-                          No {getStatusLabel(status).toLowerCase()} tasks
+                          No {getStatusLabel(status)?.toLowerCase() || status} tasks
                         </p>
                       ) : (
                         sectionTasks.map((task) => (

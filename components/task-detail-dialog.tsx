@@ -23,8 +23,8 @@ import { SubtaskManager } from "@/components/subtask-manager";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useConfirmDialog } from "@/components/ui/confirm-dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useUserTimezone } from "@/hooks/use-user-timezone";
 import { ENERGY_LABELS, PRIORITY_LABELS, TASK_TYPE_LABELS } from "@/lib/task-utils";
 import { formatDateTimeFull } from "@/lib/timezone-utils";
@@ -154,7 +154,8 @@ export function TaskDetailDialog({
   const handleUnschedule = async () => {
     const confirmed = await confirm({
       title: "Unschedule Task",
-      description: "Are you sure you want to unschedule this task? It will be removed from the calendar.",
+      description:
+        "Are you sure you want to unschedule this task? It will be removed from the calendar.",
       variant: "default",
       confirmText: "Unschedule",
     });
@@ -371,7 +372,11 @@ export function TaskDetailDialog({
             <SubtaskManager
               parentTaskId={task.id}
               onSubtaskChange={handleSubtaskChange}
-              readOnly={task.status === "completed" || task.status === "cancelled" || task.status === "rescheduled"}
+              readOnly={
+                task.status === "completed" ||
+                task.status === "cancelled" ||
+                task.status === "rescheduled"
+              }
             />
           )}
 
@@ -498,54 +503,56 @@ export function TaskDetailDialog({
           </Card>
 
           {/* Quick Status Change */}
-          {task.status !== "completed" && task.status !== "cancelled" && task.status !== "rescheduled" && (
-            <Card>
-              <CardContent className="pt-6">
-                <h3 className="text-sm font-semibold mb-3">Quick Actions</h3>
-                <div className="flex flex-wrap gap-2">
-                  {task.status === "pending" && (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => {
-                        setHasChanges(true);
-                        onStatusChange?.(task.id, "in_progress");
-                      }}
-                      disabled={isBlocked}
-                    >
-                      {isBlocked ? "Blocked" : "Start Task"}
-                    </Button>
-                  )}
-                  {task.status === "in_progress" && (
-                    <Button
-                      size="sm"
-                      variant="default"
-                      onClick={() => {
-                        setHasChanges(true);
-                        onStatusChange?.(task.id, "completed");
-                      }}
-                    >
-                      <CheckCircle2 className="h-4 w-4 mr-1" />
-                      Mark Complete
-                    </Button>
-                  )}
-                  {task.status === "pending" && !isBlocked && (
-                    <Button
-                      size="sm"
-                      variant="default"
-                      onClick={() => {
-                        setHasChanges(true);
-                        onStatusChange?.(task.id, "completed");
-                      }}
-                    >
-                      <CheckCircle2 className="h-4 w-4 mr-1" />
-                      Mark Complete
-                    </Button>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          )}
+          {task.status !== "completed" &&
+            task.status !== "cancelled" &&
+            task.status !== "rescheduled" && (
+              <Card>
+                <CardContent className="pt-6">
+                  <h3 className="text-sm font-semibold mb-3">Quick Actions</h3>
+                  <div className="flex flex-wrap gap-2">
+                    {task.status === "pending" && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          setHasChanges(true);
+                          onStatusChange?.(task.id, "in_progress");
+                        }}
+                        disabled={isBlocked}
+                      >
+                        {isBlocked ? "Blocked" : "Start Task"}
+                      </Button>
+                    )}
+                    {task.status === "in_progress" && (
+                      <Button
+                        size="sm"
+                        variant="default"
+                        onClick={() => {
+                          setHasChanges(true);
+                          onStatusChange?.(task.id, "completed");
+                        }}
+                      >
+                        <CheckCircle2 className="h-4 w-4 mr-1" />
+                        Mark Complete
+                      </Button>
+                    )}
+                    {task.status === "pending" && !isBlocked && (
+                      <Button
+                        size="sm"
+                        variant="default"
+                        onClick={() => {
+                          setHasChanges(true);
+                          onStatusChange?.(task.id, "completed");
+                        }}
+                      >
+                        <CheckCircle2 className="h-4 w-4 mr-1" />
+                        Mark Complete
+                      </Button>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
 
           {/* Action Buttons */}
           <div className="flex flex-col sm:flex-row justify-between gap-2 sm:gap-0 pt-4 border-t">

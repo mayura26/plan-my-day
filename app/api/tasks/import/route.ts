@@ -230,9 +230,10 @@ export async function POST(request: NextRequest) {
         const now = new Date().toISOString();
         const priority = taskData.priority || 3;
         const energyLevel = taskData.energy_level_required || 3;
-        const groupId = taskData.group && groupMap.has(taskData.group)
-          ? (groupMap.get(taskData.group) ?? null)
-          : null;
+        const groupId =
+          taskData.group && groupMap.has(taskData.group)
+            ? (groupMap.get(taskData.group) ?? null)
+            : null;
 
         // Default duration to 30 minutes for tasks and todos (not events)
         const defaultDuration = taskData.task_type === "event" ? null : 30;

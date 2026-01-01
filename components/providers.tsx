@@ -1,8 +1,8 @@
 "use client";
 
 import { SessionProvider } from "next-auth/react";
-import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "sonner";
+import { ThemeProvider } from "@/components/theme-provider";
 import { ConfirmDialogProvider } from "@/components/ui/confirm-dialog";
 
 interface ProvidersProps {
