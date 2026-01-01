@@ -11,8 +11,6 @@
 
 - [ ] Allow API push of data
 
-- [ ] Allow import of tasks, csv with Type, group, name, description, time, due date
-
 - [ ] Process overdue tasks, and then we can show task as not complete bu t redsculed which will be a grey out but not crossed
 
 - [ ] Add toasts

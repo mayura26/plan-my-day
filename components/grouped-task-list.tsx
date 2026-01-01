@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronDown, ChevronRight, Plus, Search } from "lucide-react";
+import { ChevronDown, ChevronRight, Plus, Search, Upload } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -24,6 +24,7 @@ interface GroupedTaskListProps {
   onExtendTask?: (taskId: string) => void;
   onUnscheduleTask?: (taskId: string) => Promise<void>;
   onCreateTask?: () => void;
+  onImport?: () => void;
   showAllTasks?: boolean;
   onShowAllTasksChange?: (show: boolean) => void;
 }
@@ -40,6 +41,7 @@ export function GroupedTaskList({
   onExtendTask,
   onUnscheduleTask,
   onCreateTask,
+  onImport,
   showAllTasks = false,
   onShowAllTasksChange,
 }: GroupedTaskListProps) {
@@ -218,12 +220,20 @@ export function GroupedTaskList({
             {searchQuery && ` matching "${searchQuery}"`}
           </p>
         </div>
-        {onCreateTask && (
-          <Button onClick={onCreateTask} className="h-11 px-4 md:h-10 md:px-4">
-            <Plus className="w-4 h-4 mr-2" />
-            Add Task
-          </Button>
-        )}
+        <div className="flex items-center gap-2">
+          {onImport && (
+            <Button onClick={onImport} variant="outline" className="h-11 px-4 md:h-10 md:px-4">
+              <Upload className="w-4 h-4 mr-2" />
+              Import Tasks
+            </Button>
+          )}
+          {onCreateTask && (
+            <Button onClick={onCreateTask} className="h-11 px-4 md:h-10 md:px-4">
+              <Plus className="w-4 h-4 mr-2" />
+              Add Task
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Filter and Control Buttons */}
