@@ -48,7 +48,7 @@ export default function CalendarPage() {
   const { data: session, status } = useSession();
   const { timezone, isLoading: timezoneLoading } = useUserTimezone();
   const router = useRouter();
-  
+
   const [tasks, setTasks] = useState<Task[]>([]);
   const [groups, setGroups] = useState<TaskGroup[]>([]);
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
@@ -146,21 +146,26 @@ export default function CalendarPage() {
 
     // Only fetch tasks and groups once authenticated AND timezone is loaded
     // Use a ref to ensure we only fetch once, even if the effect runs multiple times
-    if (status === "authenticated" && !timezoneLoading && session?.user?.id && !hasFetchedInitialDataRef.current) {
+    if (
+      status === "authenticated" &&
+      !timezoneLoading &&
+      session?.user?.id &&
+      !hasFetchedInitialDataRef.current
+    ) {
       const currentUserId = session.user.id;
-      
+
       hasFetchedInitialDataRef.current = true;
-      
+
       // Fetch tasks
       fetchTasks();
-      
+
       // Fetch groups only once per user
       if (fetchedGroupsUserIdRef.current !== currentUserId && !isFetchingGroupsRef.current) {
         fetchedGroupsUserIdRef.current = currentUserId;
         fetchGroups();
       }
     }
-    
+
     // Reset the ref if user logs out (but only if we actually had data fetched)
     if (status !== "authenticated" && hasFetchedInitialDataRef.current) {
       hasFetchedInitialDataRef.current = false;
@@ -170,39 +175,45 @@ export default function CalendarPage() {
   }, [status, timezoneLoading]);
 
   // Helper function to format date to YYYY-MM-DD in user's timezone
-  const formatDateKey = useCallback((date: Date): string => {
-    const dateInTimezone = getDateInTimezone(date, timezone);
-    return format(dateInTimezone, "yyyy-MM-dd");
-  }, [timezone]);
+  const formatDateKey = useCallback(
+    (date: Date): string => {
+      const dateInTimezone = getDateInTimezone(date, timezone);
+      return format(dateInTimezone, "yyyy-MM-dd");
+    },
+    [timezone]
+  );
 
   // Fetch day note for a specific date
-  const fetchDayNote = useCallback(async (date: Date) => {
-    try {
-      const dateKey = formatDateKey(date);
-      const response = await fetch(`/api/day-notes?date=${dateKey}`);
-      if (response.ok) {
-        const data = await response.json();
-        if (data.note === null) {
-          // Note doesn't exist, remove from map
+  const fetchDayNote = useCallback(
+    async (date: Date) => {
+      try {
+        const dateKey = formatDateKey(date);
+        const response = await fetch(`/api/day-notes?date=${dateKey}`);
+        if (response.ok) {
+          const data = await response.json();
+          if (data.note === null) {
+            // Note doesn't exist, remove from map
+            setDayNotes((prev) => {
+              const newMap = new Map(prev);
+              newMap.delete(dateKey);
+              return newMap;
+            });
+            return null;
+          }
           setDayNotes((prev) => {
             const newMap = new Map(prev);
-            newMap.delete(dateKey);
+            newMap.set(dateKey, data.note);
             return newMap;
           });
-          return null;
+          return data.note;
         }
-        setDayNotes((prev) => {
-          const newMap = new Map(prev);
-          newMap.set(dateKey, data.note);
-          return newMap;
-        });
-        return data.note;
+      } catch (error) {
+        console.error("Error fetching day note:", error);
       }
-    } catch (error) {
-      console.error("Error fetching day note:", error);
-    }
-    return null;
-  }, [timezone]);
+      return null;
+    },
+    [timezone]
+  );
 
   // Create or update day note
   const createOrUpdateDayNote = async (date: Date, content: string) => {

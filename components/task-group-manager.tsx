@@ -248,7 +248,7 @@ export function TaskGroupManager({
   const [newGroupColor, setNewGroupColor] = useState("#3B82F6");
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const [hiddenGroups, setHiddenGroups] = useState<Set<string>>(new Set());
-  
+
   const isFetchingRef = useRef<boolean>(false);
   const hasFetchedRef = useRef<boolean>(false);
 
@@ -257,9 +257,9 @@ export function TaskGroupManager({
     if (isFetchingRef.current) {
       return;
     }
-    
+
     isFetchingRef.current = true;
-    
+
     try {
       setIsLoading(true);
       const response = await fetch("/api/task-groups");
