@@ -132,11 +132,17 @@ export function SubtaskManager({
   const totalCount = subtasks.length;
   const progressPercentage = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
 
+  // Reserve space during loading to prevent layout shift
   if (isLoading) {
     return (
       <Card>
-        <CardContent className="pt-6">
-          <div className="text-sm text-muted-foreground">Loading subtasks...</div>
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-sm font-semibold">Subtasks</CardTitle>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="text-sm text-muted-foreground py-2">Loading subtasks...</div>
         </CardContent>
       </Card>
     );

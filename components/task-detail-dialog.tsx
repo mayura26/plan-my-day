@@ -60,6 +60,7 @@ export function TaskDetailDialog({
   const [dependencies, setDependencies] = useState<DependencyInfo[]>([]);
   const [blockedBy, setBlockedBy] = useState<Task[]>([]);
   const [isBlocked, setIsBlocked] = useState(false);
+  const [hasChanges, setHasChanges] = useState(false);
   const { timezone } = useUserTimezone();
 
   const fetchDependencies = useCallback(async () => {
@@ -80,16 +81,20 @@ export function TaskDetailDialog({
   useEffect(() => {
     if (open && task) {
       fetchDependencies();
+      // Reset change tracking when dialog opens
+      setHasChanges(false);
     }
   }, [open, task, fetchDependencies]);
 
   if (!task) return null;
 
-  // Handle dialog close - refresh task list when dialog is closed
+  // Handle dialog close - only refresh task list if changes were made
   const handleDialogClose = (newOpen: boolean) => {
     if (!newOpen) {
-      // Dialog is being closed, refresh the task list
-      onTaskUpdate?.();
+      // Only refresh if changes were made
+      if (hasChanges) {
+        onTaskUpdate?.();
+      }
     }
     onOpenChange(newOpen);
   };
@@ -125,6 +130,7 @@ export function TaskDetailDialog({
     setIsUnscheduling(true);
     try {
       await onUnschedule?.(task.id);
+      setHasChanges(true);
     } catch (error) {
       console.error("Error unscheduling task:", error);
     } finally {
@@ -133,6 +139,8 @@ export function TaskDetailDialog({
   };
 
   const handleSubtaskChange = async () => {
+    // Mark that changes were made
+    setHasChanges(true);
     // Refresh the task data in the dialog itself (parent task may have been unscheduled)
     // But don't refresh the full list until dialog closes for smoother UX
     if (task) {
@@ -415,7 +423,10 @@ export function TaskDetailDialog({
                     <Button
                       size="sm"
                       variant="outline"
-                      onClick={() => onStatusChange?.(task.id, "in_progress")}
+                      onClick={() => {
+                        setHasChanges(true);
+                        onStatusChange?.(task.id, "in_progress");
+                      }}
                       disabled={isBlocked}
                     >
                       {isBlocked ? "Blocked" : "Start Task"}
@@ -425,7 +436,10 @@ export function TaskDetailDialog({
                     <Button
                       size="sm"
                       variant="default"
-                      onClick={() => onStatusChange?.(task.id, "completed")}
+                      onClick={() => {
+                        setHasChanges(true);
+                        onStatusChange?.(task.id, "completed");
+                      }}
                     >
                       <CheckCircle2 className="h-4 w-4 mr-1" />
                       Mark Complete
@@ -435,7 +449,10 @@ export function TaskDetailDialog({
                     <Button
                       size="sm"
                       variant="default"
-                      onClick={() => onStatusChange?.(task.id, "completed")}
+                      onClick={() => {
+                        setHasChanges(true);
+                        onStatusChange?.(task.id, "completed");
+                      }}
                     >
                       <CheckCircle2 className="h-4 w-4 mr-1" />
                       Mark Complete
