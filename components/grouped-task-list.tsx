@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronDown, ChevronRight, Plus, Search, Upload } from "lucide-react";
+import { ChevronDown, ChevronRight, Edit, Plus, Search, Trash2, Upload } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -27,6 +27,8 @@ interface GroupedTaskListProps {
   onImport?: () => void;
   showAllTasks?: boolean;
   onShowAllTasksChange?: (show: boolean) => void;
+  onRenameGroup?: (group: TaskGroup) => void;
+  onDeleteGroup?: (groupId: string) => Promise<void>;
 }
 
 type GroupByOption = "status" | "group" | "none";
@@ -44,6 +46,8 @@ export function GroupedTaskList({
   onImport,
   showAllTasks = false,
   onShowAllTasksChange,
+  onRenameGroup,
+  onDeleteGroup,
 }: GroupedTaskListProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [groupBy, setGroupBy] = useState<GroupByOption>("status");
@@ -517,6 +521,36 @@ export function GroupedTaskList({
                       />
                       <CardTitle className="text-lg">{group.name}</CardTitle>
                       <Badge variant="secondary">{sectionTasks.length}</Badge>
+                    </div>
+                    <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                      {onRenameGroup && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 w-8 p-0"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onRenameGroup(group);
+                          }}
+                          title="Rename group"
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                      )}
+                      {onDeleteGroup && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 w-8 p-0"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onDeleteGroup(group.id);
+                          }}
+                          title="Delete group"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
                     </div>
                   </div>
                 </CardHeader>

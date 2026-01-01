@@ -13,6 +13,15 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import type { CreateTaskRequest, Task, TaskGroup } from "@/lib/types";
 
 export default function TasksPage() {
@@ -28,6 +37,10 @@ export default function TasksPage() {
   const [groups, setGroups] = useState<TaskGroup[]>([]);
   const [showAllTasks, setShowAllTasks] = useState(false);
   const [showImportDialog, setShowImportDialog] = useState(false);
+  const [showRenameDialog, setShowRenameDialog] = useState(false);
+  const [renamingGroup, setRenamingGroup] = useState<TaskGroup | null>(null);
+  const [newGroupName, setNewGroupName] = useState("");
+  const [newGroupColor, setNewGroupColor] = useState("#3B82F6");
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -224,6 +237,71 @@ export default function TasksPage() {
     }
   };
 
+  // Rename group
+  const handleRenameGroup = (group: TaskGroup) => {
+    setRenamingGroup(group);
+    setNewGroupName(group.name);
+    setNewGroupColor(group.color);
+    setShowRenameDialog(true);
+  };
+
+  const handleUpdateGroup = async () => {
+    if (!renamingGroup || !newGroupName.trim()) return;
+
+    try {
+      const response = await fetch(`/api/task-groups/${renamingGroup.id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          name: newGroupName.trim(),
+          color: newGroupColor,
+        }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setGroups((prev) => prev.map((group) => (group.id === renamingGroup.id ? data.group : group)));
+        setShowRenameDialog(false);
+        setRenamingGroup(null);
+      } else {
+        const error = await response.json();
+        console.error("Failed to update group:", error);
+        throw new Error(error.error || "Failed to update group");
+      }
+    } catch (error) {
+      console.error("Error updating group:", error);
+      throw error;
+    }
+  };
+
+  // Delete group
+  const handleDeleteGroup = async (groupId: string) => {
+    if (!confirm("Are you sure you want to delete this group? Tasks in this group will be ungrouped.")) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/task-groups/${groupId}`, {
+        method: "DELETE",
+      });
+
+      if (response.ok) {
+        setGroups((prev) => prev.filter((group) => group.id !== groupId));
+        // Refresh tasks to update group_id references
+        await fetchTasks();
+      } else {
+        const error = await response.json();
+        console.error("Failed to delete group:", error);
+        throw new Error(error.error || "Failed to delete group");
+      }
+    } catch (error) {
+      console.error("Error deleting group:", error);
+      throw error;
+    }
+  };
+
   if (status === "loading" || isLoading) {
     return (
       <div className="min-h-screen bg-background">
@@ -259,6 +337,8 @@ export default function TasksPage() {
           onImport={() => setShowImportDialog(true)}
           showAllTasks={showAllTasks}
           onShowAllTasksChange={setShowAllTasks}
+          onRenameGroup={handleRenameGroup}
+          onDeleteGroup={handleDeleteGroup}
         />
       </main>
 
@@ -322,6 +402,75 @@ export default function TasksPage() {
           await fetchGroups();
         }}
       />
+
+      {/* Rename Group Dialog */}
+      <Dialog
+        open={showRenameDialog}
+        onOpenChange={(open) => {
+          setShowRenameDialog(open);
+          if (!open) {
+            setRenamingGroup(null);
+            setNewGroupName("");
+            setNewGroupColor("#3B82F6");
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Rename Group</DialogTitle>
+            <DialogDescription>Update the group name and color.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm font-medium">Group Name</label>
+              <Input
+                value={newGroupName}
+                onChange={(e) => setNewGroupName(e.target.value)}
+                placeholder="Enter group name"
+                className="mt-1"
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium">Color</label>
+              <Select value={newGroupColor} onValueChange={setNewGroupColor}>
+                <SelectTrigger className="mt-1">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {[
+                    { name: "Blue", value: "#3B82F6" },
+                    { name: "Green", value: "#10B981" },
+                    { name: "Yellow", value: "#F59E0B" },
+                    { name: "Red", value: "#EF4444" },
+                    { name: "Purple", value: "#8B5CF6" },
+                    { name: "Pink", value: "#EC4899" },
+                    { name: "Indigo", value: "#6366F1" },
+                    { name: "Gray", value: "#6B7280" },
+                  ].map((color) => (
+                    <SelectItem key={color.value} value={color.value}>
+                      <div className="flex items-center gap-2">
+                        <div
+                          className="w-4 h-4 rounded-full border"
+                          style={{ backgroundColor: color.value }}
+                        />
+                        {color.name}
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setShowRenameDialog(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handleUpdateGroup} disabled={!newGroupName.trim()}>
+                Update Group
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
