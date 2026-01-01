@@ -1,9 +1,10 @@
 "use client";
 
-import { Clock } from "lucide-react";
+import { Clock, Key } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { useEffect } from "react";
+import { APIKeyManager } from "@/components/api-key-manager";
 import { TimezoneSelector } from "@/components/timezone-selector";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
@@ -63,6 +64,25 @@ export default function SettingsPage() {
               Changing your timezone will update how all dates and times are displayed throughout
               the application.
             </p>
+          </CardContent>
+        </Card>
+
+        <Separator />
+
+        {/* API Keys */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <Key className="h-5 w-5" />
+              <CardTitle>API Keys</CardTitle>
+            </div>
+            <CardDescription>
+              Create and manage API keys to authenticate requests to the task import API. Use these
+              keys to programmatically import tasks into your account.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <APIKeyManager />
           </CardContent>
         </Card>
       </div>

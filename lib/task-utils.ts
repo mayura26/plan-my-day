@@ -66,6 +66,10 @@ export function generateTemplateId(): string {
   return `template_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 }
 
+export function generateAPIKeyId(): string {
+  return `apikey_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+}
+
 export function formatDuration(minutes: number): string {
   if (minutes < 60) {
     return `${minutes}m`;

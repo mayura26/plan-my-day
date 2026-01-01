@@ -168,6 +168,32 @@ export interface UpdateTaskRequest extends Partial<CreateTaskRequest> {
   locked?: boolean;
 }
 
+// API Key types
+export interface APIKey {
+  id: string;
+  user_id: string;
+  name: string;
+  key_hash: string;
+  key_prefix: string;
+  last_used_at: string | null;
+  created_at: string;
+  revoked_at: string | null;
+}
+
+export interface CreateAPIKeyRequest {
+  name: string;
+}
+
+export interface APIKeyResponse {
+  id: string;
+  name: string;
+  key_prefix: string;
+  last_used_at: string | null;
+  created_at: string;
+  revoked_at: string | null;
+  key?: string; // Only present when creating a new key
+}
+
 // Request for creating a carryover task from an incomplete task
 export interface CreateCarryoverTaskRequest {
   additional_duration: number; // Extra time needed in minutes

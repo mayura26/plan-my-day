@@ -235,6 +235,22 @@ async function initDatabase() {
       )
     `);
 
+    // Create api_keys table for API key authentication
+    await turso.execute(`
+      CREATE TABLE IF NOT EXISTS api_keys (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        name TEXT NOT NULL,
+        key_hash TEXT NOT NULL UNIQUE,
+        key_prefix TEXT NOT NULL,
+        last_used_at DATETIME,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        revoked_at DATETIME,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+      )
+    `);
+    console.log("✅ Created api_keys table");
+
     console.log("✅ Database initialized successfully!");
   } catch (error) {
     console.error("❌ Error initializing database:", error);
