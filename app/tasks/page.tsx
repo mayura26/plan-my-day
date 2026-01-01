@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { GroupedTaskList } from "@/components/grouped-task-list";
 import { TaskForm } from "@/components/task-form";
 import { TaskImportDialog } from "@/components/task-import-dialog";
+import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -13,7 +14,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { CreateTaskRequest, Task, TaskGroup } from "@/lib/types";
 
@@ -255,7 +255,9 @@ export default function TasksPage() {
 
       if (response.ok) {
         const data = await response.json();
-        setGroups((prev) => prev.map((group) => (group.id === renamingGroup.id ? data.group : group)));
+        setGroups((prev) =>
+          prev.map((group) => (group.id === renamingGroup.id ? data.group : group))
+        );
         setShowRenameDialog(false);
         setRenamingGroup(null);
       } else {
@@ -271,7 +273,9 @@ export default function TasksPage() {
 
   // Delete group
   const handleDeleteGroup = async (groupId: string) => {
-    if (!confirm("Are you sure you want to delete this group? Tasks in this group will be ungrouped.")) {
+    if (
+      !confirm("Are you sure you want to delete this group? Tasks in this group will be ungrouped.")
+    ) {
       return;
     }
 

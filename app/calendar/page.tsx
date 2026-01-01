@@ -33,7 +33,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { WeeklyCalendar } from "@/components/weekly-calendar";
 import { useUserTimezone } from "@/hooks/use-user-timezone";
 import { sortTasksByCreatedTimeDesc } from "@/lib/task-utils";
-import { createDateInTimezone, formatDateTimeLocalForTimezone, getDateInTimezone } from "@/lib/timezone-utils";
+import {
+  createDateInTimezone,
+  formatDateTimeLocalForTimezone,
+  getDateInTimezone,
+} from "@/lib/timezone-utils";
 import type { CreateTaskRequest, DayNote, Task, TaskGroup } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -68,7 +72,9 @@ export default function CalendarPage() {
   const [dayNotes, setDayNotes] = useState<Map<string, DayNote>>(new Map());
   const [noteDialogOpen, setNoteDialogOpen] = useState(false);
   const [noteDialogDate, setNoteDialogDate] = useState<Date | null>(null);
-  const [quickAddInitialData, setQuickAddInitialData] = useState<Partial<CreateTaskRequest> | null>(null);
+  const [quickAddInitialData, setQuickAddInitialData] = useState<Partial<CreateTaskRequest> | null>(
+    null
+  );
   const [sidebarWidth, setSidebarWidth] = useState<number>(() => {
     // Load from localStorage or default to 320px (w-80)
     if (typeof window !== "undefined") {
@@ -438,21 +444,21 @@ export default function CalendarPage() {
   const handleSlotDoubleClick = (day: Date, hour: number, minute: number) => {
     // Create the start time in UTC using the user's timezone
     const startDate = createDateInTimezone(day, hour, minute, timezone);
-    
+
     // Calculate end time (30 minutes later)
     const endDate = new Date(startDate.getTime() + 30 * 60000);
-    
+
     // Convert to datetime-local format for the form inputs
     const scheduledStart = formatDateTimeLocalForTimezone(startDate.toISOString(), timezone);
     const scheduledEnd = formatDateTimeLocalForTimezone(endDate.toISOString(), timezone);
-    
+
     // Set initial data for quick add
     setQuickAddInitialData({
       scheduled_start: scheduledStart,
       scheduled_end: scheduledEnd,
       duration: 30, // Default duration of 30 minutes
     });
-    
+
     // Open the create form dialog
     setShowCreateForm(true);
     setSidebarOpen(false); // Close sidebar on mobile when creating task
@@ -534,13 +540,13 @@ export default function CalendarPage() {
         // The time from the slot is already in decimal hours
         // Convert to hours and minutes, rounding to nearest 15-minute interval
         let totalMinutes = Math.round(time * 60);
-        
+
         // Apply -15 minute offset for top resize (same as scheduling/rescheduling)
         // Bottom resize doesn't need the offset
         if (resizeDirection === "top") {
           totalMinutes = Math.max(0, totalMinutes - 15);
         }
-        
+
         const snappedMinutes = Math.round(totalMinutes / 15) * 15;
         const hours = Math.floor(snappedMinutes / 60);
         const minutes = snappedMinutes % 60;
@@ -678,7 +684,7 @@ export default function CalendarPage() {
     const minutes = snappedMinutes % 60;
 
     const duration = task.duration || 60; // Default to 60 minutes
-    
+
     // Create the start date in the user's timezone, then convert to UTC
     // Pass day directly - createDateInTimezone will extract the correct date from it
     const startDate = createDateInTimezone(day, hours, minutes, timezone);
@@ -827,11 +833,11 @@ export default function CalendarPage() {
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
       if (!isResizing) return;
-      
+
       const newWidth = e.clientX;
       const minWidth = 240; // Minimum width
       const maxWidth = 600; // Maximum width
-      
+
       const clampedWidth = Math.max(minWidth, Math.min(maxWidth, newWidth));
       setSidebarWidth(clampedWidth);
     };
@@ -896,7 +902,10 @@ export default function CalendarPage() {
             sidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
           )}
           style={{
-            width: typeof window !== "undefined" && window.innerWidth >= 768 ? `${sidebarWidth}px` : undefined,
+            width:
+              typeof window !== "undefined" && window.innerWidth >= 768
+                ? `${sidebarWidth}px`
+                : undefined,
           }}
         >
           <div className="p-4 space-y-4">
@@ -1034,7 +1043,7 @@ export default function CalendarPage() {
               </Card>
             )}
           </div>
-          
+
           {/* Resize handle - only visible on desktop */}
           <div
             ref={resizeRef}
@@ -1158,8 +1167,8 @@ export default function CalendarPage() {
       )}
 
       {/* Create Task Dialog */}
-      <Dialog 
-        open={showCreateForm} 
+      <Dialog
+        open={showCreateForm}
         onOpenChange={(open) => {
           setShowCreateForm(open);
           if (!open) {
@@ -1185,8 +1194,8 @@ export default function CalendarPage() {
       </Dialog>
 
       {/* Edit Task Dialog */}
-      <Dialog 
-        open={isEditing} 
+      <Dialog
+        open={isEditing}
         onOpenChange={(open) => {
           setIsEditing(open);
           if (!open) {

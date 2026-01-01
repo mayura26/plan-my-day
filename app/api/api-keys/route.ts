@@ -1,9 +1,9 @@
 import { type NextRequest, NextResponse } from "next/server";
+import { generateAPIKey, getAPIKeyPrefix, hashAPIKey } from "@/lib/api-auth";
 import { auth } from "@/lib/auth";
 import { generateAPIKeyId } from "@/lib/task-utils";
 import { db } from "@/lib/turso";
-import { generateAPIKey, hashAPIKey, getAPIKeyPrefix } from "@/lib/api-auth";
-import type { CreateAPIKeyRequest, APIKeyResponse } from "@/lib/types";
+import type { APIKeyResponse, CreateAPIKeyRequest } from "@/lib/types";
 
 /**
  * GET /api/api-keys
@@ -127,4 +127,3 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
-

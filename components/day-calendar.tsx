@@ -6,12 +6,12 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { CalendarSlot } from "@/components/calendar-slot";
 import { ResizableTask } from "@/components/calendar-task";
 import { Button } from "@/components/ui/button";
+import { sortTasksByScheduledTime } from "@/lib/task-utils";
 import {
   formatDateInTimezone,
   getDateInTimezone,
   getHoursAndMinutesInTimezone,
 } from "@/lib/timezone-utils";
-import { sortTasksByScheduledTime } from "@/lib/task-utils";
 import type { DayNote, Task, TaskGroup } from "@/lib/types";
 
 interface DayCalendarProps {
@@ -296,11 +296,20 @@ export function DayCalendar({
             <div className="relative border-l" style={{ height: "1536px" }}>
               {/* 15-minute interval slots with drop zones */}
               {TIME_SLOTS.slice(1).map(({ hour, minute, slotIndex }) => (
-                <CalendarSlot key={slotIndex} day={currentDate} hour={hour} minute={minute} onDoubleClick={onSlotDoubleClick} />
+                <CalendarSlot
+                  key={slotIndex}
+                  day={currentDate}
+                  hour={hour}
+                  minute={minute}
+                  onDoubleClick={onSlotDoubleClick}
+                />
               ))}
 
               {/* Tasks overlay - explicitly positioned relative to parent */}
-              <div className="absolute inset-0 pointer-events-none" style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0 }}>
+              <div
+                className="absolute inset-0 pointer-events-none"
+                style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0 }}
+              >
                 {(() => {
                   // Filter tasks for the current day
                   const dayTasks = tasks.filter((task) => {

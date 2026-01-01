@@ -269,7 +269,7 @@ export function createDateInTimezone(
       extractedDate: date,
       targetHours: hours,
       targetMinutes: minutes,
-      dayParts: dayParts.map(p => `${p.type}: ${p.value}`),
+      dayParts: dayParts.map((p) => `${p.type}: ${p.value}`),
     });
   }
 

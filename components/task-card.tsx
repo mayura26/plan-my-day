@@ -19,7 +19,7 @@ import {
   STATUS_LABELS,
   TASK_TYPE_LABELS,
 } from "@/lib/task-utils";
-import { formatDateShort, formatTimeShort, formatTimeRange } from "@/lib/timezone-utils";
+import { formatDateShort, formatTimeRange, formatTimeShort } from "@/lib/timezone-utils";
 import type { Task, TaskGroup, TaskStatus } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -186,15 +186,14 @@ export function TaskCard({
   }
 
   // Determine border color
-  const borderStyle = groupColor && !isOverdue && !isDueSoon 
-    ? { borderLeftColor: groupColor } 
-    : undefined;
+  const borderStyle =
+    groupColor && !isOverdue && !isDueSoon ? { borderLeftColor: groupColor } : undefined;
 
   const handleCardClick = (e: React.MouseEvent) => {
     // Don't trigger edit if clicking on checkbox, buttons, or badges
     const target = e.target as HTMLElement;
     if (
-      target.closest('button') ||
+      target.closest("button") ||
       target.closest('[role="checkbox"]') ||
       target.closest('input[type="checkbox"]')
     ) {
@@ -225,7 +224,7 @@ export function TaskCard({
             className="h-4 w-4 flex-shrink-0"
             onClick={(e) => e.stopPropagation()}
           />
-          
+
           {/* Main content - horizontal layout */}
           <div className="flex-1 min-w-0 flex items-center gap-3 flex-wrap">
             {/* Title */}
@@ -240,9 +239,7 @@ export function TaskCard({
               </h4>
               {/* Description on second line if exists */}
               {task.description && (
-                <p className="text-xs text-muted-foreground truncate mt-0.5">
-                  {task.description}
-                </p>
+                <p className="text-xs text-muted-foreground truncate mt-0.5">{task.description}</p>
               )}
             </div>
 
@@ -252,7 +249,7 @@ export function TaskCard({
               <Badge variant="outline" className={`text-xs h-5 px-1.5 ${priorityColor}`}>
                 P{task.priority}
               </Badge>
-              
+
               {/* Status badge */}
               <Badge variant="outline" className={`text-xs h-5 px-1.5 ${statusColor}`}>
                 {STATUS_LABELS[task.status]}
@@ -270,13 +267,17 @@ export function TaskCard({
               {task.scheduled_start && (
                 <span className="text-xs text-muted-foreground flex items-center gap-1">
                   <Clock className="w-3 h-3" />
-                  {formatDateShort(task.scheduled_start, timezone)} {formatTimeShort(task.scheduled_start, timezone)}
+                  {formatDateShort(task.scheduled_start, timezone)}{" "}
+                  {formatTimeShort(task.scheduled_start, timezone)}
                 </span>
               )}
 
               {/* Due date */}
               {task.due_date && (
-                <Badge variant="outline" className="text-xs h-5 px-1.5 bg-red-100 text-red-700 dark:bg-red-900/50 dark:text-red-300 border-red-200 dark:border-red-800">
+                <Badge
+                  variant="outline"
+                  className="text-xs h-5 px-1.5 bg-red-100 text-red-700 dark:bg-red-900/50 dark:text-red-300 border-red-200 dark:border-red-800"
+                >
                   <Flag className="w-3 h-3" />
                   {formatDateShort(task.due_date, timezone)}
                 </Badge>
@@ -293,13 +294,18 @@ export function TaskCard({
 
               {/* Overdue indicator */}
               {isOverdue && (
-                <span className="text-xs text-red-600 dark:text-red-400 font-medium">⚠ Overdue</span>
+                <span className="text-xs text-red-600 dark:text-red-400 font-medium">
+                  ⚠ Overdue
+                </span>
               )}
             </div>
           </div>
 
           {/* Actions - compact */}
-          <div className="flex items-center gap-1 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+          <div
+            className="flex items-center gap-1 flex-shrink-0"
+            onClick={(e) => e.stopPropagation()}
+          >
             {task.status === "pending" && (
               <Button
                 variant="ghost"
@@ -336,7 +342,7 @@ export function TaskCard({
             </Button>
           </div>
         </div>
-        
+
         {/* Group badge in bottom right corner */}
         {group && (
           <Badge

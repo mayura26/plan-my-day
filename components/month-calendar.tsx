@@ -15,8 +15,8 @@ import {
 import { ChevronLeft, ChevronRight, Menu, Zap } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { formatDateInTimezone, formatTimeShort, getDateInTimezone } from "@/lib/timezone-utils";
 import { getEnergyLevelColor, isTaskOverdue } from "@/lib/task-utils";
+import { formatDateInTimezone, formatTimeShort, getDateInTimezone } from "@/lib/timezone-utils";
 import type { Task, TaskGroup } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -173,7 +173,10 @@ export function MonthCalendar({
       {/* Calendar Grid */}
       <div className="flex-1 overflow-x-auto overflow-y-auto p-4">
         {/* Weekday Headers - Mobile: 3 columns visible, Desktop: 7 columns */}
-        <div className="grid grid-cols-[repeat(7,calc((100vw-2rem)/3))] md:grid-cols-7 gap-1 mb-2" style={{ minWidth: 'max-content' }}>
+        <div
+          className="grid grid-cols-[repeat(7,calc((100vw-2rem)/3))] md:grid-cols-7 gap-1 mb-2"
+          style={{ minWidth: "max-content" }}
+        >
           {WEEK_DAYS.map((day) => (
             <div
               key={day}
@@ -185,7 +188,10 @@ export function MonthCalendar({
         </div>
 
         {/* Calendar Days - Mobile: 3 columns visible with horizontal scroll, Desktop: 7 columns */}
-        <div className="grid grid-cols-[repeat(7,calc((100vw-2rem)/3))] md:grid-cols-7 gap-1" style={{ minWidth: 'max-content' }}>
+        <div
+          className="grid grid-cols-[repeat(7,calc((100vw-2rem)/3))] md:grid-cols-7 gap-1"
+          style={{ minWidth: "max-content" }}
+        >
           {calendarDays.map((day, index) => {
             const dayTasks = getTasksForDate(day);
             const dateInTimezone = getDateInTimezone(day, timezone);
@@ -258,7 +264,7 @@ export function MonthCalendar({
                         <span className="truncate flex-1 text-[8px] md:text-xs">{task.title}</span>
                         {/* Energy indicator at right */}
                         {task.energy_level_required && (
-                          <span 
+                          <span
                             className={cn(
                               "text-[7px] md:text-xs flex items-center gap-0.5 flex-shrink-0 px-1 md:px-1.5 py-0 md:py-0.5 rounded-full",
                               getEnergyLevelColor(task.energy_level_required)
@@ -268,7 +274,9 @@ export function MonthCalendar({
                             }}
                           >
                             <Zap className="w-2 h-2 md:w-3 md:h-3" />
-                            <span className="text-[7px] md:text-[10px]">{task.energy_level_required}</span>
+                            <span className="text-[7px] md:text-[10px]">
+                              {task.energy_level_required}
+                            </span>
                           </span>
                         )}
                       </div>

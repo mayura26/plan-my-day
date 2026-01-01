@@ -105,10 +105,14 @@ export function WeeklyCalendar({
     };
   }, []);
 
-
   // Auto-scroll to current time and current day on initial mount only
   useLayoutEffect(() => {
-    if (!calendarScrollRef.current || !horizontalScrollContainerRef.current || hasAutoScrolledRef.current) return;
+    if (
+      !calendarScrollRef.current ||
+      !horizontalScrollContainerRef.current ||
+      hasAutoScrolledRef.current
+    )
+      return;
 
     const now = new Date();
     const { hour, minute } = getHoursAndMinutesInTimezone(now, timezone);
@@ -150,7 +154,7 @@ export function WeeklyCalendar({
         headerScrollRef.current.scrollLeft = calendarScrollRef.current.scrollLeft;
       }
     }
-    
+
     hasAutoScrolledRef.current = true;
   }, [timezone]);
 
@@ -187,7 +191,7 @@ export function WeeklyCalendar({
 
     // Ensure we have a valid timezone
     const userTimezone = timezone || "UTC";
-    
+
     const taskStartUTC = parseISO(task.scheduled_start);
     const taskEndUTC = parseISO(task.scheduled_end);
 
@@ -202,7 +206,10 @@ export function WeeklyCalendar({
       taskStartUTC,
       userTimezone
     );
-    const { hour: endHour, minute: endMinute } = getHoursAndMinutesInTimezone(taskEndUTC, userTimezone);
+    const { hour: endHour, minute: endMinute } = getHoursAndMinutesInTimezone(
+      taskEndUTC,
+      userTimezone
+    );
 
     // Calculate total minutes from midnight
     const startTotalMinutes = startHour * 60 + startMinute;
@@ -224,7 +231,7 @@ export function WeeklyCalendar({
       // Calculate what percentage 6:45 PM would be
       const wrongTimeMinutes = 18 * 60 + 45; // 6:45 PM
       const wrongPercentage = (wrongTimeMinutes / (24 * 60)) * 100;
-      
+
       console.log("getTaskPosition - future date calculation:", {
         taskTitle: task.title,
         scheduled_start: task.scheduled_start,
@@ -240,7 +247,6 @@ export function WeeklyCalendar({
         difference: `${(wrongPercentage - topPercentage).toFixed(2)}%`,
       });
     }
-
 
     return {
       top: `${topPercentage}%`,
@@ -415,10 +421,21 @@ export function WeeklyCalendar({
 
               {/* Day columns */}
               {weekDays.map((day, dayIndex) => (
-                <div key={dayIndex} className="relative border-l" style={{ height: "1536px" }} data-day-column={dayIndex}>
+                <div
+                  key={dayIndex}
+                  className="relative border-l"
+                  style={{ height: "1536px" }}
+                  data-day-column={dayIndex}
+                >
                   {/* 15-minute interval slots with drop zones */}
                   {TIME_SLOTS.slice(1).map(({ hour, minute, slotIndex }) => (
-                    <CalendarSlot key={slotIndex} day={day} hour={hour} minute={minute} onDoubleClick={onSlotDoubleClick} />
+                    <CalendarSlot
+                      key={slotIndex}
+                      day={day}
+                      hour={hour}
+                      minute={minute}
+                      onDoubleClick={onSlotDoubleClick}
+                    />
                   ))}
 
                   {/* Current time indicator (red line) */}
@@ -441,7 +458,10 @@ export function WeeklyCalendar({
 
                   {/* Tasks overlay */}
                   {/* Position explicitly at top of day column with explicit height to match hour labels */}
-                  <div className="absolute top-0 left-0 right-0 pointer-events-none" style={{ height: "1536px" }}>
+                  <div
+                    className="absolute top-0 left-0 right-0 pointer-events-none"
+                    style={{ height: "1536px" }}
+                  >
                     {tasks
                       .filter((task) => {
                         if (!task.scheduled_start) return false;
@@ -449,7 +469,7 @@ export function WeeklyCalendar({
                         const taskStartDate = getDateInTimezone(taskStartUTC, timezone);
                         const dayDate = getDateInTimezone(day, timezone);
                         const matches = isSameDay(taskStartDate, dayDate);
-                        
+
                         // Debug logging for the problematic task
                         if (task.title.includes("Include -1 in invoice for cygnus")) {
                           console.log("Task day matching:", {
@@ -460,10 +480,13 @@ export function WeeklyCalendar({
                             dayDate: dayDate.toISOString(),
                             matches,
                             dayIndex,
-                            dayLabel: formatDateInTimezone(day, timezone, { weekday: "short", day: "numeric" }),
+                            dayLabel: formatDateInTimezone(day, timezone, {
+                              weekday: "short",
+                              day: "numeric",
+                            }),
                           });
                         }
-                        
+
                         return matches;
                       })
                       .map((task) => {

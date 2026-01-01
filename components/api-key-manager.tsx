@@ -1,7 +1,7 @@
 "use client";
 
 import { CheckCircle2, Copy, Key, Plus, Trash2 } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -42,6 +42,7 @@ export function APIKeyManager() {
 
   useEffect(() => {
     fetchKeys();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Create new API key
@@ -254,7 +255,11 @@ export function APIKeyManager() {
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowCreateDialog(false)} disabled={isCreating}>
+            <Button
+              variant="outline"
+              onClick={() => setShowCreateDialog(false)}
+              disabled={isCreating}
+            >
               Cancel
             </Button>
             <Button onClick={handleCreateKey} disabled={isCreating || !newKeyName.trim()}>
@@ -277,15 +282,13 @@ export function APIKeyManager() {
             <div className="space-y-2">
               <Label>Your API Key</Label>
               <div className="flex items-center gap-2">
-                <Input
-                  value={newlyCreatedKey?.key || ""}
-                  readOnly
-                  className="font-mono text-sm"
-                />
+                <Input value={newlyCreatedKey?.key || ""} readOnly className="font-mono text-sm" />
                 <Button
                   size="icon"
                   variant="outline"
-                  onClick={() => newlyCreatedKey?.key && handleCopyKey(newlyCreatedKey.key, newlyCreatedKey.id)}
+                  onClick={() =>
+                    newlyCreatedKey?.key && handleCopyKey(newlyCreatedKey.key, newlyCreatedKey.id)
+                  }
                 >
                   {copiedKeyId === newlyCreatedKey?.id ? (
                     <CheckCircle2 className="h-4 w-4 text-green-600" />
@@ -295,7 +298,10 @@ export function APIKeyManager() {
                 </Button>
               </div>
               <p className="text-xs text-muted-foreground">
-                Use this key in the Authorization header: <code className="bg-muted px-1 rounded">Bearer {newlyCreatedKey?.key_prefix}...</code>
+                Use this key in the Authorization header:{" "}
+                <code className="bg-muted px-1 rounded">
+                  Bearer {newlyCreatedKey?.key_prefix}...
+                </code>
               </p>
             </div>
             <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-lg p-3">
@@ -312,4 +318,3 @@ export function APIKeyManager() {
     </>
   );
 }
-

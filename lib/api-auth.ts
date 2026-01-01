@@ -1,7 +1,7 @@
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
-import { db } from "@/lib/turso";
 import type { NextRequest } from "next/server";
+import { db } from "@/lib/turso";
 
 const API_KEY_PREFIX = "pmy_";
 const API_KEY_LENGTH = 32; // Random part length (excluding prefix)
@@ -76,7 +76,9 @@ export async function validateAPIKey(request: NextRequest): Promise<string | nul
       if (isValid) {
         const keyId = row.id as string;
         // Update last_used_at
-        await db.execute(`UPDATE api_keys SET last_used_at = datetime('now') WHERE id = ?`, [keyId]);
+        await db.execute(`UPDATE api_keys SET last_used_at = datetime('now') WHERE id = ?`, [
+          keyId,
+        ]);
         return row.user_id as string;
       }
     }
@@ -94,4 +96,3 @@ export async function validateAPIKey(request: NextRequest): Promise<string | nul
 export function getAPIKeyPrefix(key: string): string {
   return key.substring(0, 8);
 }
-

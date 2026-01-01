@@ -1,9 +1,9 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { validateAPIKey } from "@/lib/api-auth";
-import { generateTaskId, generateGroupId } from "@/lib/task-utils";
-import { db } from "@/lib/turso";
+import { generateGroupId, generateTaskId } from "@/lib/task-utils";
 import { createDateInTimezone, getUserTimezone } from "@/lib/timezone-utils";
-import type { CreateTaskRequest, Task, TaskType } from "@/lib/types";
+import { db } from "@/lib/turso";
+import type { Task, TaskType } from "@/lib/types";
 
 // Helper to normalize task type (case-insensitive)
 function normalizeTaskType(type: string): TaskType | null {
@@ -61,7 +61,7 @@ function parseDueDate(dateStr: string | null | undefined, timezone: string): str
 
     // Try to parse as general date
     const parsedDate = new Date(trimmed);
-    if (!isNaN(parsedDate.getTime())) {
+    if (!Number.isNaN(parsedDate.getTime())) {
       const year = parsedDate.getFullYear();
       const month = parsedDate.getMonth();
       const day = parsedDate.getDate();
@@ -108,9 +108,10 @@ export async function POST(request: NextRequest) {
 
     // Get user's timezone
     const userResult = await db.execute("SELECT timezone FROM users WHERE id = ?", [userId]);
-    const userTimezone = userResult.rows.length > 0
-      ? getUserTimezone(userResult.rows[0].timezone as string | null)
-      : "UTC";
+    const userTimezone =
+      userResult.rows.length > 0
+        ? getUserTimezone(userResult.rows[0].timezone as string | null)
+        : "UTC";
 
     const body = await request.json();
 
@@ -125,7 +126,9 @@ export async function POST(request: NextRequest) {
     }
 
     // Get user's groups for lookup
-    const groupsResult = await db.execute("SELECT id, name FROM task_groups WHERE user_id = ?", [userId]);
+    const groupsResult = await db.execute("SELECT id, name FROM task_groups WHERE user_id = ?", [
+      userId,
+    ]);
     const groupMap = new Map<string, string>();
     groupsResult.rows.forEach((row) => {
       groupMap.set(row.name as string, row.id as string);
@@ -154,7 +157,10 @@ export async function POST(request: NextRequest) {
       }
 
       // Validate energy if provided
-      if (taskData.energy_level_required !== undefined && (taskData.energy_level_required < 1 || taskData.energy_level_required > 5)) {
+      if (
+        taskData.energy_level_required !== undefined &&
+        (taskData.energy_level_required < 1 || taskData.energy_level_required > 5)
+      ) {
         errors.push("Energy level must be between 1 and 5");
       }
 
@@ -225,7 +231,7 @@ export async function POST(request: NextRequest) {
         const priority = taskData.priority || 3;
         const energyLevel = taskData.energy_level_required || 3;
         const groupId = taskData.group && groupMap.has(taskData.group)
-          ? groupMap.get(taskData.group)!
+          ? (groupMap.get(taskData.group) ?? null)
           : null;
 
         // Default duration to 30 minutes for tasks and todos (not events)
@@ -336,4 +342,3 @@ export async function POST(request: NextRequest) {
     );
   }
 }
-

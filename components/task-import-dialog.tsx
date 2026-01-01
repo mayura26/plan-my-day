@@ -22,7 +22,11 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { useUserTimezone } from "@/hooks/use-user-timezone";
 import { ENERGY_LABELS, PRIORITY_LABELS } from "@/lib/task-utils";
-import { createDateInTimezone, formatDateTimeLocalForTimezone, parseDateTimeLocalToUTC } from "@/lib/timezone-utils";
+import {
+  createDateInTimezone,
+  formatDateTimeLocalForTimezone,
+  parseDateTimeLocalToUTC,
+} from "@/lib/timezone-utils";
 import type { CreateTaskRequest, TaskGroup, TaskType } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -54,7 +58,9 @@ export function TaskImportDialog({ open, onOpenChange, groups, onImport }: TaskI
   const [csvData, setCsvData] = useState("");
   const [parsedTasks, setParsedTasks] = useState<ParsedTask[]>([]);
   const [isImporting, setIsImporting] = useState(false);
-  const [importResults, setImportResults] = useState<{ success: number; failed: number } | null>(null);
+  const [importResults, setImportResults] = useState<{ success: number; failed: number } | null>(
+    null
+  );
 
   // Reset state when dialog opens/closes
   const handleOpenChange = (newOpen: boolean) => {
@@ -71,7 +77,17 @@ export function TaskImportDialog({ open, onOpenChange, groups, onImport }: TaskI
   const isHeaderRow = (row: string[]): boolean => {
     if (row.length === 0) return false;
     const firstCell = row[0].toLowerCase().trim();
-    const headerKeywords = ["type", "group", "name", "description", "duration", "due", "date", "priority", "energy"];
+    const headerKeywords = [
+      "type",
+      "group",
+      "name",
+      "description",
+      "duration",
+      "due",
+      "date",
+      "priority",
+      "energy",
+    ];
     return headerKeywords.some((keyword) => firstCell.includes(keyword));
   };
 
@@ -251,7 +267,10 @@ export function TaskImportDialog({ open, onOpenChange, groups, onImport }: TaskI
       return;
     }
 
-    const lines = csvData.trim().split(/\r?\n/).filter((line) => line.trim());
+    const lines = csvData
+      .trim()
+      .split(/\r?\n/)
+      .filter((line) => line.trim());
     if (lines.length === 0) {
       return;
     }
@@ -364,7 +383,9 @@ export function TaskImportDialog({ open, onOpenChange, groups, onImport }: TaskI
   // Execute import
   const handleImport = async () => {
     // Filter out tasks with errors
-    const validTasks = parsedTasks.filter((task) => task.errors.length === 0 && task.name && task.type);
+    const validTasks = parsedTasks.filter(
+      (task) => task.errors.length === 0 && task.name && task.type
+    );
 
     if (validTasks.length === 0) {
       return;
@@ -468,7 +489,9 @@ export function TaskImportDialog({ open, onOpenChange, groups, onImport }: TaskI
     }
   };
 
-  const hasValidTasks = parsedTasks.some((task) => task.errors.length === 0 && task.name && task.type);
+  const hasValidTasks = parsedTasks.some(
+    (task) => task.errors.length === 0 && task.name && task.type
+  );
   const errorCount = parsedTasks.filter((task) => task.errors.length > 0).length;
 
   return (
@@ -479,20 +502,33 @@ export function TaskImportDialog({ open, onOpenChange, groups, onImport }: TaskI
           <DialogDescription>
             {step === "input" ? (
               <div className="space-y-2 pt-2">
-                <p>Paste your CSV data below. You can edit the data in the preview step before importing.</p>
+                <p>
+                  Paste your CSV data below. You can edit the data in the preview step before
+                  importing.
+                </p>
                 <div className="bg-muted/50 rounded-md p-3 text-xs font-mono">
                   <div className="font-semibold mb-1">CSV Format:</div>
                   <div className="space-y-1 text-muted-foreground">
-                    <div><span className="font-medium text-foreground">Required:</span> type, name</div>
-                    <div><span className="font-medium text-foreground">Optional:</span> group, description, duration (minutes), due date, priority (1-5), energy (1-5)</div>
+                    <div>
+                      <span className="font-medium text-foreground">Required:</span> type, name
+                    </div>
+                    <div>
+                      <span className="font-medium text-foreground">Optional:</span> group,
+                      description, duration (minutes), due date, priority (1-5), energy (1-5)
+                    </div>
                   </div>
                 </div>
               </div>
             ) : (
               <div className="space-y-1 pt-2">
-                <p>Review and edit the parsed tasks below. Make any necessary changes before importing.</p>
+                <p>
+                  Review and edit the parsed tasks below. Make any necessary changes before
+                  importing.
+                </p>
                 {errorCount > 0 && (
-                  <p className="text-destructive font-medium">⚠️ {errorCount} row(s) have errors that must be fixed before importing.</p>
+                  <p className="text-destructive font-medium">
+                    ⚠️ {errorCount} row(s) have errors that must be fixed before importing.
+                  </p>
                 )}
               </div>
             )}
@@ -516,7 +552,8 @@ Todo,Home,Buy groceries,Get milk and eggs,30,2025-12-20,2,2`}
                 className="min-h-[300px] font-mono text-sm"
               />
               <p className="text-xs text-muted-foreground">
-                Headers are automatically detected and ignored. Type must be: Task, Event, or Todo (case-insensitive).
+                Headers are automatically detected and ignored. Type must be: Task, Event, or Todo
+                (case-insensitive).
               </p>
             </div>
           </div>
@@ -614,7 +651,9 @@ Todo,Home,Buy groceries,Get milk and eggs,30,2025-12-20,2,2`}
                           <td className="px-4 py-2">
                             <Input
                               value={task.description || ""}
-                              onChange={(e) => updateTaskField(index, "description", e.target.value)}
+                              onChange={(e) =>
+                                updateTaskField(index, "description", e.target.value)
+                              }
                               placeholder="Description"
                               className="w-64 h-8"
                             />
@@ -664,7 +703,9 @@ Todo,Home,Buy groceries,Get milk and eggs,30,2025-12-20,2,2`}
                           <td className="px-4 py-2">
                             <Select
                               value={(task.priority || 3).toString()}
-                              onValueChange={(value) => updateTaskField(index, "priority", parseInt(value, 10))}
+                              onValueChange={(value) =>
+                                updateTaskField(index, "priority", parseInt(value, 10))
+                              }
                             >
                               <SelectTrigger className="w-32 h-8">
                                 <SelectValue />
@@ -681,7 +722,9 @@ Todo,Home,Buy groceries,Get milk and eggs,30,2025-12-20,2,2`}
                           <td className="px-4 py-2">
                             <Select
                               value={(task.energyLevel || 3).toString()}
-                              onValueChange={(value) => updateTaskField(index, "energyLevel", parseInt(value, 10))}
+                              onValueChange={(value) =>
+                                updateTaskField(index, "energyLevel", parseInt(value, 10))
+                              }
                             >
                               <SelectTrigger className="w-32 h-8">
                                 <SelectValue />
@@ -746,8 +789,8 @@ Todo,Home,Buy groceries,Get milk and eggs,30,2025-12-20,2,2`}
                 <span className="font-medium text-green-600 dark:text-green-400">
                   {parsedTasks.filter((t) => t.errors.length === 0 && t.name && t.type).length}
                 </span>{" "}
-                valid,{" "}
-                <span className="font-medium text-destructive">{errorCount}</span> with errors
+                valid, <span className="font-medium text-destructive">{errorCount}</span> with
+                errors
               </p>
             </div>
           </div>
@@ -769,7 +812,11 @@ Todo,Home,Buy groceries,Get milk and eggs,30,2025-12-20,2,2`}
               <Button variant="outline" onClick={() => setStep("input")} disabled={isImporting}>
                 Back
               </Button>
-              <Button variant="outline" onClick={() => handleOpenChange(false)} disabled={isImporting}>
+              <Button
+                variant="outline"
+                onClick={() => handleOpenChange(false)}
+                disabled={isImporting}
+              >
                 Cancel
               </Button>
               <Button onClick={handleImport} disabled={!hasValidTasks || isImporting}>
@@ -778,7 +825,9 @@ Todo,Home,Buy groceries,Get milk and eggs,30,2025-12-20,2,2`}
                 ) : (
                   <>
                     <Upload className="h-4 w-4 mr-2" />
-                    Import {parsedTasks.filter((t) => t.errors.length === 0 && t.name && t.type).length} Task(s)
+                    Import{" "}
+                    {parsedTasks.filter((t) => t.errors.length === 0 && t.name && t.type).length}{" "}
+                    Task(s)
                   </>
                 )}
               </Button>
