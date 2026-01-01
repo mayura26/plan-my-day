@@ -1,11 +1,14 @@
 "use client";
 
-import { Clock, Key } from "lucide-react";
+import { Bell, Clock, Key, RefreshCw } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { useEffect } from "react";
 import { APIKeyManager } from "@/components/api-key-manager";
 import { TimezoneSelector } from "@/components/timezone-selector";
+import { PushNotificationManager } from "@/components/push-notification-manager";
+import { PushSubscriptionList } from "@/components/push-subscription-list";
+import { ForceUpdateButton } from "@/components/force-update-button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 
@@ -83,6 +86,49 @@ export default function SettingsPage() {
           </CardHeader>
           <CardContent>
             <APIKeyManager />
+          </CardContent>
+        </Card>
+
+        <Separator />
+
+        {/* Push Notifications */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <Bell className="h-5 w-5" />
+              <CardTitle>Push Notifications</CardTitle>
+            </div>
+            <CardDescription>
+              Enable push notifications to receive reminders for your tasks and important updates.
+              You can test notifications and manage your subscription here.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <PushNotificationManager />
+          </CardContent>
+        </Card>
+
+        <Separator />
+
+        {/* Push Subscription List */}
+        <PushSubscriptionList />
+
+        <Separator />
+
+        {/* App Updates */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <RefreshCw className="h-5 w-5" />
+              <CardTitle>App Updates</CardTitle>
+            </div>
+            <CardDescription>
+              Manage app updates and check for new versions. Force update if a new version is
+              available.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ForceUpdateButton />
           </CardContent>
         </Card>
       </div>

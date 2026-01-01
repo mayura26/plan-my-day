@@ -1,6 +1,14 @@
 {
   "name": "Plan My Day",
   "short_name": "Plan My Day",
+  "description": "A modern day planning and task management app",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "theme_color": "#23466a",
+  "background_color": "#23466a",
+  "categories": ["productivity", "lifestyle"],
   "icons": [
     {
       "src": "/web-app-manifest-192x192.png",
@@ -15,7 +23,20 @@
       "purpose": "maskable"
     }
   ],
-  "theme_color": "#23466a",
-  "background_color": "#23466a",
-  "display": "standalone"
+  "shortcuts": [
+    {
+      "name": "New Task",
+      "short_name": "New Task",
+      "description": "Create a new task",
+      "url": "/tasks?action=new",
+      "icons": [{ "src": "/web-app-manifest-192x192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Calendar",
+      "short_name": "Calendar",
+      "description": "View calendar",
+      "url": "/calendar",
+      "icons": [{ "src": "/web-app-manifest-192x192.png", "sizes": "192x192" }]
+    }
+  ]
 }
