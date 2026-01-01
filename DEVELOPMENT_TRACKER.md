@@ -11,9 +11,9 @@
 
 - [ ] Mobile day view should just fit screen
 
-- [ ] Add toasts
-
 - [ ] Group badge on both views
+
+- [ ] when task is completed on calender we need to show grey-d or corssed out. and then for overdue task which is not rescheduled we show with border to get attenito. events we also cross out after the time
 
 - [ ] Click on grid, create task in spot. quick tasks
 
@@ -27,7 +27,7 @@
 
 - [ ] Process overdue tasks
 
-- [ ] when task is completed on calender we need to show grey-d or corssed out. and then for overdue task which is not rescheduled we show with border to get attenito. events we also cross out after the time
+- [ ] Add toasts
 
 - [ ] PWA setup with service worker
 - [ ] Basic offline functionality

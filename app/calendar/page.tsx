@@ -11,13 +11,15 @@ import {
   useSensor,
   useSensors,
 } from "@dnd-kit/core";
-import { startOfMonth } from "date-fns";
+import { format, startOfMonth } from "date-fns";
 import { CheckSquare, ChevronDown, ChevronRight, Plus, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { useEffect, useState } from "react";
 import { CalendarSkeleton } from "@/components/calendar-skeleton";
 import { DayCalendar } from "@/components/day-calendar";
+import { DayNoteDialog } from "@/components/day-note-dialog";
+import { DayNotesSection } from "@/components/day-notes-section";
 import { MonthCalendar } from "@/components/month-calendar";
 import { SlimTaskCard } from "@/components/slim-task-card";
 import { TaskDetailDialog } from "@/components/task-detail-dialog";
@@ -31,8 +33,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { WeeklyCalendar } from "@/components/weekly-calendar";
 import { useUserTimezone } from "@/hooks/use-user-timezone";
 import { sortTasksByCreatedTimeDesc } from "@/lib/task-utils";
-import { createDateInTimezone } from "@/lib/timezone-utils";
-import type { CreateTaskRequest, Task, TaskGroup } from "@/lib/types";
+import { createDateInTimezone, getDateInTimezone } from "@/lib/timezone-utils";
+import type { CreateTaskRequest, DayNote, Task, TaskGroup } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 type ViewMode = "day" | "week" | "month";
@@ -63,6 +65,9 @@ export default function CalendarPage() {
   );
   const [viewMode, setViewMode] = useState<ViewMode>("week");
   const [currentDate, setCurrentDate] = useState<Date>(new Date());
+  const [dayNotes, setDayNotes] = useState<Map<string, DayNote>>(new Map());
+  const [noteDialogOpen, setNoteDialogOpen] = useState(false);
+  const [noteDialogDate, setNoteDialogDate] = useState<Date | null>(null);
 
   // Configure drag sensors
   const sensors = useSensors(
@@ -121,6 +126,139 @@ export default function CalendarPage() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session]);
+
+  // Helper function to format date to YYYY-MM-DD in user's timezone
+  const formatDateKey = (date: Date): string => {
+    const dateInTimezone = getDateInTimezone(date, timezone);
+    return format(dateInTimezone, "yyyy-MM-dd");
+  };
+
+  // Fetch day note for a specific date
+  const fetchDayNote = async (date: Date) => {
+    try {
+      const dateKey = formatDateKey(date);
+      const response = await fetch(`/api/day-notes?date=${dateKey}`);
+      if (response.ok) {
+        const data = await response.json();
+        setDayNotes((prev) => {
+          const newMap = new Map(prev);
+          newMap.set(dateKey, data.note);
+          return newMap;
+        });
+        return data.note;
+      } else if (response.status === 404) {
+        // Note doesn't exist, remove from map
+        setDayNotes((prev) => {
+          const newMap = new Map(prev);
+          newMap.delete(dateKey);
+          return newMap;
+        });
+        return null;
+      }
+    } catch (error) {
+      console.error("Error fetching day note:", error);
+    }
+    return null;
+  };
+
+  // Create or update day note
+  const createOrUpdateDayNote = async (date: Date, content: string) => {
+    const dateKey = formatDateKey(date);
+    try {
+      // Try to get existing note first
+      const existingNote = dayNotes.get(dateKey);
+      
+      let response;
+      if (existingNote) {
+        // Update existing note
+        response = await fetch(`/api/day-notes?date=${dateKey}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ content }),
+        });
+      } else {
+        // Create new note
+        response = await fetch("/api/day-notes", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ note_date: dateKey, content }),
+        });
+      }
+
+      if (response.ok) {
+        const data = await response.json();
+        setDayNotes((prev) => {
+          const newMap = new Map(prev);
+          newMap.set(dateKey, data.note);
+          return newMap;
+        });
+      } else {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to save note");
+      }
+    } catch (error) {
+      console.error("Error saving day note:", error);
+      throw error;
+    }
+  };
+
+  // Delete day note
+  const deleteDayNote = async (date: Date) => {
+    const dateKey = formatDateKey(date);
+    try {
+      const response = await fetch(`/api/day-notes?date=${dateKey}`, {
+        method: "DELETE",
+      });
+
+      if (response.ok) {
+        setDayNotes((prev) => {
+          const newMap = new Map(prev);
+          newMap.delete(dateKey);
+          return newMap;
+        });
+      } else {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to delete note");
+      }
+    } catch (error) {
+      console.error("Error deleting day note:", error);
+      throw error;
+    }
+  };
+
+  // Handle note icon click
+  const handleNoteClick = (date: Date) => {
+    setNoteDialogDate(date);
+    setNoteDialogOpen(true);
+  };
+
+  // Fetch notes for visible dates when calendar view changes
+  useEffect(() => {
+    if (status !== "authenticated" || timezoneLoading) return;
+
+    const fetchVisibleNotes = async () => {
+      const datesToFetch: Date[] = [];
+      
+      if (viewMode === "day") {
+        datesToFetch.push(currentDate);
+      } else if (viewMode === "week") {
+        // Fetch notes for the week
+        const weekStart = new Date(currentDate);
+        weekStart.setDate(currentDate.getDate() - currentDate.getDay() + 1); // Monday
+        for (let i = 0; i < 7; i++) {
+          const date = new Date(weekStart);
+          date.setDate(weekStart.getDate() + i);
+          datesToFetch.push(date);
+        }
+      }
+
+      // Fetch notes for all dates
+      await Promise.all(datesToFetch.map((date) => fetchDayNote(date)));
+    };
+
+    fetchVisibleNotes();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [viewMode, currentDate, status, timezoneLoading, timezone]);
 
   const handleTaskClick = (taskId: string) => {
     const task = tasks.find((t) => t.id === taskId);
@@ -683,6 +821,23 @@ export default function CalendarPage() {
               Add Task
             </Button>
 
+            {/* Day Notes Section - Only show in day view when note exists - Always at top */}
+            {viewMode === "day" && (() => {
+              const dateKey = formatDateKey(currentDate);
+              const note = dayNotes.get(dateKey);
+              return note ? (
+                <DayNotesSection
+                  note={note}
+                  onUpdate={async (content) => {
+                    await createOrUpdateDayNote(currentDate, content);
+                  }}
+                  onDelete={async () => {
+                    await deleteDayNote(currentDate);
+                  }}
+                />
+              ) : null;
+            })()}
+
             {/* Task Groups */}
             <div className="border rounded-lg overflow-hidden">
               <div
@@ -796,6 +951,8 @@ export default function CalendarPage() {
               onDateChange={setCurrentDate}
               mobileViewToggleButtons={mobileViewToggleButtons}
               desktopViewToggleButtons={desktopViewToggleButtons}
+              dayNote={dayNotes.get(formatDateKey(currentDate)) || null}
+              onNoteClick={handleNoteClick}
             />
           )}
           {viewMode === "week" && (
@@ -813,6 +970,8 @@ export default function CalendarPage() {
               onSidebarToggle={() => setSidebarOpen(!sidebarOpen)}
               mobileViewToggleButtons={mobileViewToggleButtons}
               desktopViewToggleButtons={desktopViewToggleButtons}
+              dayNotes={dayNotes}
+              onNoteClick={handleNoteClick}
             />
           )}
           {viewMode === "month" && (
@@ -854,6 +1013,21 @@ export default function CalendarPage() {
           setSelectedTask(updatedTask);
         }}
       />
+
+      {/* Day Note Dialog */}
+      {noteDialogDate && (
+        <DayNoteDialog
+          open={noteDialogOpen}
+          onOpenChange={setNoteDialogOpen}
+          date={noteDialogDate}
+          note={dayNotes.get(formatDateKey(noteDialogDate)) || null}
+          onSave={async (date, content) => {
+            await createOrUpdateDayNote(date, content);
+            // Refresh the note to ensure sidebar updates
+            await fetchDayNote(date);
+          }}
+        />
+      )}
 
       {/* Create Task Dialog */}
       <Dialog open={showCreateForm} onOpenChange={setShowCreateForm}>

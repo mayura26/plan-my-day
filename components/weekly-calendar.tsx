@@ -1,7 +1,7 @@
 "use client";
 
-import { addDays, addWeeks, isSameDay, parseISO, startOfWeek, subWeeks } from "date-fns";
-import { ChevronLeft, ChevronRight, Menu } from "lucide-react";
+import { addDays, addWeeks, format, isSameDay, parseISO, startOfWeek, subWeeks } from "date-fns";
+import { ChevronLeft, ChevronRight, Menu, StickyNote } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { CalendarSlot } from "@/components/calendar-slot";
 import { ResizableTask } from "@/components/calendar-task";
@@ -11,7 +11,7 @@ import {
   getDateInTimezone,
   getHoursAndMinutesInTimezone,
 } from "@/lib/timezone-utils";
-import type { Task, TaskGroup } from "@/lib/types";
+import type { DayNote, Task, TaskGroup } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 interface WeeklyCalendarProps {
@@ -28,6 +28,8 @@ interface WeeklyCalendarProps {
   onSidebarToggle?: () => void;
   mobileViewToggleButtons?: React.ReactNode;
   desktopViewToggleButtons?: React.ReactNode;
+  dayNotes?: Map<string, DayNote>;
+  onNoteClick?: (date: Date) => void;
 }
 
 const HOURS = Array.from({ length: 24 }, (_, i) => i); // 0-23 hours
@@ -54,6 +56,8 @@ export function WeeklyCalendar({
   onSidebarToggle,
   mobileViewToggleButtons,
   desktopViewToggleButtons,
+  dayNotes = new Map(),
+  onNoteClick,
 }: WeeklyCalendarProps) {
   const [currentWeek, setCurrentWeek] = useState(new Date());
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -293,22 +297,43 @@ export function WeeklyCalendar({
               const dayDate = getDateInTimezone(day, timezone);
               const todayDate = getDateInTimezone(new Date(), timezone);
               const isToday = isSameDay(dayDate, todayDate);
+              const dateKey = format(dayDate, "yyyy-MM-dd");
+              const hasNote = dayNotes.has(dateKey);
               return (
                 <div
                   key={index}
-                  className={cn("p-2 text-center border-l", isToday && "bg-primary/10")}
+                  className={cn("p-2 text-center border-l relative", isToday && "bg-primary/10")}
                 >
+                  {onNoteClick && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className={cn(
+                        "absolute top-1 right-1 h-5 w-5 md:h-6 md:w-6 p-1",
+                        "bg-muted/50 hover:bg-muted",
+                        "border border-white/20 dark:border-gray-700/50"
+                      )}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onNoteClick(dayDate);
+                      }}
+                    >
+                      <StickyNote className="h-3 w-3 md:h-3.5 md:w-3.5" />
+                    </Button>
+                  )}
                   <div className={cn("text-xs md:text-sm font-medium", isToday && "text-primary")}>
                     {formatDateInTimezone(day, timezone, { weekday: "short" })}
                   </div>
-                  <div
-                    className={cn(
-                      "text-lg md:text-2xl font-bold mt-1",
-                      isToday &&
-                        "bg-primary text-primary-foreground rounded-full w-8 h-8 md:w-10 md:h-10 flex items-center justify-center mx-auto"
-                    )}
-                  >
-                    {formatDateInTimezone(day, timezone, { day: "numeric" })}
+                  <div className="flex items-center justify-center mt-1">
+                    <div
+                      className={cn(
+                        "text-lg md:text-2xl font-bold",
+                        isToday &&
+                          "bg-primary text-primary-foreground rounded-full w-8 h-8 md:w-10 md:h-10 flex items-center justify-center"
+                      )}
+                    >
+                      {formatDateInTimezone(day, timezone, { day: "numeric" })}
+                    </div>
                   </div>
                 </div>
               );

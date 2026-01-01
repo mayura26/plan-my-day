@@ -1,7 +1,7 @@
 "use client";
 
-import { addDays, isSameDay, parseISO, subDays } from "date-fns";
-import { ChevronLeft, ChevronRight, Menu } from "lucide-react";
+import { addDays, format, isSameDay, parseISO, subDays } from "date-fns";
+import { ChevronLeft, ChevronRight, Menu, StickyNote } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { CalendarSlot } from "@/components/calendar-slot";
 import { ResizableTask } from "@/components/calendar-task";
@@ -11,7 +11,8 @@ import {
   getDateInTimezone,
   getHoursAndMinutesInTimezone,
 } from "@/lib/timezone-utils";
-import type { Task, TaskGroup } from "@/lib/types";
+import { cn } from "@/lib/utils";
+import type { DayNote, Task, TaskGroup } from "@/lib/types";
 
 interface DayCalendarProps {
   tasks: Task[];
@@ -29,6 +30,8 @@ interface DayCalendarProps {
   onDateChange?: (date: Date) => void;
   mobileViewToggleButtons?: React.ReactNode;
   desktopViewToggleButtons?: React.ReactNode;
+  dayNote?: DayNote | null;
+  onNoteClick?: (date: Date) => void;
 }
 
 const HOURS = Array.from({ length: 24 }, (_, i) => i); // 0-23 hours
@@ -56,6 +59,8 @@ export function DayCalendar({
   onDateChange,
   mobileViewToggleButtons,
   desktopViewToggleButtons,
+  dayNote,
+  onNoteClick,
 }: DayCalendarProps) {
   const [currentDate, setCurrentDate] = useState(externalCurrentDate || new Date());
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -156,7 +161,8 @@ export function DayCalendar({
   return (
     <div className="flex flex-col h-full">
       {/* Calendar Header */}
-      <div className="flex items-center justify-between p-4 border-b">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between p-4 border-b gap-2 md:gap-0">
+        {/* First row on mobile: Date, Add button, and navigation arrows */}
         <div className="flex items-center gap-2 md:gap-4 flex-1 min-w-0">
           {/* Mobile sidebar toggle button */}
           {onSidebarToggle && (
@@ -169,18 +175,45 @@ export function DayCalendar({
               <Menu className="h-5 w-5" />
             </Button>
           )}
-          <h2 className="text-xl md:text-2xl font-bold truncate">
-            {formatDateInTimezone(currentDate, timezone, { weekday: "short" })}{" "}
-            {formatDateInTimezone(currentDate, timezone, { day: "numeric" })}{" "}
-            {/* Mobile: short month */}
-            <span className="md:hidden">
-              {formatDateInTimezone(currentDate, timezone, { month: "short" })}
-            </span>
-            {/* Desktop: long month */}
-            <span className="hidden md:inline">
-              {formatDateInTimezone(currentDate, timezone, { month: "long" })}
-            </span>
-          </h2>
+          <div className="flex items-center gap-2 flex-1 min-w-0">
+            <h2 className="text-xl md:text-2xl font-bold truncate">
+              {formatDateInTimezone(currentDate, timezone, { weekday: "short" })}{" "}
+              {formatDateInTimezone(currentDate, timezone, { day: "numeric" })}{" "}
+              {/* Mobile: short month */}
+              <span className="md:hidden">
+                {formatDateInTimezone(currentDate, timezone, { month: "short" })}
+              </span>
+              {/* Desktop: long month */}
+              <span className="hidden md:inline">
+                {formatDateInTimezone(currentDate, timezone, { month: "long" })}
+              </span>
+            </h2>
+            {onNoteClick && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="bg-muted/50 hover:bg-muted border border-white/20 dark:border-gray-700/50 flex-shrink-0"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onNoteClick(dayDate);
+                }}
+              >
+                <StickyNote className="h-4 w-4 mr-1.5" />
+                Add
+              </Button>
+            )}
+          </div>
+          <div className="flex items-center gap-2 flex-shrink-0 md:hidden">
+            <Button variant="ghost" size="icon" onClick={goToPreviousDay} className="h-10 w-10">
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <Button variant="ghost" size="icon" onClick={goToNextDay} className="h-10 w-10">
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+        {/* Second row on mobile: Today button and view toggles */}
+        <div className="flex items-center justify-end md:justify-end gap-2 md:flex-1 md:min-w-0">
           <Button
             variant="outline"
             size="sm"
@@ -191,7 +224,7 @@ export function DayCalendar({
           </Button>
           {/* View toggle buttons - mobile (abbreviated) */}
           {mobileViewToggleButtons && (
-            <div className="flex items-center gap-1 ml-auto sm:ml-2 flex-shrink-0 md:hidden">
+            <div className="flex items-center gap-1 flex-shrink-0 md:hidden">
               {mobileViewToggleButtons}
             </div>
           )}
@@ -202,7 +235,8 @@ export function DayCalendar({
             </div>
           )}
         </div>
-        <div className="flex items-center gap-2 flex-shrink-0">
+        {/* Desktop navigation arrows */}
+        <div className="hidden md:flex items-center gap-2 flex-shrink-0">
           <Button variant="ghost" size="icon" onClick={goToPreviousDay} className="h-10 w-10">
             <ChevronLeft className="h-4 w-4" />
           </Button>
@@ -214,7 +248,7 @@ export function DayCalendar({
 
       {/* Calendar Grid */}
       <div ref={calendarScrollRef} className="flex-1 overflow-auto">
-        <div className="relative min-w-[600px] md:min-w-0">
+        <div className="relative md:min-w-0">
           {/* Time column and day column */}
           <div className="grid grid-cols-[60px_1fr] md:grid-cols-[80px_1fr]">
             {/* Time labels */}

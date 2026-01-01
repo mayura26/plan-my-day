@@ -134,6 +134,15 @@ export interface GoogleCalendarToken {
   updated_at: string;
 }
 
+export interface DayNote {
+  id: string;
+  user_id: string;
+  note_date: string; // ISO date string (YYYY-MM-DD)
+  content: string;
+  created_at: string;
+  updated_at: string;
+}
+
 // API Request/Response types
 export interface CreateTaskRequest {
   title: string;
@@ -211,4 +220,14 @@ export interface TaskSearchParams {
   sort_order?: "asc" | "desc";
   limit?: number;
   offset?: number;
+}
+
+// Day notes API request/response types
+export interface CreateDayNoteRequest {
+  note_date: string; // YYYY-MM-DD
+  content: string;
+}
+
+export interface UpdateDayNoteRequest {
+  content: string;
 }

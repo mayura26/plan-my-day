@@ -221,6 +221,20 @@ async function initDatabase() {
       )
     `);
 
+    // Create day notes table
+    await turso.execute(`
+      CREATE TABLE IF NOT EXISTS day_notes (
+        id TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        note_date DATE NOT NULL,
+        content TEXT NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+        UNIQUE(user_id, note_date)
+      )
+    `);
+
     console.log("✅ Database initialized successfully!");
   } catch (error) {
     console.error("❌ Error initializing database:", error);
