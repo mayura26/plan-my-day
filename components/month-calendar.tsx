@@ -12,11 +12,10 @@ import {
   startOfWeek,
   subMonths,
 } from "date-fns";
-import { ChevronLeft, ChevronRight, Menu, Flag, Zap } from "lucide-react";
+import { ChevronLeft, ChevronRight, Menu, Zap } from "lucide-react";
 import { useEffect, useState } from "react";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { formatDateInTimezone, formatDateShort, formatTimeShort, getDateInTimezone } from "@/lib/timezone-utils";
+import { formatDateInTimezone, formatTimeShort, getDateInTimezone } from "@/lib/timezone-utils";
 import { getEnergyLevelColor, isTaskOverdue } from "@/lib/task-utils";
 import type { Task, TaskGroup } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -259,22 +258,18 @@ export function MonthCalendar({
                         <span className="truncate flex-1">{task.title}</span>
                         {/* Energy indicator at right */}
                         {task.energy_level_required && (
-                          <span className={cn("text-xs flex items-center gap-0.5 flex-shrink-0", getEnergyLevelColor(task.energy_level_required))}>
+                          <span 
+                            className={cn(
+                              "text-xs flex items-center gap-0.5 flex-shrink-0 px-1.5 py-0.5 rounded-full",
+                              getEnergyLevelColor(task.energy_level_required)
+                            )}
+                            style={{
+                              backgroundColor: "rgba(0, 0, 0, 0.3)",
+                            }}
+                          >
                             <Zap className="w-3 h-3" />
                             <span className="text-[10px]">{task.energy_level_required}</span>
                           </span>
-                        )}
-                        {/* Due date badge at bottom left */}
-                        {task.due_date && (
-                          <div className="absolute bottom-0 left-0 pointer-events-none">
-                            <Badge 
-                              variant="outline" 
-                              className="text-xs h-4 px-1 bg-red-100 text-red-700 dark:bg-red-900/50 dark:text-red-300 border-red-200 dark:border-red-800"
-                            >
-                              <Flag className="w-2 h-2" />
-                              <span className="text-[8px]">{formatDateShort(task.due_date, timezone)}</span>
-                            </Badge>
-                          </div>
                         )}
                       </div>
                     );

@@ -194,18 +194,24 @@ export function ResizableTask({
           </span>
         </div>
       )}
-      {/* Due date badge at bottom left */}
-      {task.due_date && (
-        <div className="absolute bottom-1 left-1 pointer-events-none">
-          <Badge 
-            variant="outline" 
-            className="text-xs h-5 px-1.5 bg-red-100 text-red-700 dark:bg-red-900/50 dark:text-red-300 border-red-200 dark:border-red-800"
+      {/* Due date badge at bottom left - only show on screens >= 1200px */}
+      {task.due_date && (() => {
+        const dateText = formatDateShort(task.due_date, timezone);
+        const truncatedDate = dateText.length > 10 ? dateText.substring(0, 10) + "..." : dateText;
+        return (
+          <div
+            className="hidden min-[1200px]:block absolute bottom-1 left-1 px-0.5 py-0 rounded text-[9px] font-medium text-white pointer-events-none"
+            style={{
+              backgroundColor: isOverdue
+                ? "rgba(239, 68, 68, 0.8)"
+                : "rgba(239, 68, 68, 0.6)",
+            }}
           >
-            <Flag className="w-3 h-3" />
-            <span className="text-[10px]">{formatDateShort(task.due_date, timezone)}</span>
-          </Badge>
-        </div>
-      )}
+            <Flag className="w-2 h-2 inline mr-0.5" />
+            {truncatedDate}
+          </div>
+        );
+      })()}
       <div className={cn(
         "text-xs font-medium text-white truncate pointer-events-none mt-1",
         (isCompleted || isPastEvent) && "line-through"
@@ -216,16 +222,20 @@ export function ResizableTask({
         <div className="text-xs text-white/90 mt-1 flex items-center gap-1">🔒 Locked</div>
       )}
       {/* Group badge in bottom right corner - hide for tasks < 45m to avoid blocking title, and hide on width < 1200px */}
-      {group && task.duration && task.duration >= 45 && (
-        <div
-          className="hidden min-[1200px]:block absolute bottom-1 right-1 px-0.5 py-0 rounded text-[9px] font-medium text-white pointer-events-none"
-          style={{
-            backgroundColor: groupColor ? hexToRgba(groupColor, 0.8) : "rgba(107, 114, 128, 0.8)",
-          }}
-        >
-          {group.name}
-        </div>
-      )}
+      {group && task.duration && task.duration >= 45 && (() => {
+        const groupName = group.name;
+        const truncatedName = groupName.length > 10 ? groupName.substring(0, 10) + "..." : groupName;
+        return (
+          <div
+            className="hidden min-[1200px]:block absolute bottom-1 right-1 px-0.5 py-0 rounded text-[9px] font-medium text-white pointer-events-none"
+            style={{
+              backgroundColor: groupColor ? hexToRgba(groupColor, 0.8) : "rgba(107, 114, 128, 0.8)",
+            }}
+          >
+            {truncatedName}
+          </div>
+        );
+      })()}
       {!task.locked && (
         <>
           {/* Top resize handle */}

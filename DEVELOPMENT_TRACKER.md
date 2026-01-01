@@ -7,8 +7,6 @@
 - [x] Carryover task links to original via continued_from_task_id
 
 ### ⏳ Pending
-- [ ] task card should have energy  badge and due date badge. bottom left
-
 - [ ] Click on grid, create task in spot. quick tasks
 
 - [ ] Allow hiding of groups bar on left in desktop view
