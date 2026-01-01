@@ -120,9 +120,8 @@ export async function GET(request: NextRequest) {
             ...task,
             subtasks: subtasksResult.rows.map(mapRowToTask),
             subtask_count: Number(subtaskCount),
-            completed_subtask_count: subtasksResult.rows.filter(
-              (r) => r.status === "completed"
-            ).length,
+            completed_subtask_count: subtasksResult.rows.filter((r) => r.status === "completed")
+              .length,
           };
         }
 
@@ -156,10 +155,10 @@ export async function POST(request: NextRequest) {
     // Validate parent task if creating a subtask
     let parentTaskData: any = null;
     if (body.parent_task_id) {
-      const parentResult = await db.execute(
-        `SELECT * FROM tasks WHERE id = ? AND user_id = ?`,
-        [body.parent_task_id, session.user.id]
-      );
+      const parentResult = await db.execute(`SELECT * FROM tasks WHERE id = ? AND user_id = ?`, [
+        body.parent_task_id,
+        session.user.id,
+      ]);
       if (parentResult.rows.length === 0) {
         return NextResponse.json({ error: "Parent task not found" }, { status: 404 });
       }
@@ -188,7 +187,8 @@ export async function POST(request: NextRequest) {
       body.energy_level_required ||
       (body.parent_task_id ? parentTaskData?.energy_level_required : 3) ||
       3;
-    const dueDate = body.due_date || (body.parent_task_id ? parentTaskData?.due_date : null) || null;
+    const dueDate =
+      body.due_date || (body.parent_task_id ? parentTaskData?.due_date : null) || null;
 
     // Default duration to 30 minutes for tasks, todos, and subtasks (not events)
     const defaultDuration = taskType === "event" ? null : 30;
@@ -259,10 +259,10 @@ export async function POST(request: NextRequest) {
     if (body.dependency_ids && body.dependency_ids.length > 0) {
       for (const depId of body.dependency_ids) {
         // Verify the dependency task exists
-        const depResult = await db.execute(
-          `SELECT id FROM tasks WHERE id = ? AND user_id = ?`,
-          [depId, session.user.id]
-        );
+        const depResult = await db.execute(`SELECT id FROM tasks WHERE id = ? AND user_id = ?`, [
+          depId,
+          session.user.id,
+        ]);
         if (depResult.rows.length > 0) {
           await db.execute(
             `INSERT INTO task_dependencies (id, task_id, depends_on_task_id) VALUES (?, ?, ?)`,

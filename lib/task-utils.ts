@@ -354,7 +354,11 @@ export function hasSubtasks(task: Task & { subtasks?: Task[] }): boolean {
 /**
  * Get subtask completion progress
  */
-export function getSubtaskProgress(subtasks: Task[]): { completed: number; total: number; percentage: number } {
+export function getSubtaskProgress(subtasks: Task[]): {
+  completed: number;
+  total: number;
+  percentage: number;
+} {
   const total = subtasks.length;
   const completed = subtasks.filter((st) => st.status === "completed").length;
   const percentage = total > 0 ? Math.round((completed / total) * 100) : 0;
@@ -431,7 +435,7 @@ export function isTaskBlocked(task: Task, allTasks: Task[]): boolean {
  */
 export function getBlockingTasks(task: Task, allTasks: Task[]): Task[] {
   const blocking: Task[] = [];
-  
+
   // Check legacy single dependency
   if (task.depends_on_task_id) {
     const dependency = allTasks.find((t) => t.id === task.depends_on_task_id);
@@ -439,7 +443,7 @@ export function getBlockingTasks(task: Task, allTasks: Task[]): Task[] {
       blocking.push(dependency);
     }
   }
-  
+
   return blocking;
 }
 

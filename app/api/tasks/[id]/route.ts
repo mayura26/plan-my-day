@@ -186,8 +186,8 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       if (subtaskCount > 0) {
         // Parent tasks with subtasks cannot be scheduled - only subtasks should be scheduled
         // Automatically unschedule the parent task
-        body.scheduled_start = null;
-        body.scheduled_end = null;
+        body.scheduled_start = undefined;
+        body.scheduled_end = undefined;
       }
     }
 

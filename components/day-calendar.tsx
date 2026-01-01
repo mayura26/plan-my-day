@@ -1,6 +1,6 @@
 "use client";
 
-import { addDays, format, isSameDay, parseISO, subDays } from "date-fns";
+import { addDays, isSameDay, parseISO, subDays } from "date-fns";
 import { ChevronLeft, ChevronRight, Menu, StickyNote } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { CalendarSlot } from "@/components/calendar-slot";
@@ -11,7 +11,6 @@ import {
   getDateInTimezone,
   getHoursAndMinutesInTimezone,
 } from "@/lib/timezone-utils";
-import { cn } from "@/lib/utils";
 import type { DayNote, Task, TaskGroup } from "@/lib/types";
 
 interface DayCalendarProps {

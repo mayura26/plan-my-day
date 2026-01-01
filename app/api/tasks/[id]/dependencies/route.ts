@@ -94,10 +94,7 @@ async function wouldCreateCircularDependency(
 }
 
 // GET /api/tasks/[id]/dependencies - Get all dependencies for a task
-export async function GET(
-  _request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function GET(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const session = await auth();
     if (!session?.user?.id) {
@@ -107,10 +104,10 @@ export async function GET(
     const { id } = await params;
 
     // Verify task exists and belongs to user
-    const taskResult = await db.execute(
-      "SELECT * FROM tasks WHERE id = ? AND user_id = ?",
-      [id, session.user.id]
-    );
+    const taskResult = await db.execute("SELECT * FROM tasks WHERE id = ? AND user_id = ?", [
+      id,
+      session.user.id,
+    ]);
 
     if (taskResult.rows.length === 0) {
       return NextResponse.json({ error: "Task not found" }, { status: 404 });
@@ -167,10 +164,7 @@ export async function GET(
 }
 
 // PUT /api/tasks/[id]/dependencies - Set dependencies for a task (replaces existing)
-export async function PUT(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const session = await auth();
     if (!session?.user?.id) {
@@ -181,17 +175,14 @@ export async function PUT(
     const body: { dependency_ids: string[] } = await request.json();
 
     if (!Array.isArray(body.dependency_ids)) {
-      return NextResponse.json(
-        { error: "dependency_ids must be an array" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "dependency_ids must be an array" }, { status: 400 });
     }
 
     // Verify task exists and belongs to user
-    const taskResult = await db.execute(
-      "SELECT * FROM tasks WHERE id = ? AND user_id = ?",
-      [id, session.user.id]
-    );
+    const taskResult = await db.execute("SELECT * FROM tasks WHERE id = ? AND user_id = ?", [
+      id,
+      session.user.id,
+    ]);
 
     if (taskResult.rows.length === 0) {
       return NextResponse.json({ error: "Task not found" }, { status: 404 });
@@ -201,23 +192,17 @@ export async function PUT(
     for (const depId of body.dependency_ids) {
       // Can't depend on itself
       if (depId === id) {
-        return NextResponse.json(
-          { error: "Task cannot depend on itself" },
-          { status: 400 }
-        );
+        return NextResponse.json({ error: "Task cannot depend on itself" }, { status: 400 });
       }
 
       // Verify dependency task exists and belongs to user
-      const depResult = await db.execute(
-        "SELECT id FROM tasks WHERE id = ? AND user_id = ?",
-        [depId, session.user.id]
-      );
+      const depResult = await db.execute("SELECT id FROM tasks WHERE id = ? AND user_id = ?", [
+        depId,
+        session.user.id,
+      ]);
 
       if (depResult.rows.length === 0) {
-        return NextResponse.json(
-          { error: `Dependency task not found: ${depId}` },
-          { status: 404 }
-        );
+        return NextResponse.json({ error: `Dependency task not found: ${depId}` }, { status: 404 });
       }
 
       // Check for circular dependency
@@ -264,10 +249,7 @@ export async function PUT(
 }
 
 // POST /api/tasks/[id]/dependencies - Add a single dependency
-export async function POST(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const session = await auth();
     if (!session?.user?.id) {
@@ -278,35 +260,29 @@ export async function POST(
     const body: { depends_on_task_id: string } = await request.json();
 
     if (!body.depends_on_task_id) {
-      return NextResponse.json(
-        { error: "depends_on_task_id is required" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "depends_on_task_id is required" }, { status: 400 });
     }
 
     // Can't depend on itself
     if (body.depends_on_task_id === id) {
-      return NextResponse.json(
-        { error: "Task cannot depend on itself" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "Task cannot depend on itself" }, { status: 400 });
     }
 
     // Verify task exists and belongs to user
-    const taskResult = await db.execute(
-      "SELECT * FROM tasks WHERE id = ? AND user_id = ?",
-      [id, session.user.id]
-    );
+    const taskResult = await db.execute("SELECT * FROM tasks WHERE id = ? AND user_id = ?", [
+      id,
+      session.user.id,
+    ]);
 
     if (taskResult.rows.length === 0) {
       return NextResponse.json({ error: "Task not found" }, { status: 404 });
     }
 
     // Verify dependency task exists and belongs to user
-    const depResult = await db.execute(
-      "SELECT * FROM tasks WHERE id = ? AND user_id = ?",
-      [body.depends_on_task_id, session.user.id]
-    );
+    const depResult = await db.execute("SELECT * FROM tasks WHERE id = ? AND user_id = ?", [
+      body.depends_on_task_id,
+      session.user.id,
+    ]);
 
     if (depResult.rows.length === 0) {
       return NextResponse.json({ error: "Dependency task not found" }, { status: 404 });
@@ -319,10 +295,7 @@ export async function POST(
     );
 
     if (existingDep.rows.length > 0) {
-      return NextResponse.json(
-        { error: "Dependency already exists" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "Dependency already exists" }, { status: 400 });
     }
 
     // Check for circular dependency
@@ -384,10 +357,10 @@ export async function DELETE(
     }
 
     // Verify task exists and belongs to user
-    const taskResult = await db.execute(
-      "SELECT * FROM tasks WHERE id = ? AND user_id = ?",
-      [id, session.user.id]
-    );
+    const taskResult = await db.execute("SELECT * FROM tasks WHERE id = ? AND user_id = ?", [
+      id,
+      session.user.id,
+    ]);
 
     if (taskResult.rows.length === 0) {
       return NextResponse.json({ error: "Task not found" }, { status: 404 });
@@ -395,10 +368,10 @@ export async function DELETE(
 
     if (dependencyId) {
       // Delete by dependency ID
-      await db.execute(
-        `DELETE FROM task_dependencies WHERE id = ? AND task_id = ?`,
-        [dependencyId, id]
-      );
+      await db.execute(`DELETE FROM task_dependencies WHERE id = ? AND task_id = ?`, [
+        dependencyId,
+        id,
+      ]);
     } else if (dependsOnTaskId) {
       // Delete by depends_on_task_id
       await db.execute(
@@ -413,6 +386,3 @@ export async function DELETE(
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
-
-
-

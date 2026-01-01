@@ -43,4 +43,3 @@ async function migrateDayNotes() {
 }
 
 migrateDayNotes();
-

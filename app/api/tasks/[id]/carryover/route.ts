@@ -33,10 +33,7 @@ function mapRowToTask(row: any): Task {
 }
 
 // POST /api/tasks/[id]/carryover - Create a carryover task from an incomplete task
-export async function POST(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const session = await auth();
     if (!session?.user?.id) {
@@ -55,10 +52,10 @@ export async function POST(
     }
 
     // Verify original task exists and belongs to user
-    const originalResult = await db.execute(
-      "SELECT * FROM tasks WHERE id = ? AND user_id = ?",
-      [originalTaskId, session.user.id]
-    );
+    const originalResult = await db.execute("SELECT * FROM tasks WHERE id = ? AND user_id = ?", [
+      originalTaskId,
+      session.user.id,
+    ]);
 
     if (originalResult.rows.length === 0) {
       return NextResponse.json({ error: "Original task not found" }, { status: 404 });
@@ -88,7 +85,9 @@ export async function POST(
     // Build description for carryover task
     let carryoverDescription = originalTask.description || "";
     if (body.notes) {
-      carryoverDescription = body.notes + (carryoverDescription ? "\n\n---\nOriginal description:\n" + carryoverDescription : "");
+      carryoverDescription =
+        body.notes +
+        (carryoverDescription ? "\n\n---\nOriginal description:\n" + carryoverDescription : "");
     }
 
     // Create the carryover task with the same properties but new duration
@@ -162,15 +161,19 @@ export async function POST(
     for (const row of depsResult.rows) {
       await db.execute(
         `INSERT INTO task_dependencies (id, task_id, depends_on_task_id) VALUES (?, ?, ?)`,
-        [`dep_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`, taskId, row.depends_on_task_id]
+        [
+          `dep_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          taskId,
+          row.depends_on_task_id,
+        ]
       );
     }
 
     // Mark the original task as cancelled (overrun)
-    await db.execute(
-      `UPDATE tasks SET status = 'cancelled', updated_at = ? WHERE id = ?`,
-      [now, originalTaskId]
-    );
+    await db.execute(`UPDATE tasks SET status = 'cancelled', updated_at = ? WHERE id = ?`, [
+      now,
+      originalTaskId,
+    ]);
 
     // Return both tasks
     return NextResponse.json(
@@ -188,10 +191,7 @@ export async function POST(
 }
 
 // GET /api/tasks/[id]/carryover - Get carryover history for a task
-export async function GET(
-  _request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function GET(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const session = await auth();
     if (!session?.user?.id) {
@@ -201,10 +201,10 @@ export async function GET(
     const { id } = await params;
 
     // Verify task exists and belongs to user
-    const taskResult = await db.execute(
-      "SELECT * FROM tasks WHERE id = ? AND user_id = ?",
-      [id, session.user.id]
-    );
+    const taskResult = await db.execute("SELECT * FROM tasks WHERE id = ? AND user_id = ?", [
+      id,
+      session.user.id,
+    ]);
 
     if (taskResult.rows.length === 0) {
       return NextResponse.json({ error: "Task not found" }, { status: 404 });
@@ -218,10 +218,10 @@ export async function GET(
     // Find ancestors (tasks this was continued from)
     let currentId: string | null = task.continued_from_task_id ?? null;
     while (currentId) {
-      const ancestorResult = await db.execute(
-        "SELECT * FROM tasks WHERE id = ? AND user_id = ?",
-        [currentId, session.user.id]
-      );
+      const ancestorResult = await db.execute("SELECT * FROM tasks WHERE id = ? AND user_id = ?", [
+        currentId,
+        session.user.id,
+      ]);
       if (ancestorResult.rows.length === 0) break;
       const ancestor = mapRowToTask(ancestorResult.rows[0]);
       chain.unshift(ancestor); // Add to beginning
@@ -258,4 +258,3 @@ export async function GET(
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
-

@@ -429,12 +429,12 @@ export function TaskGroupManager({
     return tasks.filter((task) => {
       const isUnscheduled = !task.scheduled_start || !task.scheduled_end;
       if (!isUnscheduled) return false;
-      
+
       // Exclude parent tasks that have subtasks (only show subtasks in unscheduled view)
       if (!task.parent_task_id && (task.subtask_count || 0) > 0) {
         return false;
       }
-      
+
       if (groupId === null) {
         return !task.group_id;
       }

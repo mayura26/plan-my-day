@@ -30,9 +30,7 @@ export function CarryoverTaskDialog({
   onOpenChange,
   onCarryoverCreated,
 }: CarryoverTaskDialogProps) {
-  const [additionalDuration, setAdditionalDuration] = useState<number>(
-    task?.duration || 30
-  );
+  const [additionalDuration, setAdditionalDuration] = useState<number>(task?.duration || 30);
   const [notes, setNotes] = useState("");
   const [isCreating, setIsCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -146,9 +144,7 @@ export function CarryoverTaskDialog({
           </div>
 
           {error && (
-            <div className="text-sm text-destructive bg-destructive/10 rounded-md p-3">
-              {error}
-            </div>
+            <div className="text-sm text-destructive bg-destructive/10 rounded-md p-3">{error}</div>
           )}
 
           {/* What will happen */}
@@ -191,6 +187,3 @@ export function CarryoverTaskDialog({
     </Dialog>
   );
 }
-
-
-

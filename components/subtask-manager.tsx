@@ -13,7 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ENERGY_LABELS, PRIORITY_LABELS, formatDuration } from "@/lib/task-utils";
+import { ENERGY_LABELS, formatDuration, PRIORITY_LABELS } from "@/lib/task-utils";
 import type { Task } from "@/lib/types";
 
 interface SubtaskManagerProps {
@@ -299,7 +299,12 @@ export function SubtaskManager({
                   >
                     Cancel
                   </Button>
-                  <Button type="submit" size="sm" disabled={isAdding || !formData.title.trim()} className="flex-1">
+                  <Button
+                    type="submit"
+                    size="sm"
+                    disabled={isAdding || !formData.title.trim()}
+                    className="flex-1"
+                  >
                     {isAdding ? "Adding..." : "Add"}
                   </Button>
                 </div>
@@ -326,6 +331,3 @@ export function SubtaskManager({
     </Card>
   );
 }
-
-
-

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -21,13 +21,7 @@ interface DayNoteDialogProps {
   onSave: (date: Date, content: string) => Promise<void>;
 }
 
-export function DayNoteDialog({
-  open,
-  onOpenChange,
-  date,
-  note,
-  onSave,
-}: DayNoteDialogProps) {
+export function DayNoteDialog({ open, onOpenChange, date, note, onSave }: DayNoteDialogProps) {
   const [content, setContent] = useState("");
   const [isSaving, setIsSaving] = useState(false);
 
@@ -96,11 +90,7 @@ export function DayNoteDialog({
         </div>
 
         <DialogFooter>
-          <Button
-            variant="outline"
-            onClick={() => handleOpenChange(false)}
-            disabled={isSaving}
-          >
+          <Button variant="outline" onClick={() => handleOpenChange(false)} disabled={isSaving}>
             Cancel
           </Button>
           <Button onClick={handleSave} disabled={isSaving || !content.trim()}>
@@ -111,4 +101,3 @@ export function DayNoteDialog({
     </Dialog>
   );
 }
-

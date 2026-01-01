@@ -42,10 +42,7 @@ export function DependencySelector({
         const data = await response.json();
         // Filter out the current task and subtasks
         const availableTasks = (data.tasks || []).filter(
-          (t: Task) =>
-            t.id !== taskId &&
-            t.task_type !== "subtask" &&
-            !t.parent_task_id
+          (t: Task) => t.id !== taskId && t.task_type !== "subtask" && !t.parent_task_id
         );
         setTasks(availableTasks);
       }
@@ -128,9 +125,7 @@ export function DependencySelector({
             <Command>
               <CommandInput placeholder="Search tasks..." />
               <CommandList>
-                <CommandEmpty>
-                  {isLoading ? "Loading tasks..." : "No tasks found."}
-                </CommandEmpty>
+                <CommandEmpty>{isLoading ? "Loading tasks..." : "No tasks found."}</CommandEmpty>
                 <CommandGroup>
                   {tasks.map((task) => {
                     const isSelected = selectedIds.includes(task.id);
@@ -180,6 +175,3 @@ export function DependencySelector({
     </div>
   );
 }
-
-
-

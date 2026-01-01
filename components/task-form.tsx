@@ -2,6 +2,7 @@
 
 import { Calendar, Clock, Zap } from "lucide-react";
 import { useEffect, useState } from "react";
+import { DependencySelector } from "@/components/dependency-selector";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,7 +14,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { DependencySelector } from "@/components/dependency-selector";
 import { useUserTimezone } from "@/hooks/use-user-timezone";
 import { ENERGY_LABELS, PRIORITY_LABELS, TASK_TYPE_LABELS } from "@/lib/task-utils";
 import { formatDateTimeLocalForTimezone, parseDateTimeLocalToUTC } from "@/lib/timezone-utils";

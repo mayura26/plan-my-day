@@ -7,10 +7,6 @@
 - [x] Carryover task links to original via continued_from_task_id
 
 ### ⏳ Pending
-- [ ] Add notes for the day where user can put prioritys. and when in day view show this
-
-- [ ] Mobile day view should just fit screen
-
 - [ ] Group badge on both views
 
 - [ ] when task is completed on calender we need to show grey-d or corssed out. and then for overdue task which is not rescheduled we show with border to get attenito. events we also cross out after the time

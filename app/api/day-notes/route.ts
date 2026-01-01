@@ -16,15 +16,6 @@ function mapRowToDayNote(row: any): DayNote {
   };
 }
 
-// Helper function to normalize date to YYYY-MM-DD format
-function normalizeDate(date: Date | string): string {
-  const dateObj = typeof date === "string" ? new Date(date) : date;
-  const year = dateObj.getFullYear();
-  const month = String(dateObj.getMonth() + 1).padStart(2, "0");
-  const day = String(dateObj.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
-
 // GET /api/day-notes?date=YYYY-MM-DD - Get note for a specific date
 export async function GET(request: NextRequest) {
   try {
@@ -46,10 +37,10 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Invalid date format. Use YYYY-MM-DD" }, { status: 400 });
     }
 
-    const result = await db.execute(
-      "SELECT * FROM day_notes WHERE user_id = ? AND note_date = ?",
-      [session.user.id, dateParam]
-    );
+    const result = await db.execute("SELECT * FROM day_notes WHERE user_id = ? AND note_date = ?", [
+      session.user.id,
+      dateParam,
+    ]);
 
     if (result.rows.length === 0) {
       return NextResponse.json({ error: "Note not found" }, { status: 404 });
@@ -75,10 +66,7 @@ export async function POST(request: NextRequest) {
 
     // Validate request body
     if (!body.note_date || !body.content) {
-      return NextResponse.json(
-        { error: "note_date and content are required" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "note_date and content are required" }, { status: 400 });
     }
 
     // Validate date format
@@ -167,10 +155,10 @@ export async function PUT(request: NextRequest) {
     );
 
     // Fetch the updated note
-    const result = await db.execute(
-      "SELECT * FROM day_notes WHERE user_id = ? AND note_date = ?",
-      [session.user.id, dateParam]
-    );
+    const result = await db.execute("SELECT * FROM day_notes WHERE user_id = ? AND note_date = ?", [
+      session.user.id,
+      dateParam,
+    ]);
     const note = mapRowToDayNote(result.rows[0]);
 
     return NextResponse.json({ note });
@@ -222,4 +210,3 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
-

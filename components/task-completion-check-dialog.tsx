@@ -117,6 +117,3 @@ export function TaskCompletionCheckDialog({
     </Dialog>
   );
 }
-
-
-

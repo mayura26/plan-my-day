@@ -1,10 +1,10 @@
 "use client";
 
+import { Edit2, Save, Trash2, X } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
-import { Edit2, Trash2, Save, X } from "lucide-react";
 import type { DayNote } from "@/lib/types";
 
 interface DayNotesSectionProps {
@@ -118,12 +118,9 @@ export function DayNotesSection({ note, onUpdate, onDelete }: DayNotesSectionPro
             autoFocus
           />
         ) : (
-          <div className="text-sm text-muted-foreground whitespace-pre-wrap">
-            {note.content}
-          </div>
+          <div className="text-sm text-muted-foreground whitespace-pre-wrap">{note.content}</div>
         )}
       </CardContent>
     </Card>
   );
 }
-

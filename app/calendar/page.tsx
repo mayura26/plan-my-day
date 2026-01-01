@@ -167,7 +167,7 @@ export default function CalendarPage() {
     try {
       // Try to get existing note first
       const existingNote = dayNotes.get(dateKey);
-      
+
       let response;
       if (existingNote) {
         // Update existing note
@@ -238,7 +238,7 @@ export default function CalendarPage() {
 
     const fetchVisibleNotes = async () => {
       const datesToFetch: Date[] = [];
-      
+
       if (viewMode === "day") {
         datesToFetch.push(currentDate);
       } else if (viewMode === "week") {
@@ -439,12 +439,12 @@ export default function CalendarPage() {
   const unscheduledTasks = filteredTasks.filter((task) => {
     const isUnscheduled = !task.scheduled_start || !task.scheduled_end;
     if (!isUnscheduled) return false;
-    
+
     // Exclude parent tasks that have subtasks (only show subtasks in unscheduled view)
     if (!task.parent_task_id && (task.subtask_count || 0) > 0) {
       return false;
     }
-    
+
     return true;
   });
 
@@ -822,21 +822,22 @@ export default function CalendarPage() {
             </Button>
 
             {/* Day Notes Section - Only show in day view when note exists - Always at top */}
-            {viewMode === "day" && (() => {
-              const dateKey = formatDateKey(currentDate);
-              const note = dayNotes.get(dateKey);
-              return note ? (
-                <DayNotesSection
-                  note={note}
-                  onUpdate={async (content) => {
-                    await createOrUpdateDayNote(currentDate, content);
-                  }}
-                  onDelete={async () => {
-                    await deleteDayNote(currentDate);
-                  }}
-                />
-              ) : null;
-            })()}
+            {viewMode === "day" &&
+              (() => {
+                const dateKey = formatDateKey(currentDate);
+                const note = dayNotes.get(dateKey);
+                return note ? (
+                  <DayNotesSection
+                    note={note}
+                    onUpdate={async (content) => {
+                      await createOrUpdateDayNote(currentDate, content);
+                    }}
+                    onDelete={async () => {
+                      await deleteDayNote(currentDate);
+                    }}
+                  />
+                ) : null;
+              })()}
 
             {/* Task Groups */}
             <div className="border rounded-lg overflow-hidden">

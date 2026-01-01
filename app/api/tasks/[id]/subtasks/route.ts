@@ -33,10 +33,7 @@ function mapRowToTask(row: any): Task {
 }
 
 // GET /api/tasks/[id]/subtasks - Get all subtasks for a task
-export async function GET(
-  _request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function GET(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const session = await auth();
     if (!session?.user?.id) {
@@ -46,10 +43,10 @@ export async function GET(
     const { id } = await params;
 
     // Verify parent task exists and belongs to user
-    const parentResult = await db.execute(
-      "SELECT * FROM tasks WHERE id = ? AND user_id = ?",
-      [id, session.user.id]
-    );
+    const parentResult = await db.execute("SELECT * FROM tasks WHERE id = ? AND user_id = ?", [
+      id,
+      session.user.id,
+    ]);
 
     if (parentResult.rows.length === 0) {
       return NextResponse.json({ error: "Parent task not found" }, { status: 404 });
@@ -77,10 +74,7 @@ export async function GET(
 }
 
 // POST /api/tasks/[id]/subtasks - Create a new subtask
-export async function POST(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const session = await auth();
     if (!session?.user?.id) {
@@ -91,10 +85,10 @@ export async function POST(
     const body: Partial<CreateTaskRequest> = await request.json();
 
     // Verify parent task exists and belongs to user
-    const parentResult = await db.execute(
-      "SELECT * FROM tasks WHERE id = ? AND user_id = ?",
-      [parentId, session.user.id]
-    );
+    const parentResult = await db.execute("SELECT * FROM tasks WHERE id = ? AND user_id = ?", [
+      parentId,
+      session.user.id,
+    ]);
 
     if (parentResult.rows.length === 0) {
       return NextResponse.json({ error: "Parent task not found" }, { status: 404 });
@@ -212,4 +206,3 @@ export async function POST(
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
-
