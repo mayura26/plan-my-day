@@ -262,10 +262,10 @@ export function TaskCard({
 
               {/* Due date */}
               {task.due_date && (
-                <span className="text-xs text-muted-foreground flex items-center gap-1">
+                <Badge variant="outline" className="text-xs h-5 px-1.5 bg-red-100 text-red-700 dark:bg-red-900/50 dark:text-red-300 border-red-200 dark:border-red-800">
                   <Flag className="w-3 h-3" />
                   {formatDateShort(task.due_date, timezone)}
-                </span>
+                </Badge>
               )}
 
               {/* Energy level */}

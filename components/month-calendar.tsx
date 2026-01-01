@@ -12,10 +12,12 @@ import {
   startOfWeek,
   subMonths,
 } from "date-fns";
-import { ChevronLeft, ChevronRight, Menu } from "lucide-react";
+import { ChevronLeft, ChevronRight, Menu, Flag, Zap } from "lucide-react";
 import { useEffect, useState } from "react";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { formatDateInTimezone, formatTimeShort, getDateInTimezone } from "@/lib/timezone-utils";
+import { formatDateInTimezone, formatDateShort, formatTimeShort, getDateInTimezone } from "@/lib/timezone-utils";
+import { getEnergyLevelColor, isTaskOverdue } from "@/lib/task-utils";
 import type { Task, TaskGroup } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -222,13 +224,15 @@ export function MonthCalendar({
                     const group = task.group_id ? groups.find((g) => g.id === task.group_id) : null;
                     const groupColor = group?.color || null;
                     const isEvent = task.task_type === "event";
+                    const isCompleted = task.status === "completed";
+                    const isOverdue = !isCompleted && isTaskOverdue(task);
 
                     return (
                       <div
                         key={task.id}
                         className={cn(
                           "text-xs p-1 rounded truncate cursor-pointer hover:opacity-80 transition-opacity",
-                          "flex items-center gap-1",
+                          "flex items-center gap-1 relative",
                           groupColor && "text-white"
                         )}
                         style={
@@ -252,7 +256,26 @@ export function MonthCalendar({
                         <span className="font-medium">
                           {formatTimeShort(task.scheduled_start!, timezone)}
                         </span>
-                        <span className="truncate">{task.title}</span>
+                        <span className="truncate flex-1">{task.title}</span>
+                        {/* Energy indicator at right */}
+                        {task.energy_level_required && (
+                          <span className={cn("text-xs flex items-center gap-0.5 flex-shrink-0", getEnergyLevelColor(task.energy_level_required))}>
+                            <Zap className="w-3 h-3" />
+                            <span className="text-[10px]">{task.energy_level_required}</span>
+                          </span>
+                        )}
+                        {/* Due date badge at bottom left */}
+                        {task.due_date && (
+                          <div className="absolute bottom-0 left-0 pointer-events-none">
+                            <Badge 
+                              variant="outline" 
+                              className="text-xs h-4 px-1 bg-red-100 text-red-700 dark:bg-red-900/50 dark:text-red-300 border-red-200 dark:border-red-800"
+                            >
+                              <Flag className="w-2 h-2" />
+                              <span className="text-[8px]">{formatDateShort(task.due_date, timezone)}</span>
+                            </Badge>
+                          </div>
+                        )}
                       </div>
                     );
                   })}

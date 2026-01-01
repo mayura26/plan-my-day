@@ -161,11 +161,11 @@ export function getTaskStatusColor(status: TaskStatus): string {
 
 export function getEnergyLevelColor(energyLevel: number): string {
   const colors = {
-    1: "text-red-500",
-    2: "text-orange-500",
+    1: "text-green-500", // Low energy = green
+    2: "text-blue-500",
     3: "text-yellow-500",
-    4: "text-blue-500",
-    5: "text-green-500",
+    4: "text-orange-500",
+    5: "text-red-500", // High energy = red
   };
   return colors[energyLevel as keyof typeof colors] || colors[3];
 }

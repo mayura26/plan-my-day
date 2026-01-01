@@ -479,6 +479,7 @@ export function WeeklyCalendar({
                             resizingTaskId={resizingTaskId}
                             selectedGroupId={selectedGroupId}
                             groups={groups}
+                            timezone={timezone}
                           />
                         );
                       })}

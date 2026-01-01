@@ -2,8 +2,10 @@
 
 import { useDraggable } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
-import { GripVertical } from "lucide-react";
-import { isTaskOverdue, isTaskTimeExpired } from "@/lib/task-utils";
+import { Flag, GripVertical, Zap } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { getEnergyLevelColor, isTaskOverdue, isTaskTimeExpired } from "@/lib/task-utils";
+import { formatDateShort } from "@/lib/timezone-utils";
 import type { Task, TaskGroup } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -25,6 +27,7 @@ export const getPriorityBarColor = (priority: number) => {
   }
 };
 
+
 interface ResizableTaskProps {
   task: Task;
   position: { top: string; height: string };
@@ -34,6 +37,7 @@ interface ResizableTaskProps {
   resizingTaskId?: string | null;
   selectedGroupId?: string | null;
   groups?: TaskGroup[];
+  timezone?: string;
 }
 
 export function ResizableTask({
@@ -45,6 +49,7 @@ export function ResizableTask({
   resizingTaskId,
   selectedGroupId,
   groups = [],
+  timezone = "UTC",
 }: ResizableTaskProps) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: task.id,
@@ -180,6 +185,27 @@ export function ResizableTask({
           getPriorityBarColor(task.priority)
         )}
       />
+      {/* Energy badge at top right */}
+      {task.energy_level_required && (
+        <div className="absolute top-2 right-1 pointer-events-none">
+          <span className={cn("text-xs flex items-center gap-0.5", getEnergyLevelColor(task.energy_level_required))}>
+            <Zap className="w-3 h-3" />
+            <span className="text-[10px]">{task.energy_level_required}</span>
+          </span>
+        </div>
+      )}
+      {/* Due date badge at bottom left */}
+      {task.due_date && (
+        <div className="absolute bottom-1 left-1 pointer-events-none">
+          <Badge 
+            variant="outline" 
+            className="text-xs h-5 px-1.5 bg-red-100 text-red-700 dark:bg-red-900/50 dark:text-red-300 border-red-200 dark:border-red-800"
+          >
+            <Flag className="w-3 h-3" />
+            <span className="text-[10px]">{formatDateShort(task.due_date, timezone)}</span>
+          </Badge>
+        </div>
+      )}
       <div className={cn(
         "text-xs font-medium text-white truncate pointer-events-none mt-1",
         (isCompleted || isPastEvent) && "line-through"
@@ -189,10 +215,10 @@ export function ResizableTask({
       {task.locked && (
         <div className="text-xs text-white/90 mt-1 flex items-center gap-1">🔒 Locked</div>
       )}
-      {/* Group badge in bottom right corner - hide for tasks < 45m to avoid blocking title, and hide on mobile/width < 1000px */}
+      {/* Group badge in bottom right corner - hide for tasks < 45m to avoid blocking title, and hide on width < 1200px */}
       {group && task.duration && task.duration >= 45 && (
         <div
-          className="hidden lg:block absolute bottom-1 right-1 px-1 py-0.5 rounded text-[10px] font-medium text-white pointer-events-none"
+          className="hidden min-[1200px]:block absolute bottom-1 right-1 px-0.5 py-0 rounded text-[9px] font-medium text-white pointer-events-none"
           style={{
             backgroundColor: groupColor ? hexToRgba(groupColor, 0.8) : "rgba(107, 114, 128, 0.8)",
           }}

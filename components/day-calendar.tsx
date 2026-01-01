@@ -329,6 +329,7 @@ export function DayCalendar({
                         resizingTaskId={resizingTaskId}
                         selectedGroupId={selectedGroupId}
                         groups={groups}
+                        timezone={timezone}
                       />
                     );
                   });
