@@ -140,20 +140,21 @@ export default function CalendarPage() {
       const response = await fetch(`/api/day-notes?date=${dateKey}`);
       if (response.ok) {
         const data = await response.json();
+        if (data.note === null) {
+          // Note doesn't exist, remove from map
+          setDayNotes((prev) => {
+            const newMap = new Map(prev);
+            newMap.delete(dateKey);
+            return newMap;
+          });
+          return null;
+        }
         setDayNotes((prev) => {
           const newMap = new Map(prev);
           newMap.set(dateKey, data.note);
           return newMap;
         });
         return data.note;
-      } else if (response.status === 404) {
-        // Note doesn't exist, remove from map
-        setDayNotes((prev) => {
-          const newMap = new Map(prev);
-          newMap.delete(dateKey);
-          return newMap;
-        });
-        return null;
       }
     } catch (error) {
       console.error("Error fetching day note:", error);
@@ -496,25 +497,24 @@ export default function CalendarPage() {
       ) {
         // Calculate new time based on drop position
         const { day, time } = dropData;
-        // Snap to 15-minute intervals
-        let totalMinutes = time * 60;
-        let snappedMinutes = Math.round(totalMinutes / 15) * 15;
+        // The time from the slot is already in decimal hours
+        // Convert to hours and minutes, rounding to nearest 15-minute interval
+        let totalMinutes = Math.round(time * 60);
         
-        // When resizing from the top, the drop target is often the slot below the handle
-        // So we need to subtract 15 minutes to get the correct time
+        // Apply -15 minute offset for top resize (same as scheduling/rescheduling)
+        // Bottom resize doesn't need the offset
         if (resizeDirection === "top") {
-          snappedMinutes = Math.max(0, snappedMinutes - 15);
+          totalMinutes = Math.max(0, totalMinutes - 15);
         }
         
+        const snappedMinutes = Math.round(totalMinutes / 15) * 15;
         const hours = Math.floor(snappedMinutes / 60);
         const minutes = snappedMinutes % 60;
 
-        // Normalize the day to represent the correct date in the user's timezone
-        const normalizedDay = getDateInTimezone(day, timezone);
-
         if (resizeDirection === "bottom") {
           // Resize from bottom - change end time
-          const newEndDate = createDateInTimezone(normalizedDay, hours, minutes, timezone);
+          // Pass day directly - createDateInTimezone will extract the correct date from it
+          const newEndDate = createDateInTimezone(day, hours, minutes, timezone);
           const startDate = new Date(task.scheduled_start);
 
           // Ensure end time is after start time
@@ -523,7 +523,8 @@ export default function CalendarPage() {
           }
         } else if (resizeDirection === "top") {
           // Resize from top - change start time
-          const newStartDate = createDateInTimezone(normalizedDay, hours, minutes, timezone);
+          // Pass day directly - createDateInTimezone will extract the correct date from it
+          const newStartDate = createDateInTimezone(day, hours, minutes, timezone);
           const endDate = new Date(task.scheduled_end);
 
           // Ensure start time is before end time
@@ -633,20 +634,20 @@ export default function CalendarPage() {
     const task = tasks.find((t) => t.id === taskId);
     if (!task || task.locked) return;
 
-    // Snap to 15-minute intervals
-    const totalMinutes = time * 60;
+    // The time from the slot is already in decimal hours (e.g., 18.0 for 6pm)
+    // Apply -15 minute offset to account for slot positioning
+    // Convert to hours and minutes, rounding to nearest 15-minute interval
+    let totalMinutes = Math.round(time * 60);
+    totalMinutes = Math.max(0, totalMinutes - 15); // Subtract 15 minutes to fix offset
     const snappedMinutes = Math.round(totalMinutes / 15) * 15;
     const hours = Math.floor(snappedMinutes / 60);
     const minutes = snappedMinutes % 60;
 
     const duration = task.duration || 60; // Default to 60 minutes
     
-    // Normalize the day to represent the correct date in the user's timezone
-    // This ensures createDateInTimezone gets the correct date context
-    const normalizedDay = getDateInTimezone(day, timezone);
-    
     // Create the start date in the user's timezone, then convert to UTC
-    const startDate = createDateInTimezone(normalizedDay, hours, minutes, timezone);
+    // Pass day directly - createDateInTimezone will extract the correct date from it
+    const startDate = createDateInTimezone(day, hours, minutes, timezone);
     const endDate = new Date(startDate.getTime() + duration * 60000);
 
     try {
@@ -674,8 +675,11 @@ export default function CalendarPage() {
     const task = tasks.find((t) => t.id === taskId);
     if (!task || task.locked || !task.scheduled_start || !task.scheduled_end) return;
 
-    // Snap to 15-minute intervals
-    const totalMinutes = time * 60;
+    // The time from the slot is already in decimal hours (e.g., 18.0 for 6pm)
+    // Apply -15 minute offset to account for slot positioning
+    // Convert to hours and minutes, rounding to nearest 15-minute interval
+    let totalMinutes = Math.round(time * 60);
+    totalMinutes = Math.max(0, totalMinutes - 15); // Subtract 15 minutes to fix offset
     const snappedMinutes = Math.round(totalMinutes / 15) * 15;
     const hours = Math.floor(snappedMinutes / 60);
     const minutes = snappedMinutes % 60;
@@ -685,12 +689,9 @@ export default function CalendarPage() {
     const oldEnd = new Date(task.scheduled_end);
     const duration = (oldEnd.getTime() - oldStart.getTime()) / 60000; // in minutes
 
-    // Normalize the day to represent the correct date in the user's timezone
-    // This ensures createDateInTimezone gets the correct date context
-    const normalizedDay = getDateInTimezone(day, timezone);
-    
     // Create the start date in the user's timezone, then convert to UTC
-    const startDate = createDateInTimezone(normalizedDay, hours, minutes, timezone);
+    // Pass day directly - createDateInTimezone will extract the correct date from it
+    const startDate = createDateInTimezone(day, hours, minutes, timezone);
     const endDate = new Date(startDate.getTime() + duration * 60000);
 
     try {

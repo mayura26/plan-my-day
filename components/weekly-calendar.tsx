@@ -103,6 +103,7 @@ export function WeeklyCalendar({
     };
   }, []);
 
+
   // Auto-scroll to current time and current day on initial mount only
   useLayoutEffect(() => {
     if (!calendarScrollRef.current || !horizontalScrollContainerRef.current || hasAutoScrolledRef.current) return;
@@ -182,21 +183,66 @@ export function WeeklyCalendar({
   const getTaskPosition = (task: Task) => {
     if (!task.scheduled_start || !task.scheduled_end) return null;
 
+    // Ensure we have a valid timezone
+    const userTimezone = timezone || "UTC";
+    
     const taskStartUTC = parseISO(task.scheduled_start);
     const taskEndUTC = parseISO(task.scheduled_end);
 
+    // Verify the Date objects are valid
+    if (isNaN(taskStartUTC.getTime()) || isNaN(taskEndUTC.getTime())) {
+      console.error("Invalid date for task:", task.id, task.scheduled_start, task.scheduled_end);
+      return null;
+    }
+
+    // Get the time in the user's timezone
     const { hour: startHour, minute: startMinute } = getHoursAndMinutesInTimezone(
       taskStartUTC,
-      timezone
+      userTimezone
     );
-    const { hour: endHour, minute: endMinute } = getHoursAndMinutesInTimezone(taskEndUTC, timezone);
+    const { hour: endHour, minute: endMinute } = getHoursAndMinutesInTimezone(taskEndUTC, userTimezone);
 
-    const startPosition = (startHour * 60 + startMinute) / 60; // in hours
-    const duration = (endHour * 60 + endMinute - (startHour * 60 + startMinute)) / 60; // in hours
+    // Calculate total minutes from midnight
+    const startTotalMinutes = startHour * 60 + startMinute;
+    const endTotalMinutes = endHour * 60 + endMinute;
+    const durationMinutes = endTotalMinutes - startTotalMinutes;
+
+    // Calculate percentage position
+    // The hour labels span 24 hours (1536px = 24 * 64px)
+    // The slots span from 0:15 to 23:45 (95 slots = 1520px = 95 * 16px)
+    // Tasks are positioned relative to the hour labels container (24 hours)
+    // So we calculate percentage based on full 24-hour day
+    const topPercentage = (startTotalMinutes / (24 * 60)) * 100;
+    const heightPercentage = (durationMinutes / (24 * 60)) * 100;
+
+    // Debug logging for future dates
+    const today = new Date();
+    const isFutureDate = taskStartUTC > today;
+    if (isFutureDate && task.title.includes("Include -1 in invoice for cygnus")) {
+      // Calculate what percentage 6:45 PM would be
+      const wrongTimeMinutes = 18 * 60 + 45; // 6:45 PM
+      const wrongPercentage = (wrongTimeMinutes / (24 * 60)) * 100;
+      
+      console.log("getTaskPosition - future date calculation:", {
+        taskTitle: task.title,
+        scheduled_start: task.scheduled_start,
+        taskStartUTC: taskStartUTC.toISOString(),
+        userTimezone,
+        calculatedHour: startHour,
+        calculatedMinute: startMinute,
+        calculatedTime: `${startHour}:${startMinute.toString().padStart(2, "0")}`,
+        startTotalMinutes,
+        topPercentage: `${topPercentage.toFixed(2)}%`,
+        expectedPosition: "71.875% (for 5:15 PM)",
+        wrongPosition: `${wrongPercentage.toFixed(2)}% (for 6:45 PM - what user sees)`,
+        difference: `${(wrongPercentage - topPercentage).toFixed(2)}%`,
+      });
+    }
+
 
     return {
-      top: `${(startPosition / 24) * 100}%`,
-      height: `${(duration / 24) * 100}%`,
+      top: `${topPercentage}%`,
+      height: `${heightPercentage}%`,
       startHour,
       endHour,
     };
@@ -367,7 +413,7 @@ export function WeeklyCalendar({
 
               {/* Day columns */}
               {weekDays.map((day, dayIndex) => (
-                <div key={dayIndex} className="relative border-l">
+                <div key={dayIndex} className="relative border-l" style={{ height: "1536px" }} data-day-column={dayIndex}>
                   {/* 15-minute interval slots with drop zones */}
                   {TIME_SLOTS.slice(1).map(({ hour, minute, slotIndex }) => (
                     <CalendarSlot key={slotIndex} day={day} hour={hour} minute={minute} />
@@ -392,14 +438,31 @@ export function WeeklyCalendar({
                   )}
 
                   {/* Tasks overlay */}
-                  <div className="absolute inset-0 pointer-events-none">
+                  {/* Position explicitly at top of day column with explicit height to match hour labels */}
+                  <div className="absolute top-0 left-0 right-0 pointer-events-none" style={{ height: "1536px" }}>
                     {tasks
                       .filter((task) => {
                         if (!task.scheduled_start) return false;
                         const taskStartUTC = parseISO(task.scheduled_start);
                         const taskStartDate = getDateInTimezone(taskStartUTC, timezone);
                         const dayDate = getDateInTimezone(day, timezone);
-                        return isSameDay(taskStartDate, dayDate);
+                        const matches = isSameDay(taskStartDate, dayDate);
+                        
+                        // Debug logging for the problematic task
+                        if (task.title.includes("Include -1 in invoice for cygnus")) {
+                          console.log("Task day matching:", {
+                            taskTitle: task.title,
+                            taskStartUTC: taskStartUTC.toISOString(),
+                            taskStartDate: taskStartDate.toISOString(),
+                            day: day.toISOString(),
+                            dayDate: dayDate.toISOString(),
+                            matches,
+                            dayIndex,
+                            dayLabel: formatDateInTimezone(day, timezone, { weekday: "short", day: "numeric" }),
+                          });
+                        }
+                        
+                        return matches;
                       })
                       .map((task) => {
                         const position = getTaskPosition(task);

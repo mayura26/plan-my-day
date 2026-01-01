@@ -43,7 +43,7 @@ export async function GET(request: NextRequest) {
     ]);
 
     if (result.rows.length === 0) {
-      return NextResponse.json({ error: "Note not found" }, { status: 404 });
+      return NextResponse.json({ note: null });
     }
 
     const note = mapRowToDayNote(result.rows[0]);

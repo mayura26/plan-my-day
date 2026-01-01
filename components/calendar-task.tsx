@@ -123,10 +123,16 @@ export function ResizableTask({
     return `rgba(${r}, ${g}, ${b}, ${alpha})`;
   };
 
+  // Only apply transform when actually dragging/resizing to avoid positioning issues
+  const transformString = transform ? CSS.Translate.toString(transform) : undefined;
+  
   const style = {
+    position: "absolute" as const, // Explicitly set position to ensure absolute positioning
     top: position.top,
+    left: "0.25rem", // Match left-1 from className (0.25rem = 4px)
+    right: "0.25rem", // Match right-1 from className  
     height: position.height,
-    transform: CSS.Translate.toString(transform),
+    ...(transformString && { transform: transformString }), // Only include transform if it exists
     opacity: isDragging || isTaskResizing ? 0.7 : shouldFade ? 0.3 : isCompleted || isPastEvent ? 0.5 : 1,
     transition: isDragging || isTaskResizing ? "none" : "all 0.2s ease-in-out",
     zIndex: isActiveDrag ? 50 : 10,
@@ -153,9 +159,9 @@ export function ResizableTask({
       {...(task.locked ? {} : listeners)}
       {...attributes}
       className={cn(
-        "absolute left-1 right-1 rounded-md border-l-4 p-1.5 md:p-2 cursor-pointer pointer-events-auto",
+        "rounded-md border-l-4 p-1.5 md:p-2 cursor-pointer pointer-events-auto",
         "min-h-[44px] md:min-h-0", // Minimum touch target height on mobile
-        "hover:shadow-lg transition-shadow overflow-hidden group relative",
+        "hover:shadow-lg transition-shadow overflow-hidden group", // Removed 'relative' - using absolute positioning from style
         task.locked && "cursor-not-allowed opacity-75",
         !task.locked && "cursor-grab active:cursor-grabbing",
         isActiveDrag && "shadow-xl ring-2 ring-primary/50",

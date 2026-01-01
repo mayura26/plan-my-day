@@ -11,6 +11,7 @@ import {
   getDateInTimezone,
   getHoursAndMinutesInTimezone,
 } from "@/lib/timezone-utils";
+import { sortTasksByScheduledTime } from "@/lib/task-utils";
 import type { DayNote, Task, TaskGroup } from "@/lib/types";
 
 interface DayCalendarProps {
@@ -107,18 +108,39 @@ export function DayCalendar({
     const taskStartUTC = parseISO(task.scheduled_start);
     const taskEndUTC = parseISO(task.scheduled_end);
 
+    // Verify the Date objects are valid
+    if (isNaN(taskStartUTC.getTime()) || isNaN(taskEndUTC.getTime())) {
+      console.error("Invalid date for task:", task.id, task.scheduled_start, task.scheduled_end);
+      return null;
+    }
+
+    // Get the time in the user's timezone
     const { hour: startHour, minute: startMinute } = getHoursAndMinutesInTimezone(
       taskStartUTC,
       timezone
     );
     const { hour: endHour, minute: endMinute } = getHoursAndMinutesInTimezone(taskEndUTC, timezone);
 
-    const startPosition = (startHour * 60 + startMinute) / 60; // in hours
-    const duration = (endHour * 60 + endMinute - (startHour * 60 + startMinute)) / 60; // in hours
+    // Calculate total minutes from midnight
+    const startTotalMinutes = startHour * 60 + startMinute;
+    const endTotalMinutes = endHour * 60 + endMinute;
+    const durationMinutes = endTotalMinutes - startTotalMinutes;
+
+    // Ensure duration is positive
+    if (durationMinutes <= 0) {
+      console.error("Invalid duration for task:", task.id, "duration:", durationMinutes);
+      return null;
+    }
+
+    // Calculate percentage position (0% = midnight, 100% = next midnight)
+    // Since slots start at 0:15 (slice(1)), tasks before 0:15 will be positioned above the grid
+    // but that's fine - they'll just be off-screen
+    const topPercentage = (startTotalMinutes / (24 * 60)) * 100;
+    const heightPercentage = (durationMinutes / (24 * 60)) * 100;
 
     return {
-      top: `${(startPosition / 24) * 100}%`,
-      height: `${(duration / 24) * 100}%`,
+      top: `${topPercentage}%`,
+      height: `${heightPercentage}%`,
       startHour,
       endHour,
     };
@@ -269,22 +291,30 @@ export function DayCalendar({
             </div>
 
             {/* Day column */}
-            <div className="relative border-l">
+            <div className="relative border-l" style={{ height: "1536px" }}>
               {/* 15-minute interval slots with drop zones */}
               {TIME_SLOTS.slice(1).map(({ hour, minute, slotIndex }) => (
                 <CalendarSlot key={slotIndex} day={currentDate} hour={hour} minute={minute} />
               ))}
 
-              {/* Tasks overlay */}
-              <div className="absolute inset-0 pointer-events-none">
-                {tasks
-                  .filter((task) => {
+              {/* Tasks overlay - explicitly positioned relative to parent */}
+              <div className="absolute inset-0 pointer-events-none" style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0 }}>
+                {(() => {
+                  // Filter tasks for the current day
+                  const dayTasks = tasks.filter((task) => {
                     if (!task.scheduled_start) return false;
                     const taskStartUTC = parseISO(task.scheduled_start);
                     const taskStartDate = getDateInTimezone(taskStartUTC, timezone);
                     return isSameDay(taskStartDate, dayDate);
-                  })
-                  .map((task) => {
+                  });
+
+                  // Sort tasks by scheduled time to ensure consistent rendering order
+                  const sortedTasks = sortTasksByScheduledTime(dayTasks);
+
+                  // Render each task with its own position calculation
+                  return sortedTasks.map((task) => {
+                    // Calculate position for this specific task
+                    // Create a fresh position object for each task to avoid any object reuse issues
                     const position = getTaskPosition(task);
                     if (!position) return null;
 
@@ -301,7 +331,8 @@ export function DayCalendar({
                         groups={groups}
                       />
                     );
-                  })}
+                  });
+                })()}
               </div>
 
               {/* Current time indicator (red line) - rendered after tasks to ensure it appears on top */}

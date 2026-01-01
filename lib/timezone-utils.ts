@@ -256,6 +256,23 @@ export function createDateInTimezone(
   const month = parseInt(dayParts.find((p) => p.type === "month")?.value || "0", 10) - 1;
   const date = parseInt(dayParts.find((p) => p.type === "day")?.value || "0", 10);
 
+  // Debug logging for future dates
+  const today = new Date();
+  const isFutureDate = day > today;
+  if (isFutureDate && hours >= 17) {
+    console.log("createDateInTimezone - extracting date:", {
+      inputDay: day.toISOString(),
+      inputDayLocal: day.toString(),
+      timezone,
+      extractedYear: year,
+      extractedMonth: month + 1,
+      extractedDate: date,
+      targetHours: hours,
+      targetMinutes: minutes,
+      dayParts: dayParts.map(p => `${p.type}: ${p.value}`),
+    });
+  }
+
   // Now find the UTC timestamp that represents midnight (00:00) on this date in the target timezone
   // Then add hours and minutes to get the final time
 
@@ -304,6 +321,14 @@ export function createDateInTimezone(
         vTzHour === hours &&
         vTzMinute === minutes
       ) {
+        if (isFutureDate) {
+          console.log("createDateInTimezone - found match (quick search):", {
+            resultUTC: result.toISOString(),
+            resultLocal: result.toString(),
+            verifiedTzTime: `${vTzHour}:${vTzMinute.toString().padStart(2, "0")}`,
+            expectedTzTime: `${hours}:${minutes.toString().padStart(2, "0")}`,
+          });
+        }
         return result;
       }
     }
