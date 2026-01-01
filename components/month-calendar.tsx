@@ -171,9 +171,9 @@ export function MonthCalendar({
       </div>
 
       {/* Calendar Grid */}
-      <div className="flex-1 overflow-auto p-4">
-        {/* Weekday Headers */}
-        <div className="grid grid-cols-7 gap-1 mb-2">
+      <div className="flex-1 overflow-x-auto overflow-y-auto p-4">
+        {/* Weekday Headers - Mobile: 3 columns visible, Desktop: 7 columns */}
+        <div className="grid grid-cols-[repeat(7,calc((100vw-2rem)/3))] md:grid-cols-7 gap-1 mb-2" style={{ minWidth: 'max-content' }}>
           {WEEK_DAYS.map((day) => (
             <div
               key={day}
@@ -184,8 +184,8 @@ export function MonthCalendar({
           ))}
         </div>
 
-        {/* Calendar Days */}
-        <div className="grid grid-cols-7 gap-1">
+        {/* Calendar Days - Mobile: 3 columns visible with horizontal scroll, Desktop: 7 columns */}
+        <div className="grid grid-cols-[repeat(7,calc((100vw-2rem)/3))] md:grid-cols-7 gap-1" style={{ minWidth: 'max-content' }}>
           {calendarDays.map((day, index) => {
             const dayTasks = getTasksForDate(day);
             const dateInTimezone = getDateInTimezone(day, timezone);
@@ -198,7 +198,7 @@ export function MonthCalendar({
               <div
                 key={index}
                 className={cn(
-                  "min-h-[100px] md:min-h-[120px] border rounded-md p-2 cursor-pointer transition-colors",
+                  "min-h-[100px] md:min-h-[120px] border rounded-md p-1.5 md:p-2 cursor-pointer transition-colors",
                   !isCurrentMonth && "opacity-40 bg-muted/30",
                   isCurrentMonth && "bg-background",
                   isCurrentDay && "ring-2 ring-primary"
@@ -208,7 +208,7 @@ export function MonthCalendar({
                 {/* Date Number */}
                 <div
                   className={cn(
-                    "text-sm md:text-base font-bold mb-1 flex items-center justify-center w-8 h-8 rounded-full",
+                    "text-xs md:text-base font-bold mb-1 flex items-center justify-center w-6 h-6 md:w-8 md:h-8 rounded-full",
                     isCurrentDay && "bg-primary text-primary-foreground",
                     !isCurrentDay && isCurrentMonth && "text-foreground",
                     !isCurrentMonth && "text-muted-foreground"
@@ -218,8 +218,8 @@ export function MonthCalendar({
                 </div>
 
                 {/* Tasks List */}
-                <div className="space-y-1">
-                  {dayTasks.slice(0, 3).map((task) => {
+                <div className="space-y-0.5 md:space-y-1">
+                  {dayTasks.slice(0, 5).map((task) => {
                     const group = task.group_id ? groups.find((g) => g.id === task.group_id) : null;
                     const groupColor = group?.color || null;
                     const isEvent = task.task_type === "event";
@@ -230,8 +230,8 @@ export function MonthCalendar({
                       <div
                         key={task.id}
                         className={cn(
-                          "text-xs p-1 rounded truncate cursor-pointer hover:opacity-80 transition-opacity",
-                          "flex items-center gap-1 relative",
+                          "text-[9px] md:text-xs p-0.5 md:p-1 rounded truncate cursor-pointer hover:opacity-80 transition-opacity",
+                          "flex items-center gap-0.5 md:gap-1 relative",
                           groupColor && "text-white"
                         )}
                         style={
@@ -248,35 +248,35 @@ export function MonthCalendar({
                           className={cn(
                             "flex-shrink-0",
                             isEvent
-                              ? "w-2 h-2 border border-white rounded-full"
-                              : "w-2 h-2 bg-white rounded-full"
+                              ? "w-1.5 h-1.5 md:w-2 md:h-2 border border-white rounded-full"
+                              : "w-1.5 h-1.5 md:w-2 md:h-2 bg-white rounded-full"
                           )}
                         />
-                        <span className="font-medium">
+                        <span className="font-medium text-[8px] md:text-xs">
                           {formatTimeShort(task.scheduled_start!, timezone)}
                         </span>
-                        <span className="truncate flex-1">{task.title}</span>
+                        <span className="truncate flex-1 text-[8px] md:text-xs">{task.title}</span>
                         {/* Energy indicator at right */}
                         {task.energy_level_required && (
                           <span 
                             className={cn(
-                              "text-xs flex items-center gap-0.5 flex-shrink-0 px-1.5 py-0.5 rounded-full",
+                              "text-[7px] md:text-xs flex items-center gap-0.5 flex-shrink-0 px-1 md:px-1.5 py-0 md:py-0.5 rounded-full",
                               getEnergyLevelColor(task.energy_level_required)
                             )}
                             style={{
                               backgroundColor: "rgba(0, 0, 0, 0.3)",
                             }}
                           >
-                            <Zap className="w-3 h-3" />
-                            <span className="text-[10px]">{task.energy_level_required}</span>
+                            <Zap className="w-2 h-2 md:w-3 md:h-3" />
+                            <span className="text-[7px] md:text-[10px]">{task.energy_level_required}</span>
                           </span>
                         )}
                       </div>
                     );
                   })}
-                  {dayTasks.length > 3 && (
-                    <div className="text-xs text-muted-foreground px-1">
-                      +{dayTasks.length - 3} more
+                  {dayTasks.length > 5 && (
+                    <div className="text-[8px] md:text-xs text-muted-foreground px-1">
+                      +{dayTasks.length - 5} more
                     </div>
                   )}
                 </div>
