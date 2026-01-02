@@ -1,3 +1,4 @@
+import type * as React from "react";
 import { Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -12,11 +13,12 @@ const sizeClasses = {
   lg: "h-6 w-6",
 };
 
-export function LoadingSpinner({ size = "md", className }: LoadingSpinnerProps) {
+export function LoadingSpinner({ size = "md", className, ...props }: LoadingSpinnerProps & React.SVGProps<SVGSVGElement>) {
   return (
     <Loader2
       className={cn("animate-spin", sizeClasses[size], className)}
       aria-hidden="true"
+      {...props}
     />
   );
 }

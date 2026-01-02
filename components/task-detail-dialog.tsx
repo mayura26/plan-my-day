@@ -20,6 +20,7 @@ import {
   Zap,
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import { toast } from "sonner";
 import { SubtaskManager } from "@/components/subtask-manager";
 import { Badge } from "@/components/ui/badge";
@@ -64,7 +65,9 @@ export function TaskDetailDialog({
   const [isDeleting, setIsDeleting] = useState(false);
   const [isUnscheduling, setIsUnscheduling] = useState(false);
   const [isUnignoring, setIsUnignoring] = useState(false);
-  const [isChangingStatus, setIsChangingStatus] = useState(false);
+  const [isMarkingIncomplete, setIsMarkingIncomplete] = useState(false);
+  const [isStartingTask, setIsStartingTask] = useState(false);
+  const [isMarkingComplete, setIsMarkingComplete] = useState(false);
   const [dependencies, setDependencies] = useState<DependencyInfo[]>([]);
   const [blockedBy, setBlockedBy] = useState<Task[]>([]);
   const [isBlocked, setIsBlocked] = useState(false);
@@ -367,15 +370,17 @@ export function TaskDetailDialog({
                     size="sm"
                     variant="outline"
                     onClick={async () => {
-                      setIsChangingStatus(true);
+                      flushSync(() => {
+                        setIsMarkingIncomplete(true);
+                      });
                       try {
                         await onStatusChange?.(task.id, "pending");
                         setHasChanges(true);
                       } finally {
-                        setIsChangingStatus(false);
+                        setIsMarkingIncomplete(false);
                       }
                     }}
-                    loading={isChangingStatus}
+                    loading={isMarkingIncomplete}
                     className="flex-1 sm:flex-initial text-xs sm:text-sm"
                   >
                     <Circle className="h-4 w-4 mr-1" />
@@ -388,15 +393,17 @@ export function TaskDetailDialog({
                     size="sm"
                     variant="default"
                     onClick={async () => {
-                      setIsChangingStatus(true);
+                      flushSync(() => {
+                        setIsStartingTask(true);
+                      });
                       try {
                         await onStatusChange?.(task.id, "in_progress");
                         setHasChanges(true);
                       } finally {
-                        setIsChangingStatus(false);
+                        setIsStartingTask(false);
                       }
                     }}
-                    loading={isChangingStatus}
+                    loading={isStartingTask}
                     className="flex-1 sm:flex-initial text-xs sm:text-sm"
                   >
                     Start Task
@@ -407,15 +414,17 @@ export function TaskDetailDialog({
                     size="sm"
                     variant="default"
                     onClick={async () => {
-                      setIsChangingStatus(true);
+                      flushSync(() => {
+                        setIsMarkingComplete(true);
+                      });
                       try {
                         await onStatusChange?.(task.id, "completed");
                         setHasChanges(true);
                       } finally {
-                        setIsChangingStatus(false);
+                        setIsMarkingComplete(false);
                       }
                     }}
-                    loading={isChangingStatus}
+                    loading={isMarkingComplete}
                     className="flex-1 sm:flex-initial text-xs sm:text-sm"
                   >
                     <CheckCircle2 className="h-4 w-4 mr-1" />
@@ -428,15 +437,17 @@ export function TaskDetailDialog({
                     size="sm"
                     variant="default"
                     onClick={async () => {
-                      setIsChangingStatus(true);
+                      flushSync(() => {
+                        setIsMarkingComplete(true);
+                      });
                       try {
                         await onStatusChange?.(task.id, "completed");
                         setHasChanges(true);
                       } finally {
-                        setIsChangingStatus(false);
+                        setIsMarkingComplete(false);
                       }
                     }}
-                    loading={isChangingStatus}
+                    loading={isMarkingComplete}
                     className="flex-1 sm:flex-initial text-xs sm:text-sm"
                   >
                     <CheckCircle2 className="h-4 w-4 mr-1" />
@@ -471,7 +482,7 @@ export function TaskDetailDialog({
 
           {/* Schedule Information */}
           {(task.scheduled_start || task.scheduled_end) && (
-            <Card className="py-2 sm:py-6">
+            <Card className="py-2">
               <CardContent className="pt-0 pb-0 px-3 sm:px-6">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-0 mb-2 sm:mb-3">
                   <h3 className="text-sm font-semibold flex items-center gap-2">
@@ -528,7 +539,7 @@ export function TaskDetailDialog({
 
           {/* Subtasks - Only show for non-subtask tasks */}
           {!isSubtask && (
-            <Card className="py-0 sm:py-6">
+            <Card className="py-0">
               <CardContent className="p-0">
                 <button
                   type="button"
@@ -572,7 +583,7 @@ export function TaskDetailDialog({
 
           {/* Description */}
           {task.description && (
-            <Card className="py-2 sm:py-6">
+            <Card className="py-2">
               <CardContent className="pt-0 pb-0 px-3 sm:px-6">
                 <h3 className="text-sm font-semibold mb-1.5 sm:mb-2">Description</h3>
                 <p className="text-xs sm:text-sm text-muted-foreground whitespace-pre-wrap break-words">
@@ -584,7 +595,7 @@ export function TaskDetailDialog({
 
           {/* Blocked By Warning */}
           {isBlocked && blockedBy.length > 0 && (
-            <Card className="border-destructive bg-destructive/10 py-2 sm:py-6">
+            <Card className="border-destructive bg-destructive/10 py-2">
               <CardContent className="pt-0 pb-0 px-3 sm:px-6">
                 <h3 className="text-sm font-semibold mb-1.5 sm:mb-2 text-destructive flex items-center gap-2">
                   <GitBranch className="h-4 w-4" />
@@ -604,7 +615,7 @@ export function TaskDetailDialog({
 
           {/* Dependencies */}
           {dependencies.length > 0 && (
-            <Card className="py-2 sm:py-6">
+            <Card className="py-2">
               <CardContent className="pt-0 pb-0 px-3 sm:px-6">
                 <h3 className="text-sm font-semibold mb-1.5 sm:mb-2 flex items-center gap-2">
                   <GitBranch className="h-4 w-4" />

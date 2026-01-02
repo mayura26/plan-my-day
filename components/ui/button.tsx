@@ -55,13 +55,13 @@ function Button({
       data-slot="button"
       className={cn(
         buttonVariants({ variant, size, className }),
-        loading && "[&>svg]:hidden"
+        loading && "[&>svg:not([data-loading-spinner])]:hidden"
       )}
       disabled={isDisabled}
       aria-busy={loading}
       {...props}
     >
-      {loading && <LoadingSpinner size="sm" className="mr-1" />}
+      {loading && <LoadingSpinner size="sm" className="mr-1" data-loading-spinner />}
       {children}
     </Comp>
   );
