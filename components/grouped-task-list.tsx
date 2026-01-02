@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronDown, ChevronRight, Edit, Plus, Search, Trash2, Upload } from "lucide-react";
+import { ChevronDown, ChevronRight, Edit, Folder, Plus, Search, Trash2, Upload } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -29,6 +29,7 @@ interface GroupedTaskListProps {
   onShowAllTasksChange?: (show: boolean) => void;
   onRenameGroup?: (group: TaskGroup) => void;
   onDeleteGroup?: (groupId: string) => Promise<void>;
+  onCreateParentGroup?: () => void;
 }
 
 type GroupByOption = "status" | "group" | "none";
@@ -48,6 +49,7 @@ export function GroupedTaskList({
   onShowAllTasksChange,
   onRenameGroup,
   onDeleteGroup,
+  onCreateParentGroup,
 }: GroupedTaskListProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [groupBy, setGroupBy] = useState<GroupByOption>("status");
@@ -61,8 +63,15 @@ export function GroupedTaskList({
     if (groupBy === "status") {
       setExpandedSections(new Set(["pending", "in_progress", "completed", "cancelled"]));
     } else if (groupBy === "group") {
-      const allGroupIds = ["ungrouped", ...groups.map((g) => g.id)];
-      setExpandedSections(new Set(allGroupIds));
+      const hierarchy = buildGroupHierarchy();
+      const allIds: string[] = ["ungrouped"];
+      hierarchy.forEach((item) => {
+        allIds.push(item.id);
+        if (item.isParent) {
+          item.children.forEach((child) => allIds.push(child.id));
+        }
+      });
+      setExpandedSections(new Set(allIds));
     }
   }, [groupBy, groups]);
 
@@ -114,6 +123,55 @@ export function GroupedTaskList({
         return filteredTasks;
     }
   })();
+
+  // Build hierarchy of groups (parent groups with their children)
+  const buildGroupHierarchy = (): Array<{
+    id: string;
+    name: string;
+    color: string;
+    isParent: boolean;
+    children: Array<{ id: string; name: string; color: string }>;
+  }> => {
+    const parentGroups = groups.filter((g) => g.is_parent_group);
+    const regularGroups = groups.filter((g) => !g.is_parent_group);
+    const topLevelGroups = regularGroups.filter((g) => !g.parent_group_id);
+
+    // Build hierarchy
+    const hierarchy: Array<{
+      id: string;
+      name: string;
+      color: string;
+      isParent: boolean;
+      children: Array<{ id: string; name: string; color: string }>;
+    }> = [];
+
+    // Add parent groups with their children
+    parentGroups.forEach((parent) => {
+      const children = regularGroups
+        .filter((g) => g.parent_group_id === parent.id)
+        .map((g) => ({ id: g.id, name: g.name, color: g.color }));
+      hierarchy.push({
+        id: parent.id,
+        name: parent.name,
+        color: parent.color,
+        isParent: true,
+        children,
+      });
+    });
+
+    // Add top-level regular groups (not under any parent)
+    topLevelGroups.forEach((group) => {
+      hierarchy.push({
+        id: group.id,
+        name: group.name,
+        color: group.color,
+        isParent: false,
+        children: [],
+      });
+    });
+
+    return hierarchy;
+  };
 
   // Group tasks
   const groupedTasks: Record<string, Task[]> = (() => {
@@ -168,8 +226,15 @@ export function GroupedTaskList({
     if (groupBy === "status") {
       setExpandedSections(new Set(["pending", "in_progress", "completed", "cancelled"]));
     } else if (groupBy === "group") {
-      const allGroupIds = ["ungrouped", ...groups.map((g) => g.id)];
-      setExpandedSections(new Set(allGroupIds));
+      const hierarchy = buildGroupHierarchy();
+      const allIds: string[] = ["ungrouped"];
+      hierarchy.forEach((item) => {
+        allIds.push(item.id);
+        if (item.isParent) {
+          item.children.forEach((child) => allIds.push(child.id));
+        }
+      });
+      setExpandedSections(new Set(allIds));
     }
   };
 
@@ -227,6 +292,12 @@ export function GroupedTaskList({
           </p>
         </div>
         <div className="flex items-center gap-2">
+          {onCreateParentGroup && (
+            <Button onClick={onCreateParentGroup} variant="outline" className="h-11 px-4 md:h-10 md:px-4">
+              <Folder className="w-4 h-4 mr-2" />
+              Create Parent Group
+            </Button>
+          )}
           {onImport && (
             <Button onClick={onImport} variant="outline" className="h-11 px-4 md:h-10 md:px-4">
               <Upload className="w-4 h-4 mr-2" />
@@ -497,94 +568,244 @@ export function GroupedTaskList({
             )}
           </Card>
 
-          {/* Group tasks */}
-          {groups.map((group) => {
-            const sectionTasks = groupedTasks[group.id] || [];
-            if (sectionTasks.length === 0) return null;
+          {/* Group tasks - organized by parent groups */}
+          {buildGroupHierarchy().map((hierarchyItem) => {
+            if (hierarchyItem.isParent) {
+              // Parent group section
+              const parentGroup = groups.find((g) => g.id === hierarchyItem.id);
+              if (!parentGroup) return null;
 
-            return (
-              <Card key={group.id}>
-                <CardHeader
-                  className="cursor-pointer hover:bg-accent/50 transition-colors"
-                  onClick={() => toggleSection(group.id)}
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      {expandedSections.has(group.id) ? (
-                        <ChevronDown className="h-4 w-4" />
-                      ) : (
-                        <ChevronRight className="h-4 w-4" />
-                      )}
-                      <div
-                        className="w-3 h-3 rounded-full border"
-                        style={{ backgroundColor: group.color }}
-                      />
-                      <CardTitle className="text-lg">{group.name}</CardTitle>
-                      <Badge variant="secondary">{sectionTasks.length}</Badge>
+              // Calculate total tasks in all child groups
+              const totalTasks = hierarchyItem.children.reduce(
+                (sum, child) => sum + (groupedTasks[child.id]?.length || 0),
+                0
+              );
+
+              if (hierarchyItem.children.length === 0 && totalTasks === 0) return null;
+
+              return (
+                <Card key={hierarchyItem.id} className="border-2 border-dashed" style={{ borderColor: hierarchyItem.color }}>
+                  <CardHeader
+                    className="cursor-pointer hover:bg-accent/50 transition-colors"
+                    onClick={() => toggleSection(hierarchyItem.id)}
+                    style={{ backgroundColor: `${hierarchyItem.color}10` }}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        {expandedSections.has(hierarchyItem.id) ? (
+                          <ChevronDown className="h-4 w-4" style={{ color: hierarchyItem.color }} />
+                        ) : (
+                          <ChevronRight className="h-4 w-4" style={{ color: hierarchyItem.color }} />
+                        )}
+                        <Folder className="h-4 w-4" style={{ color: hierarchyItem.color }} />
+                        <CardTitle className="text-lg" style={{ color: hierarchyItem.color }}>
+                          {hierarchyItem.name}
+                        </CardTitle>
+                        <Badge variant="secondary" style={{ backgroundColor: `${hierarchyItem.color}20`, color: hierarchyItem.color }}>
+                          {hierarchyItem.children.length} {hierarchyItem.children.length === 1 ? "group" : "groups"}
+                        </Badge>
+                      </div>
                     </div>
-                    {/* biome-ignore lint/a11y/useSemanticElements: Container div for button group requires div layout */}
-                    <div
-                      className="flex items-center gap-2"
-                      onClick={(e) => e.stopPropagation()}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" || e.key === " ") {
-                          e.preventDefault();
-                          e.stopPropagation();
-                        }
-                      }}
-                      role="button"
-                      tabIndex={0}
-                    >
-                      {onRenameGroup && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-8 w-8 p-0"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onRenameGroup(group);
-                          }}
-                          title="Rename group"
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                      )}
-                      {onDeleteGroup && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-8 w-8 p-0"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onDeleteGroup(group.id);
-                          }}
-                          title="Delete group"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                </CardHeader>
-                {expandedSections.has(group.id) && (
-                  <CardContent className="pt-0">
-                    <div className="space-y-3">
-                      {sectionTasks.map((task) => (
-                        <TaskCard
-                          key={task.id}
-                          task={task}
-                          onUpdate={onUpdateTask}
-                          onDelete={onDeleteTask}
-                          onEdit={onEditTask}
-                          onUnschedule={onUnscheduleTask}
-                          groups={groups}
+                  </CardHeader>
+                  {expandedSections.has(hierarchyItem.id) && (
+                    <CardContent className="pt-0 pl-4 pr-4 pb-4">
+                      <div className="space-y-3">
+                        {hierarchyItem.children.map((childGroup) => {
+                          const sectionTasks = groupedTasks[childGroup.id] || [];
+                          const childGroupFull = groups.find((g) => g.id === childGroup.id);
+                          if (!childGroupFull) return null;
+
+                          return (
+                            <Card key={childGroup.id} className="ml-4">
+                              <CardHeader
+                                className="cursor-pointer hover:bg-accent/50 transition-colors"
+                                onClick={() => toggleSection(childGroup.id)}
+                              >
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-3">
+                                    {expandedSections.has(childGroup.id) ? (
+                                      <ChevronDown className="h-4 w-4" />
+                                    ) : (
+                                      <ChevronRight className="h-4 w-4" />
+                                    )}
+                                    <div
+                                      className="w-3 h-3 rounded-full border"
+                                      style={{ backgroundColor: childGroup.color }}
+                                    />
+                                    <CardTitle className="text-base">{childGroup.name}</CardTitle>
+                                    <Badge variant="secondary">{sectionTasks.length}</Badge>
+                                  </div>
+                                  {/* biome-ignore lint/a11y/useSemanticElements: Container div for button group requires div layout */}
+                                  <div
+                                    className="flex items-center gap-2"
+                                    onClick={(e) => e.stopPropagation()}
+                                    onKeyDown={(e) => {
+                                      if (e.key === "Enter" || e.key === " ") {
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                      }
+                                    }}
+                                    role="button"
+                                    tabIndex={0}
+                                  >
+                                    {onRenameGroup && (
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="h-8 w-8 p-0"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          onRenameGroup(childGroupFull);
+                                        }}
+                                        title="Rename group"
+                                      >
+                                        <Edit className="h-4 w-4" />
+                                      </Button>
+                                    )}
+                                    {onDeleteGroup && (
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="h-8 w-8 p-0"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          onDeleteGroup(childGroup.id);
+                                        }}
+                                        title="Delete group"
+                                      >
+                                        <Trash2 className="h-4 w-4" />
+                                      </Button>
+                                    )}
+                                  </div>
+                                </div>
+                              </CardHeader>
+                              {expandedSections.has(childGroup.id) && (
+                                <CardContent className="pt-0">
+                                  <div className="space-y-3">
+                                    {sectionTasks.map((task) => (
+                                      <TaskCard
+                                        key={task.id}
+                                        task={task}
+                                        onUpdate={onUpdateTask}
+                                        onDelete={onDeleteTask}
+                                        onEdit={onEditTask}
+                                        onUnschedule={onUnscheduleTask}
+                                        groups={groups}
+                                      />
+                                    ))}
+                                    {sectionTasks.length === 0 && (
+                                      <p className="text-sm text-muted-foreground py-2 text-center">
+                                        No tasks in this group
+                                      </p>
+                                    )}
+                                  </div>
+                                </CardContent>
+                              )}
+                            </Card>
+                          );
+                        })}
+                        {hierarchyItem.children.length === 0 && (
+                          <p className="text-sm text-muted-foreground py-2 text-center">
+                            No groups in this parent group
+                          </p>
+                        )}
+                      </div>
+                    </CardContent>
+                  )}
+                </Card>
+              );
+            } else {
+              // Regular top-level group (not under a parent)
+              const sectionTasks = groupedTasks[hierarchyItem.id] || [];
+              if (sectionTasks.length === 0) return null;
+
+              const group = groups.find((g) => g.id === hierarchyItem.id);
+              if (!group) return null;
+
+              return (
+                <Card key={hierarchyItem.id}>
+                  <CardHeader
+                    className="cursor-pointer hover:bg-accent/50 transition-colors"
+                    onClick={() => toggleSection(hierarchyItem.id)}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        {expandedSections.has(hierarchyItem.id) ? (
+                          <ChevronDown className="h-4 w-4" />
+                        ) : (
+                          <ChevronRight className="h-4 w-4" />
+                        )}
+                        <div
+                          className="w-3 h-3 rounded-full border"
+                          style={{ backgroundColor: hierarchyItem.color }}
                         />
-                      ))}
+                        <CardTitle className="text-lg">{hierarchyItem.name}</CardTitle>
+                        <Badge variant="secondary">{sectionTasks.length}</Badge>
+                      </div>
+                      {/* biome-ignore lint/a11y/useSemanticElements: Container div for button group requires div layout */}
+                      <div
+                        className="flex items-center gap-2"
+                        onClick={(e) => e.stopPropagation()}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            e.stopPropagation();
+                          }
+                        }}
+                        role="button"
+                        tabIndex={0}
+                      >
+                        {onRenameGroup && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 w-8 p-0"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onRenameGroup(group);
+                            }}
+                            title="Rename group"
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                        )}
+                        {onDeleteGroup && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 w-8 p-0"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onDeleteGroup(hierarchyItem.id);
+                            }}
+                            title="Delete group"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        )}
+                      </div>
                     </div>
-                  </CardContent>
-                )}
-              </Card>
-            );
+                  </CardHeader>
+                  {expandedSections.has(hierarchyItem.id) && (
+                    <CardContent className="pt-0">
+                      <div className="space-y-3">
+                        {sectionTasks.map((task) => (
+                          <TaskCard
+                            key={task.id}
+                            task={task}
+                            onUpdate={onUpdateTask}
+                            onDelete={onDeleteTask}
+                            onEdit={onEditTask}
+                            onUnschedule={onUnscheduleTask}
+                            groups={groups}
+                          />
+                        ))}
+                      </div>
+                    </CardContent>
+                  )}
+                </Card>
+              );
+            }
           })}
         </div>
       )}

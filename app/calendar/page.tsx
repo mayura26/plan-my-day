@@ -79,12 +79,12 @@ export default function CalendarPage() {
     null
   );
   const [sidebarWidth, setSidebarWidth] = useState<number>(() => {
-    // Load from localStorage or default to 320px (w-80)
+    // Load from localStorage or default to 380px (wider for buttons to fit in one row)
     if (typeof window !== "undefined") {
       const saved = localStorage.getItem("sidebar-width");
-      return saved ? parseInt(saved, 10) : 320;
+      return saved ? parseInt(saved, 10) : 380;
     }
-    return 320;
+    return 380;
   });
   const [isResizing, setIsResizing] = useState(false);
   const fetchedGroupsUserIdRef = useRef<string | null>(null);
@@ -1243,7 +1243,10 @@ export default function CalendarPage() {
           }
         }}
       >
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto w-[95vw] md:w-full mx-2 md:mx-auto">
+        <DialogContent 
+          className="max-w-2xl max-h-[90vh] overflow-y-auto w-[95vw] md:w-full mx-2 md:mx-auto"
+          onInteractOutside={(e) => e.preventDefault()}
+        >
           <DialogHeader>
             <DialogTitle>Create New Task</DialogTitle>
           </DialogHeader>

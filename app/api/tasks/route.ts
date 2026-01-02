@@ -153,6 +153,24 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Validation failed", details: errors }, { status: 400 });
     }
 
+    // Validate group_id - ensure it's not a parent group
+    if (body.group_id) {
+      const groupResult = await db.execute(
+        `SELECT is_parent_group FROM task_groups WHERE id = ? AND user_id = ?`,
+        [body.group_id, session.user.id]
+      );
+      if (groupResult.rows.length === 0) {
+        return NextResponse.json({ error: "Task group not found" }, { status: 404 });
+      }
+      const isParentGroup = Boolean(groupResult.rows[0].is_parent_group);
+      if (isParentGroup) {
+        return NextResponse.json(
+          { error: "Cannot assign tasks to parent groups. Please select a regular group." },
+          { status: 400 }
+        );
+      }
+    }
+
     // Validate parent task if creating a subtask
     let parentTaskData: any = null;
     if (body.parent_task_id) {

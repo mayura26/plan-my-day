@@ -387,17 +387,19 @@ export function TaskForm({ onSubmit, onCancel, initialData, isLoading = false }:
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="no-group">None</SelectItem>
-                {taskGroups.map((group) => (
-                  <SelectItem key={group.id} value={group.id}>
-                    <div className="flex items-center gap-2">
-                      <div
-                        className="w-2.5 h-2.5 rounded-full"
-                        style={{ backgroundColor: group.color }}
-                      />
-                      {group.name}
-                    </div>
-                  </SelectItem>
-                ))}
+                {taskGroups
+                  .filter((group) => !group.is_parent_group) // Only show regular groups, not parent groups
+                  .map((group) => (
+                    <SelectItem key={group.id} value={group.id}>
+                      <div className="flex items-center gap-2">
+                        <div
+                          className="w-2.5 h-2.5 rounded-full"
+                          style={{ backgroundColor: group.color }}
+                        />
+                        {group.name}
+                      </div>
+                    </SelectItem>
+                  ))}
               </SelectContent>
             </Select>
           </div>

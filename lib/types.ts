@@ -67,6 +67,8 @@ export interface TaskGroup {
   name: string;
   color: string;
   collapsed: boolean;
+  parent_group_id?: string | null;
+  is_parent_group?: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -205,6 +207,8 @@ export interface CreateCarryoverTaskRequest {
 export interface CreateTaskGroupRequest {
   name: string;
   color?: string;
+  parent_group_id?: string;
+  is_parent_group?: boolean;
 }
 
 export interface CreateTaskTemplateRequest {

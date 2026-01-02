@@ -28,8 +28,16 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import type { CreateTaskGroupRequest, Task, TaskGroup } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { EditGroupDialog } from "./edit-group-dialog";
 
 interface TaskGroupManagerProps {
   onGroupSelect?: (groupId: string | null) => void;
@@ -62,10 +70,102 @@ function getContrastColor(hexColor: string): string {
   return luminance > 0.5 ? "#000000" : "#ffffff";
 }
 
+// Helper function to get all descendant group IDs (including nested descendants)
+function getGroupDescendants(groupId: string, groups: TaskGroup[]): string[] {
+  const descendants: string[] = [];
+  const queue = [groupId];
+
+  while (queue.length > 0) {
+    const currentId = queue.shift()!;
+    const children = groups.filter((g) => g.parent_group_id === currentId);
+    
+    for (const child of children) {
+      if (!descendants.includes(child.id)) {
+        descendants.push(child.id);
+        queue.push(child.id);
+      }
+    }
+  }
+
+  return descendants;
+}
+
+// Hierarchical group structure
+interface HierarchicalGroup extends TaskGroup {
+  children: HierarchicalGroup[];
+  isParent: boolean;
+}
+
+// Build hierarchical structure from flat list
+function buildGroupHierarchy(groups: TaskGroup[]): HierarchicalGroup[] {
+  // Create a map of all groups
+  const groupMap = new Map<string, HierarchicalGroup>();
+  
+  // Initialize all groups with empty children arrays
+  groups.forEach((group) => {
+    groupMap.set(group.id, {
+      ...group,
+      children: [],
+      isParent: group.is_parent_group || false, // Mark parent groups as parents immediately
+    });
+  });
+
+  // Build the tree structure
+  const rootGroups: HierarchicalGroup[] = [];
+  
+  groups.forEach((group) => {
+    const hierarchicalGroup = groupMap.get(group.id)!;
+    
+    if (group.parent_group_id) {
+      const parent = groupMap.get(group.parent_group_id);
+      if (parent) {
+        parent.children.push(hierarchicalGroup);
+        parent.isParent = true; // Mark parent as having children
+      } else {
+        // Parent not found, treat as root
+        rootGroups.push(hierarchicalGroup);
+      }
+    } else {
+      rootGroups.push(hierarchicalGroup);
+    }
+  });
+
+  // Sort groups alphabetically at each level
+  const sortGroups = (groupList: HierarchicalGroup[]): HierarchicalGroup[] => {
+    const sorted = [...groupList].sort((a, b) => a.name.localeCompare(b.name));
+    sorted.forEach((group) => {
+      if (group.children.length > 0) {
+        group.children = sortGroups(group.children);
+      }
+    });
+    return sorted;
+  };
+
+  return sortGroups(rootGroups);
+}
+
+// Flatten hierarchical structure back to array for processing
+function flattenGroupHierarchy(hierarchicalGroups: HierarchicalGroup[]): HierarchicalGroup[] {
+  const result: HierarchicalGroup[] = [];
+  
+  const traverse = (groups: HierarchicalGroup[]) => {
+    for (const group of groups) {
+      result.push(group);
+      if (group.children.length > 0) {
+        traverse(group.children);
+      }
+    }
+  };
+  
+  traverse(hierarchicalGroups);
+  return result;
+}
+
 interface GroupCardProps {
   groupName: string;
   groupColor: string;
   taskCount: number;
+  childGroupCount?: number;
   tasks: Task[];
   isExpanded: boolean;
   isHidden: boolean;
@@ -78,12 +178,16 @@ interface GroupCardProps {
   onEdit?: () => void;
   onDelete?: () => void;
   isUngrouped?: boolean;
+  isParent?: boolean;
+  indentLevel?: number;
+  children?: React.ReactNode;
 }
 
 function GroupCard({
   groupName,
   groupColor,
   taskCount,
+  childGroupCount = 0,
   tasks,
   isExpanded,
   isHidden,
@@ -96,16 +200,92 @@ function GroupCard({
   onEdit,
   onDelete,
   isUngrouped = false,
+  isParent = false,
+  indentLevel = 0,
+  children,
 }: GroupCardProps) {
   const textColor = getContrastColor(groupColor);
 
+  // For parent groups, render as wireframe container
+  if (isParent) {
+    return (
+      <div
+        className={cn(
+          "transition-opacity duration-200",
+          "border-2 border-dashed rounded-lg",
+          "p-2 space-y-2",
+          isOtherSelected && "opacity-40",
+          indentLevel > 0 && `ml-${indentLevel * 4}`
+        )}
+        style={{
+          borderColor: groupColor,
+          backgroundColor: `${groupColor}10`,
+          ...(indentLevel > 0 ? { marginLeft: `${indentLevel * 16}px` } : {}),
+        }}
+      >
+        {/* Parent Group Header */}
+        <div
+          role="button"
+          tabIndex={0}
+          className="flex items-center justify-between gap-2 px-2 py-1 cursor-pointer rounded hover:bg-black/5"
+          onClick={onSelect}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              onSelect();
+            }
+          }}
+        >
+          <div className="flex items-center gap-2 flex-1 min-w-0">
+            <Folder className="h-4 w-4 shrink-0" style={{ color: groupColor }} />
+            <span
+              className="truncate text-sm font-semibold"
+              style={{ color: groupColor }}
+            >
+              {groupName}
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <Badge
+              variant="secondary"
+              className="text-[10px] px-1.5 py-0 h-4 min-w-[1.25rem]"
+              style={{ backgroundColor: `${groupColor}20`, color: groupColor }}
+            >
+              {childGroupCount}
+            </Badge>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-6 w-6 p-0 flex-shrink-0"
+              onClick={(e) => {
+                e.stopPropagation();
+                onToggleExpand();
+              }}
+            >
+              {isExpanded ? (
+                <ChevronDown className="h-3.5 w-3.5" style={{ color: groupColor }} />
+              ) : (
+                <ChevronRight className="h-3.5 w-3.5" style={{ color: groupColor }} />
+              )}
+            </Button>
+          </div>
+        </div>
+        {/* Child groups rendered here when expanded */}
+        {children}
+      </div>
+    );
+  }
+
+  // Regular group card (non-parent)
   return (
     <Card
       className={cn(
         "transition-opacity duration-200 overflow-hidden",
         "pt-0 pb-[5px] gap-0",
-        isOtherSelected && "opacity-40"
+        isOtherSelected && "opacity-40",
+        indentLevel > 0 && `ml-${indentLevel * 4}`
       )}
+      style={indentLevel > 0 ? { marginLeft: `${indentLevel * 16}px` } : undefined}
     >
       {/* Colored Header */}
       <div
@@ -123,7 +303,10 @@ function GroupCard({
       >
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2 flex-1 min-w-0">
-            <span className="text-sm font-medium truncate" style={{ color: textColor }}>
+            <span
+              className="truncate text-sm font-medium"
+              style={{ color: textColor }}
+            >
               {groupName}
             </span>
           </div>
@@ -195,7 +378,7 @@ function GroupCard({
         </div>
       )}
 
-      {/* Tasks - Shown when expanded */}
+      {/* Tasks - Shown when expanded (only for non-parent groups) */}
       {isExpanded && (
         <CardContent className="pt-0 pb-2 px-2 space-y-1 overflow-y-auto max-h-64">
           {/* Minimal header when expanded */}
@@ -243,6 +426,8 @@ export function TaskGroupManager({
   const [editingGroup, setEditingGroup] = useState<TaskGroup | null>(null);
   const [newGroupName, setNewGroupName] = useState("");
   const [newGroupColor, setNewGroupColor] = useState("#3B82F6");
+  const [newParentGroupId, setNewParentGroupId] = useState<string | null>(null);
+  const [isCreatingParentGroup, setIsCreatingParentGroup] = useState(false);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const [hiddenGroups, setHiddenGroups] = useState<Set<string>>(new Set());
 
@@ -324,6 +509,8 @@ export function TaskGroupManager({
         body: JSON.stringify({
           name: newGroupName.trim(),
           color: newGroupColor,
+          parent_group_id: isCreatingParentGroup ? undefined : (newParentGroupId || undefined),
+          is_parent_group: isCreatingParentGroup,
         } as CreateTaskGroupRequest),
       });
 
@@ -332,8 +519,10 @@ export function TaskGroupManager({
         setGroups((prev) => [...prev, data.group]);
         setNewGroupName("");
         setNewGroupColor("#3B82F6");
+        setNewParentGroupId(null);
+        setIsCreatingParentGroup(false);
         setIsCreateDialogOpen(false);
-        toast.success("Task group created successfully");
+        toast.success(isCreatingParentGroup ? "Parent group created successfully" : "Task group created successfully");
       } else {
         const errorData = await response
           .json()
@@ -410,15 +599,57 @@ export function TaskGroupManager({
     setEditingGroup(group);
     setNewGroupName(group.name);
     setNewGroupColor(group.color);
+    setNewParentGroupId(group.parent_group_id || null);
     setIsEditDialogOpen(true);
   };
+
+  // Get available parent groups (only groups marked as parent groups, excluding current group when editing)
+  const getAvailableParentGroups = (excludeGroupId?: string): TaskGroup[] => {
+    // Only return groups that are marked as parent groups
+    let parentGroups = groups.filter((g) => g.is_parent_group);
+    
+    if (excludeGroupId) {
+      // When editing, exclude the current group and all its descendants
+      const excludedIds = new Set([excludeGroupId, ...getGroupDescendants(excludeGroupId, groups)]);
+      parentGroups = parentGroups.filter((g) => !excludedIds.has(g.id));
+    }
+    
+    return parentGroups;
+  };
+
+  // Get all parent groups
+  const parentGroups = groups.filter((g) => g.is_parent_group);
+  
+  // Get all regular groups (non-parent groups)
+  const regularGroups = groups.filter((g) => !g.is_parent_group);
+
+  // Build hierarchy including parent groups and their children
+  // First, create a map of all groups (both parent and regular)
+  const allGroupsForHierarchy = [...parentGroups, ...regularGroups];
+  const hierarchicalGroups = buildGroupHierarchy(allGroupsForHierarchy);
+  
+  // Filter out parent groups that have no children
+  const filteredHierarchicalGroups = hierarchicalGroups.filter((group) => {
+    // If it's a parent group, only show it if it has children
+    if (group.isParent || group.is_parent_group) {
+      return group.children.length > 0;
+    }
+    // Show all regular groups
+    return true;
+  });
 
   const toggleGroupExpansion = (groupId: string) => {
     setExpandedGroups((prev) => {
       const newSet = new Set(prev);
-      if (newSet.has(groupId)) {
+      const isCurrentlyExpanded = newSet.has(groupId);
+      
+      if (isCurrentlyExpanded) {
+        // Collapsing: remove this group and all its descendants
         newSet.delete(groupId);
+        const descendants = getGroupDescendants(groupId, groups);
+        descendants.forEach((descendantId) => newSet.delete(descendantId));
       } else {
+        // Expanding: add this group
         newSet.add(groupId);
       }
       return newSet;
@@ -457,6 +688,9 @@ export function TaskGroupManager({
 
   const getUnscheduledTasksForGroup = (groupId: string | null) => {
     return tasks.filter((task) => {
+      // Exclude completed tasks
+      if (task.status === "completed") return false;
+
       const isUnscheduled = !task.scheduled_start || !task.scheduled_end;
       if (!isUnscheduled) return false;
 
@@ -474,6 +708,9 @@ export function TaskGroupManager({
 
   const getAllTasksForGroup = (groupId: string | null) => {
     return tasks.filter((task) => {
+      // Exclude completed tasks
+      if (task.status === "completed") return false;
+
       if (groupId === null) {
         return !task.group_id;
       }
@@ -488,11 +725,91 @@ export function TaskGroupManager({
   const getTaskCountForGroup = (groupId: string | null) => {
     if (showAllTasks) {
       if (groupId === null) {
-        return tasks.filter((t) => !t.group_id).length;
+        return tasks.filter((t) => !t.group_id && t.status !== "completed").length;
       }
-      return tasks.filter((t) => t.group_id === groupId).length;
+      return tasks.filter((t) => t.group_id === groupId && t.status !== "completed").length;
     }
     return getUnscheduledTasksForGroup(groupId).length;
+  };
+
+  // hierarchicalGroups is already built above
+
+  // Recursive function to render a group and its children
+  const renderGroup = (group: HierarchicalGroup, level: number = 0) => {
+    const isParentGroup = group.isParent;
+    const childGroupCount = group.children.length;
+    const isExpanded = expandedGroups.has(group.id);
+
+    // For parent groups, render children inside the wireframe
+    if (isParentGroup) {
+      return (
+        <div key={group.id}>
+          <GroupCard
+            groupName={group.name}
+            groupColor={group.color}
+            taskCount={getTaskCountForGroup(group.id)}
+            childGroupCount={childGroupCount}
+            tasks={getTasksForGroup(group.id)}
+            isExpanded={isExpanded}
+            isHidden={hiddenGroups.has(group.id)}
+            isOtherSelected={selectedGroupId !== null && selectedGroupId !== group.id}
+            showAllTasks={showAllTasks}
+            onToggleExpand={() => toggleGroupExpansion(group.id)}
+            onToggleVisibility={() => toggleGroupVisibility(group.id)}
+            onSelect={() => {
+              if (selectedGroupId === group.id) {
+                onGroupSelect?.(null);
+              } else {
+                onGroupSelect?.(group.id);
+              }
+            }}
+            onTaskClick={onTaskClick}
+            onEdit={() => handleEditGroup(group)}
+            onDelete={() => deleteGroup(group.id)}
+            isParent={isParentGroup}
+            indentLevel={level}
+          >
+            {/* Render children inside parent wireframe when expanded */}
+            {isExpanded && group.children.length > 0 && (
+              <div className="mt-2 space-y-2">
+                {group.children.map((child) => renderGroup(child, 0))}
+              </div>
+            )}
+          </GroupCard>
+        </div>
+      );
+    }
+
+    // Regular groups
+    return (
+      <div key={group.id}>
+        <GroupCard
+          groupName={group.name}
+          groupColor={group.color}
+          taskCount={getTaskCountForGroup(group.id)}
+          childGroupCount={childGroupCount}
+          tasks={getTasksForGroup(group.id)}
+          isExpanded={isExpanded}
+          isHidden={hiddenGroups.has(group.id)}
+          isOtherSelected={selectedGroupId !== null && selectedGroupId !== group.id}
+          showAllTasks={showAllTasks}
+          onToggleExpand={() => toggleGroupExpansion(group.id)}
+          onToggleVisibility={() => toggleGroupVisibility(group.id)}
+          onSelect={() => {
+            if (selectedGroupId === group.id) {
+              onGroupSelect?.(null);
+            } else {
+              onGroupSelect?.(group.id);
+            }
+          }}
+          onTaskClick={onTaskClick}
+          onEdit={() => handleEditGroup(group)}
+          onDelete={() => deleteGroup(group.id)}
+          isParent={isParentGroup}
+          indentLevel={level}
+        />
+      </div>
+    );
   };
 
   if (isLoading) {
@@ -509,18 +826,32 @@ export function TaskGroupManager({
   return (
     <div className="flex flex-col h-full max-h-full overflow-hidden w-full">
       {/* Control buttons row */}
-      <div className="flex-shrink-0 pb-2 px-3 pt-3 flex items-center gap-2 flex-wrap">
-        <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+      <div className="flex-shrink-0 pb-2 px-3 pt-3 flex items-center gap-2">
+        <Dialog open={isCreateDialogOpen} onOpenChange={(open) => {
+          setIsCreateDialogOpen(open);
+          if (!open) {
+            setIsCreatingParentGroup(false);
+          }
+        }}>
           <DialogTrigger asChild>
-            <Button size="sm" variant="outline" className="h-8 px-3">
+            <Button 
+              size="sm" 
+              variant="outline" 
+              className="h-8 px-3"
+              onClick={() => setIsCreatingParentGroup(false)}
+            >
               <Plus className="h-4 w-4 mr-1.5" />
-              <span className="text-xs">New</span>
+              <span className="text-xs">New Group</span>
             </Button>
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Create New Group</DialogTitle>
-              <DialogDescription>Create a new task group to organize your tasks.</DialogDescription>
+              <DialogTitle>{isCreatingParentGroup ? "Create New Parent Group" : "Create New Group"}</DialogTitle>
+              <DialogDescription>
+                {isCreatingParentGroup 
+                  ? "Create a new parent group to organize your task groups." 
+                  : "Create a new task group to organize your tasks."}
+              </DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
               <div>
@@ -562,12 +893,35 @@ export function TaskGroupManager({
                   </div>
                 </div>
               </div>
+              {!isCreatingParentGroup && (
+                <div>
+                  <label htmlFor="parent-group-select-create" className="text-sm font-medium">
+                    Parent Group
+                  </label>
+                  <Select
+                    value={newParentGroupId || "__none__"}
+                    onValueChange={(value) => setNewParentGroupId(value === "__none__" ? null : value)}
+                  >
+                    <SelectTrigger id="parent-group-select-create" className="mt-1 w-full">
+                      <SelectValue placeholder="None (top-level group)" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__none__">None (top-level group)</SelectItem>
+                      {getAvailableParentGroups().map((group) => (
+                        <SelectItem key={group.id} value={group.id}>
+                          {group.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
               <div className="flex justify-end gap-2">
                 <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
                   Cancel
                 </Button>
                 <Button onClick={createGroup} disabled={!newGroupName.trim()}>
-                  Create Group
+                  {isCreatingParentGroup ? "Create Parent Group" : "Create Group"}
                 </Button>
               </div>
             </div>
@@ -604,32 +958,8 @@ export function TaskGroupManager({
 
       {/* Content */}
       <div className="space-y-2 overflow-y-auto overflow-x-hidden flex-1 min-h-0 px-3 pb-3">
-        {/* Task Groups first */}
-        {groups.map((group) => (
-          <GroupCard
-            key={group.id}
-            groupName={group.name}
-            groupColor={group.color}
-            taskCount={getTaskCountForGroup(group.id)}
-            tasks={getTasksForGroup(group.id)}
-            isExpanded={expandedGroups.has(group.id)}
-            isHidden={hiddenGroups.has(group.id)}
-            isOtherSelected={selectedGroupId !== null && selectedGroupId !== group.id}
-            showAllTasks={showAllTasks}
-            onToggleExpand={() => toggleGroupExpansion(group.id)}
-            onToggleVisibility={() => toggleGroupVisibility(group.id)}
-            onSelect={() => {
-              if (selectedGroupId === group.id) {
-                onGroupSelect?.(null);
-              } else {
-                onGroupSelect?.(group.id);
-              }
-            }}
-            onTaskClick={onTaskClick}
-            onEdit={() => handleEditGroup(group)}
-            onDelete={() => deleteGroup(group.id)}
-          />
-        ))}
+        {/* Task Groups - rendered hierarchically */}
+        {filteredHierarchicalGroups.map((group) => renderGroup(group))}
 
         {groups.length === 0 && (
           <div className="text-center py-4 text-muted-foreground">
@@ -664,72 +994,13 @@ export function TaskGroupManager({
       </div>
 
       {/* Edit Group Dialog */}
-      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Edit Group</DialogTitle>
-            <DialogDescription>Update the group name and color.</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <div className="text-sm font-medium mb-1">Group Name</div>
-              <Input
-                value={newGroupName}
-                onChange={(e) => setNewGroupName(e.target.value)}
-                placeholder="Enter group name"
-                className="mt-1"
-              />
-            </div>
-            <div>
-              <label htmlFor="group-color-input-edit" className="text-sm font-medium">
-                Color
-              </label>
-              <div className="mt-1 flex items-center gap-3">
-                <div className="relative">
-                  <input
-                    id="group-color-input-edit"
-                    type="color"
-                    value={newGroupColor}
-                    onChange={(e) => setNewGroupColor(e.target.value)}
-                    className="h-10 w-20 cursor-pointer rounded-md border border-input bg-background"
-                    title="Pick a color"
-                  />
-                </div>
-                <div className="flex items-center gap-2">
-                  <div
-                    className="h-10 w-10 rounded-md border border-input"
-                    style={{ backgroundColor: newGroupColor }}
-                  />
-                  <Input
-                    type="text"
-                    value={newGroupColor}
-                    onChange={(e) => setNewGroupColor(e.target.value)}
-                    placeholder="#3B82F6"
-                    className="w-24 font-mono text-sm"
-                  />
-                </div>
-              </div>
-            </div>
-            <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
-                Cancel
-              </Button>
-              <Button
-                onClick={() =>
-                  editingGroup &&
-                  updateGroup(editingGroup.id, {
-                    name: newGroupName.trim(),
-                    color: newGroupColor,
-                  })
-                }
-                disabled={!newGroupName.trim()}
-              >
-                Update Group
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <EditGroupDialog
+        open={isEditDialogOpen}
+        onOpenChange={setIsEditDialogOpen}
+        group={editingGroup}
+        groups={groups}
+        onGroupUpdated={fetchGroups}
+      />
     </div>
   );
 }

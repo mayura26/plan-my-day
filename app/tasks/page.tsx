@@ -1,9 +1,11 @@
 "use client";
 
+import { Folder } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
+import { EditGroupDialog } from "@/components/edit-group-dialog";
 import { GroupedTaskList } from "@/components/grouped-task-list";
 import { TaskForm } from "@/components/task-form";
 import { TaskImportDialog } from "@/components/task-import-dialog";
@@ -17,7 +19,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import type { CreateTaskRequest, Task, TaskGroup } from "@/lib/types";
+import type { CreateTaskGroupRequest, CreateTaskRequest, Task, TaskGroup } from "@/lib/types";
 
 export default function TasksPage() {
   const { confirm } = useConfirmDialog();
@@ -33,8 +35,9 @@ export default function TasksPage() {
   const [groups, setGroups] = useState<TaskGroup[]>([]);
   const [showAllTasks, setShowAllTasks] = useState(false);
   const [showImportDialog, setShowImportDialog] = useState(false);
-  const [showRenameDialog, setShowRenameDialog] = useState(false);
-  const [renamingGroup, setRenamingGroup] = useState<TaskGroup | null>(null);
+  const [editingGroup, setEditingGroup] = useState<TaskGroup | null>(null);
+  const [showEditGroupDialog, setShowEditGroupDialog] = useState(false);
+  const [showCreateParentDialog, setShowCreateParentDialog] = useState(false);
   const [newGroupName, setNewGroupName] = useState("");
   const [newGroupColor, setNewGroupColor] = useState("#3B82F6");
 
@@ -238,45 +241,49 @@ export default function TasksPage() {
     }
   };
 
-  // Rename group
+  // Edit group
   const handleRenameGroup = (group: TaskGroup) => {
-    setRenamingGroup(group);
-    setNewGroupName(group.name);
-    setNewGroupColor(group.color);
-    setShowRenameDialog(true);
+    setEditingGroup(group);
+    setShowEditGroupDialog(true);
   };
 
-  const handleUpdateGroup = async () => {
-    if (!renamingGroup || !newGroupName.trim()) return;
+  const handleGroupUpdated = async () => {
+    // Refresh groups after update
+    await fetchGroups();
+  };
+
+  // Create parent group
+  const handleCreateParentGroup = async () => {
+    if (!newGroupName.trim()) return;
 
     try {
-      const response = await fetch(`/api/task-groups/${renamingGroup.id}`, {
-        method: "PUT",
+      const response = await fetch("/api/task-groups", {
+        method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
           name: newGroupName.trim(),
           color: newGroupColor,
-        }),
+          is_parent_group: true,
+        } as CreateTaskGroupRequest),
       });
 
       if (response.ok) {
         const data = await response.json();
-        setGroups((prev) =>
-          prev.map((group) => (group.id === renamingGroup.id ? data.group : group))
-        );
-        setShowRenameDialog(false);
-        setRenamingGroup(null);
-        toast.success("Task group updated successfully");
+        setGroups((prev) => [...prev, data.group]);
+        setNewGroupName("");
+        setNewGroupColor("#3B82F6");
+        setShowCreateParentDialog(false);
+        toast.success("Parent group created successfully");
       } else {
         const error = await response.json();
-        toast.error(error.error || "Failed to update task group");
-        console.error("Failed to update group:", error);
-        throw new Error(error.error || "Failed to update group");
+        toast.error(error.error || "Failed to create parent group");
+        console.error("Failed to create parent group:", error);
+        throw new Error(error.error || "Failed to create parent group");
       }
     } catch (error) {
-      console.error("Error updating group:", error);
+      console.error("Error creating parent group:", error);
       throw error;
     }
   };
@@ -354,6 +361,7 @@ export default function TasksPage() {
           onShowAllTasksChange={setShowAllTasks}
           onRenameGroup={handleRenameGroup}
           onDeleteGroup={handleDeleteGroup}
+          onCreateParentGroup={() => setShowCreateParentDialog(true)}
         />
       </main>
 
@@ -418,13 +426,12 @@ export default function TasksPage() {
         }}
       />
 
-      {/* Rename Group Dialog */}
+      {/* Create Parent Group Dialog */}
       <Dialog
-        open={showRenameDialog}
+        open={showCreateParentDialog}
         onOpenChange={(open) => {
-          setShowRenameDialog(open);
+          setShowCreateParentDialog(open);
           if (!open) {
-            setRenamingGroup(null);
             setNewGroupName("");
             setNewGroupColor("#3B82F6");
           }
@@ -432,30 +439,32 @@ export default function TasksPage() {
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Rename Group</DialogTitle>
-            <DialogDescription>Update the group name and color.</DialogDescription>
+            <DialogTitle>Create Parent Group</DialogTitle>
+            <DialogDescription>
+              Create a new parent group to organize your task groups.
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <label htmlFor="group-name-input" className="text-sm font-medium">
-                Group Name
+              <label htmlFor="parent-group-name-input" className="text-sm font-medium">
+                Parent Group Name
               </label>
               <Input
-                id="group-name-input"
+                id="parent-group-name-input"
                 value={newGroupName}
                 onChange={(e) => setNewGroupName(e.target.value)}
-                placeholder="Enter group name"
+                placeholder="Enter parent group name"
                 className="mt-1"
               />
             </div>
             <div>
-              <label htmlFor="group-color-input" className="text-sm font-medium">
+              <label htmlFor="parent-group-color-input" className="text-sm font-medium">
                 Color
               </label>
               <div className="mt-1 flex items-center gap-3">
                 <div className="relative">
                   <input
-                    id="group-color-input"
+                    id="parent-group-color-input"
                     type="color"
                     value={newGroupColor}
                     onChange={(e) => setNewGroupColor(e.target.value)}
@@ -479,16 +488,25 @@ export default function TasksPage() {
               </div>
             </div>
             <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setShowRenameDialog(false)}>
+              <Button variant="outline" onClick={() => setShowCreateParentDialog(false)}>
                 Cancel
               </Button>
-              <Button onClick={handleUpdateGroup} disabled={!newGroupName.trim()}>
-                Update Group
+              <Button onClick={handleCreateParentGroup} disabled={!newGroupName.trim()}>
+                Create Parent Group
               </Button>
             </div>
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Edit Group Dialog */}
+      <EditGroupDialog
+        open={showEditGroupDialog}
+        onOpenChange={setShowEditGroupDialog}
+        group={editingGroup}
+        groups={groups}
+        onGroupUpdated={handleGroupUpdated}
+      />
     </div>
   );
 }

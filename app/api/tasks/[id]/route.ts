@@ -183,6 +183,24 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       return NextResponse.json({ error: "Validation failed", details: errors }, { status: 400 });
     }
 
+    // Validate group_id - ensure it's not a parent group
+    if (body.group_id !== undefined && body.group_id !== null) {
+      const groupResult = await db.execute(
+        `SELECT is_parent_group FROM task_groups WHERE id = ? AND user_id = ?`,
+        [body.group_id, session.user.id]
+      );
+      if (groupResult.rows.length === 0) {
+        return NextResponse.json({ error: "Task group not found" }, { status: 404 });
+      }
+      const isParentGroup = Boolean(groupResult.rows[0].is_parent_group);
+      if (isParentGroup) {
+        return NextResponse.json(
+          { error: "Cannot assign tasks to parent groups. Please select a regular group." },
+          { status: 400 }
+        );
+      }
+    }
+
     // Check if task exists and belongs to user
     const existingTaskResult = await db.execute(
       "SELECT * FROM tasks WHERE id = ? AND user_id = ?",

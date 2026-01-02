@@ -24,6 +24,8 @@ export async function GET(_request: NextRequest) {
       name: row.name as string,
       color: row.color as string,
       collapsed: Boolean(row.collapsed),
+      parent_group_id: (row.parent_group_id as string) || null,
+      is_parent_group: Boolean(row.is_parent_group),
       created_at: row.created_at as string,
       updated_at: row.updated_at as string,
     }));
@@ -47,6 +49,21 @@ export async function POST(request: NextRequest) {
 
     if (!body.name || body.name.trim().length === 0) {
       return NextResponse.json({ error: "Group name is required" }, { status: 400 });
+    }
+
+    // Validate parent_group_id if provided
+    if (body.parent_group_id) {
+      const parentGroup = await db.execute(
+        "SELECT id FROM task_groups WHERE id = ? AND user_id = ?",
+        [body.parent_group_id, session.user.id]
+      );
+
+      if (parentGroup.rows.length === 0) {
+        return NextResponse.json(
+          { error: "Parent group not found or does not belong to user" },
+          { status: 400 }
+        );
+      }
     }
 
     // Verify user exists in database, create if missing (handles edge cases)
@@ -93,14 +110,16 @@ export async function POST(request: NextRequest) {
       name: body.name.trim(),
       color: body.color || "#3B82F6",
       collapsed: false,
+      parent_group_id: body.parent_group_id || null,
+      is_parent_group: body.is_parent_group || false,
       created_at: now,
       updated_at: now,
     };
 
     await db.execute(
       `
-      INSERT INTO task_groups (id, user_id, name, color, collapsed, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO task_groups (id, user_id, name, color, collapsed, parent_group_id, is_parent_group, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `,
       [
         group.id,
@@ -108,6 +127,8 @@ export async function POST(request: NextRequest) {
         group.name,
         group.color,
         group.collapsed,
+        group.parent_group_id,
+        group.is_parent_group,
         group.created_at,
         group.updated_at,
       ]
