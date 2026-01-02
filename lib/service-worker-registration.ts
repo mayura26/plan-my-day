@@ -5,7 +5,7 @@
  * Following Next.js PWA best practices: https://nextjs.org/docs/app/guides/progressive-web-apps
  *
  * Manual registration with updateViaCache: 'none' to prevent caching issues
- * This prevents the reload loops caused by next-pwa's auto-registration
+ * Service worker registration is disabled in development mode to prevent caching issues
  */
 
 export async function registerServiceWorker(): Promise<ServiceWorkerRegistration | null> {
@@ -13,10 +13,19 @@ export async function registerServiceWorker(): Promise<ServiceWorkerRegistration
     return null;
   }
 
+  // Skip service worker registration in development mode
+  const isDevelopment =
+    process.env.NODE_ENV === "development" ||
+    window.location.hostname === "localhost" ||
+    window.location.hostname === "127.0.0.1";
+
+  if (isDevelopment) {
+    return null;
+  }
+
   try {
     // Manual registration following Next.js best practices
     // updateViaCache: 'none' prevents the service worker from being cached
-    // This is crucial to prevent reload loops in development
     const registration = await navigator.serviceWorker.register("/sw.js", {
       scope: "/",
       updateViaCache: "none", // Key difference from next-pwa auto-registration

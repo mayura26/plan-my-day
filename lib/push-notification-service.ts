@@ -56,14 +56,26 @@ class PushNotificationService {
         throw new Error("Push notifications are not supported");
       }
 
+      // Skip service worker registration in development mode
+      const isDevelopment =
+        process.env.NODE_ENV === "development" ||
+        (typeof window !== "undefined" &&
+          (window.location.hostname === "localhost" ||
+            window.location.hostname === "127.0.0.1"));
+
       // Register service worker manually if not already registered
       // Following Next.js best practices with updateViaCache: 'none'
       let registration = await navigator.serviceWorker.getRegistration();
-      if (!registration) {
+      if (!registration && !isDevelopment) {
         registration = await navigator.serviceWorker.register("/sw.js", {
           scope: "/",
           updateViaCache: "none", // Prevent caching issues per Next.js docs
         });
+      }
+
+      // In development, if no registration exists, throw an error
+      if (!registration && isDevelopment) {
+        throw new Error("Service worker is disabled in development mode");
       }
 
       // Wait for service worker to be ready
