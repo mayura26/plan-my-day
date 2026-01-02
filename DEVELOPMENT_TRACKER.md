@@ -1,6 +1,5 @@
 ### ⏳ Pending
 ---
-[ ] task voew page has react loo[]
 [ ] Redesign task control form to be slimer 
 [ ] All buttons and actions should be smooth with loading animations
 

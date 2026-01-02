@@ -81,6 +81,15 @@ class PushNotificationService {
       // Wait for service worker to be ready
       await navigator.serviceWorker.ready;
 
+      // Ensure we have a registration (re-fetch after ready to get active registration)
+      if (!registration) {
+        registration = await navigator.serviceWorker.getRegistration();
+      }
+
+      if (!registration) {
+        throw new Error("Service worker registration not available");
+      }
+
       // Check current subscription
       let subscription = await registration.pushManager.getSubscription();
 
