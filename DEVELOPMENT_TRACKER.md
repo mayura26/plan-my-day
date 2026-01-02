@@ -1,8 +1,3 @@
-### ⏳ Pending
----
-[ ] Redesign task control form to be slimer 
-[ ] All buttons and actions should be smooth with loading animations
-
 ## Phase 2: AI Scheduling & Notifications (Weeks 5-8)
 
 ### ⏳ Pending

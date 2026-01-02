@@ -298,14 +298,14 @@ export function TaskDetailDialog({
     <Dialog open={open} onOpenChange={handleDialogClose}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto w-[95vw] md:w-full mx-2 md:mx-auto">
         <DialogHeader>
-          <DialogTitle className="text-2xl">{task.title}</DialogTitle>
+          <DialogTitle className="text-xl sm:text-2xl">{task.title}</DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-4">
+        <div className="space-y-3 sm:space-y-4">
           {/* Top Action Bar */}
-          <div className="space-y-3">
+          <div className="space-y-2 sm:space-y-3">
             {/* Compact Status Badges */}
-            <div className="flex flex-wrap items-center gap-1.5">
+            <div className="flex flex-wrap items-center gap-1 sm:gap-1.5">
               <Badge className={`${getStatusColor(task.status)} text-xs px-1.5 py-0.5`}>
                 {task.status === "completed" ? (
                   <CheckCircle2 className="h-2.5 w-2.5 mr-0.5" />
@@ -359,8 +359,8 @@ export function TaskDetailDialog({
               )}
             </div>
             {/* Action Buttons */}
-            <div className="border rounded-lg bg-muted/30 p-3">
-              <div className="flex flex-wrap items-center gap-2">
+            <div className="border rounded-lg bg-muted/30 py-2 px-3 sm:py-3 sm:px-4">
+              <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
                 {/* Status Change Actions */}
                 {task.status === "completed" && (
                   <Button
@@ -376,9 +376,11 @@ export function TaskDetailDialog({
                       }
                     }}
                     loading={isChangingStatus}
+                    className="flex-1 sm:flex-initial text-xs sm:text-sm"
                   >
                     <Circle className="h-4 w-4 mr-1" />
-                    Mark Incomplete
+                    <span className="hidden sm:inline">Mark Incomplete</span>
+                    <span className="sm:hidden">Incomplete</span>
                   </Button>
                 )}
                 {task.status === "pending" && !isBlocked && (
@@ -395,6 +397,7 @@ export function TaskDetailDialog({
                       }
                     }}
                     loading={isChangingStatus}
+                    className="flex-1 sm:flex-initial text-xs sm:text-sm"
                   >
                     Start Task
                   </Button>
@@ -413,9 +416,11 @@ export function TaskDetailDialog({
                       }
                     }}
                     loading={isChangingStatus}
+                    className="flex-1 sm:flex-initial text-xs sm:text-sm"
                   >
                     <CheckCircle2 className="h-4 w-4 mr-1" />
-                    Mark Complete
+                    <span className="hidden sm:inline">Mark Complete</span>
+                    <span className="sm:hidden">Complete</span>
                   </Button>
                 )}
                 {task.status === "in_progress" && (
@@ -432,30 +437,33 @@ export function TaskDetailDialog({
                       }
                     }}
                     loading={isChangingStatus}
+                    className="flex-1 sm:flex-initial text-xs sm:text-sm"
                   >
                     <CheckCircle2 className="h-4 w-4 mr-1" />
-                    Mark Complete
+                    <span className="hidden sm:inline">Mark Complete</span>
+                    <span className="sm:hidden">Complete</span>
                   </Button>
                 )}
                 {task.status === "pending" && isBlocked && (
-                  <Button size="sm" variant="outline" disabled>
+                  <Button size="sm" variant="outline" disabled className="flex-1 sm:flex-initial text-xs sm:text-sm">
                     Blocked
                   </Button>
                 )}
 
                 {/* Edit and Delete */}
-                <Button size="sm" variant="outline" onClick={handleEdit}>
+                <Button size="sm" variant="outline" onClick={handleEdit} className="flex-1 sm:flex-initial text-xs sm:text-sm">
                   <Edit className="h-4 w-4 mr-1" />
-                  Edit
+                  <span className="hidden sm:inline">Edit</span>
                 </Button>
                 <Button
                   size="sm"
                   variant="destructive"
                   onClick={handleDelete}
                   loading={isDeleting}
+                  className="flex-1 sm:flex-initial text-xs sm:text-sm"
                 >
                   <Trash2 className="h-4 w-4 mr-1" />
-                  Delete
+                  <span className="hidden sm:inline">Delete</span>
                 </Button>
               </div>
             </div>
@@ -463,9 +471,9 @@ export function TaskDetailDialog({
 
           {/* Schedule Information */}
           {(task.scheduled_start || task.scheduled_end) && (
-            <Card>
-              <CardContent className="pt-4">
-                <div className="flex items-center justify-between mb-3">
+            <Card className="py-2 sm:py-6">
+              <CardContent className="pt-0 pb-0 px-3 sm:px-6">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-0 mb-2 sm:mb-3">
                   <h3 className="text-sm font-semibold flex items-center gap-2">
                     <Calendar className="h-4 w-4" />
                     Schedule
@@ -476,6 +484,7 @@ export function TaskDetailDialog({
                       variant="outline"
                       onClick={handleUnschedule}
                       loading={isUnscheduling}
+                      className="text-xs sm:text-sm w-full sm:w-auto"
                     >
                       <CalendarX className="h-4 w-4 mr-2" />
                       {isUnscheduling ? "Unscheduling..." : "Unschedule"}
@@ -484,24 +493,24 @@ export function TaskDetailDialog({
                 </div>
                 <div className="space-y-2">
                   {task.scheduled_start && (
-                    <div className="flex items-center gap-2 text-sm">
-                      <span className="text-muted-foreground w-16">Start:</span>
-                      <span className="font-medium">
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 text-xs sm:text-sm">
+                      <span className="text-muted-foreground sm:w-16">Start:</span>
+                      <span className="font-medium break-words">
                         {formatDateTimeFull(task.scheduled_start, timezone)}
                       </span>
                     </div>
                   )}
                   {task.scheduled_end && (
-                    <div className="flex items-center gap-2 text-sm">
-                      <span className="text-muted-foreground w-16">End:</span>
-                      <span className="font-medium">
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 text-xs sm:text-sm">
+                      <span className="text-muted-foreground sm:w-16">End:</span>
+                      <span className="font-medium break-words">
                         {formatDateTimeFull(task.scheduled_end, timezone)}
                       </span>
                     </div>
                   )}
                   {task.scheduled_start && task.scheduled_end && (
-                    <div className="flex items-center gap-2 text-sm pt-2 border-t">
-                      <span className="text-muted-foreground w-16">Duration:</span>
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 text-xs sm:text-sm pt-2 border-t">
+                      <span className="text-muted-foreground sm:w-16">Duration:</span>
                       <span className="font-medium">
                         {Math.round(
                           (parseISO(task.scheduled_end).getTime() -
@@ -519,12 +528,12 @@ export function TaskDetailDialog({
 
           {/* Subtasks - Only show for non-subtask tasks */}
           {!isSubtask && (
-            <Card>
+            <Card className="py-0 sm:py-6">
               <CardContent className="p-0">
                 <button
                   type="button"
                   onClick={() => setSubtasksExpanded(!subtasksExpanded)}
-                  className="w-full flex items-center justify-between p-4 hover:bg-accent/50 transition-colors"
+                  className="w-full flex items-center justify-between py-2 px-3 sm:py-4 sm:px-6 hover:bg-accent/50 transition-colors"
                 >
                   <div className="flex items-center gap-2">
                     {subtasksExpanded ? (
@@ -544,7 +553,7 @@ export function TaskDetailDialog({
                   )}
                 </button>
                 {subtasksExpanded && (
-                  <div className="border-t p-4">
+                  <div className="border-t py-2 px-3 sm:py-4 sm:px-6">
                     <SubtaskManager
                       parentTaskId={task.id}
                       onSubtaskChange={handleSubtaskChange}
@@ -563,10 +572,10 @@ export function TaskDetailDialog({
 
           {/* Description */}
           {task.description && (
-            <Card>
-              <CardContent className="pt-4">
-                <h3 className="text-sm font-semibold mb-2">Description</h3>
-                <p className="text-sm text-muted-foreground whitespace-pre-wrap">
+            <Card className="py-2 sm:py-6">
+              <CardContent className="pt-0 pb-0 px-3 sm:px-6">
+                <h3 className="text-sm font-semibold mb-1.5 sm:mb-2">Description</h3>
+                <p className="text-xs sm:text-sm text-muted-foreground whitespace-pre-wrap break-words">
                   {task.description}
                 </p>
               </CardContent>
@@ -575,16 +584,16 @@ export function TaskDetailDialog({
 
           {/* Blocked By Warning */}
           {isBlocked && blockedBy.length > 0 && (
-            <Card className="border-destructive bg-destructive/10">
-              <CardContent className="pt-4">
-                <h3 className="text-sm font-semibold mb-2 text-destructive flex items-center gap-2">
+            <Card className="border-destructive bg-destructive/10 py-2 sm:py-6">
+              <CardContent className="pt-0 pb-0 px-3 sm:px-6">
+                <h3 className="text-sm font-semibold mb-1.5 sm:mb-2 text-destructive flex items-center gap-2">
                   <GitBranch className="h-4 w-4" />
                   Blocked by incomplete tasks
                 </h3>
-                <ul className="text-sm space-y-1">
+                <ul className="text-xs sm:text-sm space-y-1">
                   {blockedBy.map((dep) => (
-                    <li key={dep.id} className="flex items-center gap-2">
-                      <Circle className="h-3 w-3 text-muted-foreground" />
+                    <li key={dep.id} className="flex items-center gap-2 break-words">
+                      <Circle className="h-3 w-3 text-muted-foreground flex-shrink-0" />
                       <span>{dep.title}</span>
                     </li>
                   ))}
@@ -595,19 +604,19 @@ export function TaskDetailDialog({
 
           {/* Dependencies */}
           {dependencies.length > 0 && (
-            <Card>
-              <CardContent className="pt-4">
-                <h3 className="text-sm font-semibold mb-2 flex items-center gap-2">
+            <Card className="py-2 sm:py-6">
+              <CardContent className="pt-0 pb-0 px-3 sm:px-6">
+                <h3 className="text-sm font-semibold mb-1.5 sm:mb-2 flex items-center gap-2">
                   <GitBranch className="h-4 w-4" />
                   Dependencies
                 </h3>
-                <ul className="text-sm space-y-1">
+                <ul className="text-xs sm:text-sm space-y-1">
                   {dependencies.map((dep) => (
-                    <li key={dep.id} className="flex items-center gap-2">
+                    <li key={dep.id} className="flex items-center gap-2 break-words">
                       {dep.dependency_status === "completed" ? (
-                        <CheckCircle2 className="h-3 w-3 text-green-500" />
+                        <CheckCircle2 className="h-3 w-3 text-green-500 flex-shrink-0" />
                       ) : (
-                        <Circle className="h-3 w-3 text-muted-foreground" />
+                        <Circle className="h-3 w-3 text-muted-foreground flex-shrink-0" />
                       )}
                       <span
                         className={
@@ -626,20 +635,20 @@ export function TaskDetailDialog({
           )}
 
           {/* Task Properties */}
-          <Card>
-            <CardContent className="pt-4">
-              <h3 className="text-sm font-semibold mb-3">Task Properties</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <Card className="py-2 sm:py-6">
+            <CardContent className="pt-0 pb-0 px-3 sm:px-6">
+              <h3 className="text-sm font-semibold mb-2 sm:mb-3">Task Properties</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
                 {task.duration && (
-                  <div className="flex items-center gap-2 text-sm">
-                    <Clock className="h-4 w-4 text-muted-foreground" />
+                  <div className="flex items-center gap-2 text-xs sm:text-sm">
+                    <Clock className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                     <span className="text-muted-foreground">Duration:</span>
                     <span className="font-medium">{task.duration} min</span>
                   </div>
                 )}
                 {task.energy_level_required && (
-                  <div className="flex items-center gap-2 text-sm">
-                    <Zap className="h-4 w-4 text-muted-foreground" />
+                  <div className="flex items-center gap-2 text-xs sm:text-sm">
+                    <Zap className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                     <span className="text-muted-foreground">Energy:</span>
                     <span className="font-medium">
                       {ENERGY_LABELS[task.energy_level_required as keyof typeof ENERGY_LABELS]}
@@ -647,10 +656,10 @@ export function TaskDetailDialog({
                   </div>
                 )}
                 {task.due_date && (
-                  <div className="flex items-center gap-2 text-sm col-span-2">
-                    <Calendar className="h-4 w-4 text-muted-foreground" />
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 text-xs sm:text-sm col-span-2">
+                    <Calendar className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                     <span className="text-muted-foreground">Due:</span>
-                    <span className="font-medium">
+                    <span className="font-medium break-words">
                       {formatDateTimeFull(task.due_date, timezone)}
                     </span>
                   </div>
