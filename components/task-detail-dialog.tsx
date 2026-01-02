@@ -98,9 +98,7 @@ export function TaskDetailDialog({
     if (!open) {
       openedTaskIdRef.current = null;
     }
-    // fetchDependencies is stable (empty deps), so we don't need it in the dependency array
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, task?.id]);
+  }, [open, task?.id, fetchDependencies]);
 
   if (!task) return null;
 
