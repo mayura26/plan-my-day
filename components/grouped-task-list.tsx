@@ -306,7 +306,7 @@ export function GroupedTaskList({
           {onCreateParentGroup && (
             <Button onClick={onCreateParentGroup} variant="outline" className="h-11 px-4 md:h-10 md:px-4">
               <Folder className="w-4 h-4 mr-2" />
-              Create Parent Group
+              Manage Parent Groups
             </Button>
           )}
           {onImport && (

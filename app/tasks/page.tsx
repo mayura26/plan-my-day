@@ -1,6 +1,6 @@
 "use client";
 
-import { Folder } from "lucide-react";
+import { Folder, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { useCallback, useEffect, useState } from "react";
@@ -20,6 +20,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { CreateTaskGroupRequest, CreateTaskRequest, Task, TaskGroup } from "@/lib/types";
 
 export default function TasksPage() {
@@ -41,6 +42,7 @@ export default function TasksPage() {
   const [editingGroup, setEditingGroup] = useState<TaskGroup | null>(null);
   const [showEditGroupDialog, setShowEditGroupDialog] = useState(false);
   const [showCreateParentDialog, setShowCreateParentDialog] = useState(false);
+  const [activeTab, setActiveTab] = useState("create");
   const [newGroupName, setNewGroupName] = useState("");
   const [newGroupColor, setNewGroupColor] = useState("#3B82F6");
 
@@ -303,6 +305,8 @@ export default function TasksPage() {
       if (response.ok) {
         const data = await response.json();
         setGroups((prev) => [...prev, data.group]);
+        // Refresh groups to ensure consistency
+        await fetchGroups();
         setNewGroupName("");
         setNewGroupColor("#3B82F6");
         setShowCreateParentDialog(false);
@@ -340,7 +344,8 @@ export default function TasksPage() {
 
       if (response.ok) {
         setGroups((prev) => prev.filter((group) => group.id !== groupId));
-        // Refresh tasks to update group_id references
+        // Refresh groups and tasks to ensure consistency
+        await fetchGroups();
         await fetchTasks();
         toast.success("Task group deleted successfully");
       } else {
@@ -478,7 +483,7 @@ export default function TasksPage() {
         }}
       />
 
-      {/* Create Parent Group Dialog */}
+      {/* Manage Parent Groups Dialog */}
       <Dialog
         open={showCreateParentDialog}
         onOpenChange={(open) => {
@@ -486,68 +491,129 @@ export default function TasksPage() {
           if (!open) {
             setNewGroupName("");
             setNewGroupColor("#3B82F6");
+            setActiveTab("create");
           }
         }}
       >
-        <DialogContent>
+        <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>Create Parent Group</DialogTitle>
+            <DialogTitle>Manage Parent Groups</DialogTitle>
             <DialogDescription>
-              Create a new parent group to organize your task groups.
+              Create new parent groups or manage existing ones to organize your task groups.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <label htmlFor="parent-group-name-input" className="text-sm font-medium">
-                Parent Group Name
-              </label>
-              <Input
-                id="parent-group-name-input"
-                value={newGroupName}
-                onChange={(e) => setNewGroupName(e.target.value)}
-                placeholder="Enter parent group name"
-                className="mt-1"
-              />
-            </div>
-            <div>
-              <label htmlFor="parent-group-color-input" className="text-sm font-medium">
-                Color
-              </label>
-              <div className="mt-1 flex items-center gap-3">
-                <div className="relative">
-                  <input
-                    id="parent-group-color-input"
-                    type="color"
-                    value={newGroupColor}
-                    onChange={(e) => setNewGroupColor(e.target.value)}
-                    className="h-10 w-20 cursor-pointer rounded-md border border-input bg-background"
-                    title="Pick a color"
-                  />
-                </div>
-                <div className="flex items-center gap-2">
-                  <div
-                    className="h-10 w-10 rounded-md border border-input"
-                    style={{ backgroundColor: newGroupColor }}
-                  />
-                  <Input
-                    type="text"
-                    value={newGroupColor}
-                    onChange={(e) => setNewGroupColor(e.target.value)}
-                    placeholder="#3B82F6"
-                    className="w-24 font-mono text-sm"
-                  />
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="create">Create</TabsTrigger>
+              <TabsTrigger value="manage">Manage</TabsTrigger>
+            </TabsList>
+            <TabsContent value="create" className="space-y-4">
+              <div>
+                <label htmlFor="parent-group-name-input" className="text-sm font-medium">
+                  Parent Group Name
+                </label>
+                <Input
+                  id="parent-group-name-input"
+                  value={newGroupName}
+                  onChange={(e) => setNewGroupName(e.target.value)}
+                  placeholder="Enter parent group name"
+                  className="mt-1"
+                />
+              </div>
+              <div>
+                <label htmlFor="parent-group-color-input" className="text-sm font-medium">
+                  Color
+                </label>
+                <div className="mt-1 flex items-center gap-3">
+                  <div className="relative">
+                    <input
+                      id="parent-group-color-input"
+                      type="color"
+                      value={newGroupColor}
+                      onChange={(e) => setNewGroupColor(e.target.value)}
+                      className="h-10 w-20 cursor-pointer rounded-md border border-input bg-background"
+                      title="Pick a color"
+                    />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div
+                      className="h-10 w-10 rounded-md border border-input"
+                      style={{ backgroundColor: newGroupColor }}
+                    />
+                    <Input
+                      type="text"
+                      value={newGroupColor}
+                      onChange={(e) => setNewGroupColor(e.target.value)}
+                      placeholder="#3B82F6"
+                      className="w-24 font-mono text-sm"
+                    />
+                  </div>
                 </div>
               </div>
-            </div>
-            <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setShowCreateParentDialog(false)}>
-                Cancel
-              </Button>
-              <Button onClick={handleCreateParentGroup} disabled={!newGroupName.trim()}>
-                Create Parent Group
-              </Button>
-            </div>
-          </div>
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setShowCreateParentDialog(false)}>
+                  Cancel
+                </Button>
+                <Button onClick={handleCreateParentGroup} disabled={!newGroupName.trim()}>
+                  Create Parent Group
+                </Button>
+              </div>
+            </TabsContent>
+            <TabsContent value="manage" className="space-y-4">
+              {(() => {
+                const parentGroups = groups.filter((g) => g.is_parent_group);
+                const getChildGroupCount = (parentId: string) => {
+                  return groups.filter((g) => g.parent_group_id === parentId).length;
+                };
+
+                if (parentGroups.length === 0) {
+                  return (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <Folder className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                      <p className="text-sm">No parent groups yet</p>
+                      <p className="text-xs">Create your first parent group to organize task groups</p>
+                    </div>
+                  );
+                }
+
+                return (
+                  <div className="space-y-2 max-h-[400px] overflow-y-auto">
+                    {parentGroups.map((group) => {
+                      const childCount = getChildGroupCount(group.id);
+                      return (
+                        <div
+                          key={group.id}
+                          className="flex items-center justify-between p-3 border rounded-lg hover:bg-muted/50 transition-colors"
+                        >
+                          <div className="flex items-center gap-3 flex-1 min-w-0">
+                            <div
+                              className="h-4 w-4 rounded shrink-0"
+                              style={{ backgroundColor: group.color }}
+                            />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium truncate">{group.name}</p>
+                              <p className="text-xs text-muted-foreground">
+                                {childCount} {childCount === 1 ? "child group" : "child groups"}
+                              </p>
+                            </div>
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 w-8 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
+                            onClick={() => handleDeleteGroup(group.id)}
+                            title="Delete parent group"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
+            </TabsContent>
+          </Tabs>
         </DialogContent>
       </Dialog>
 
