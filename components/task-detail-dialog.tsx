@@ -17,7 +17,7 @@ import {
   XCircle,
   Zap,
 } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { SubtaskManager } from "@/components/subtask-manager";
 import { Badge } from "@/components/ui/badge";
@@ -68,10 +68,9 @@ export function TaskDetailDialog({
   const [hasChanges, setHasChanges] = useState(false);
   const { timezone } = useUserTimezone();
 
-  const fetchDependencies = useCallback(async () => {
-    if (!task) return;
+  const fetchDependencies = useCallback(async (taskId: string) => {
     try {
-      const response = await fetch(`/api/tasks/${task.id}/dependencies`);
+      const response = await fetch(`/api/tasks/${taskId}/dependencies`);
       if (response.ok) {
         const data = await response.json();
         setDependencies(data.dependencies || []);
@@ -81,33 +80,27 @@ export function TaskDetailDialog({
     } catch (error) {
       console.error("Error fetching dependencies:", error);
     }
-  }, [task]);
+  }, []);
 
-  useEffect(() => {
-    if (open && task) {
-      fetchDependencies();
-      // Reset change tracking when dialog opens
-      setHasChanges(false);
-    }
-  }, [open, task, fetchDependencies]);
-
-  // Refresh task data when dialog opens or task ID changes to ensure we have the latest state
+  // Track when dialog opens to fetch dependencies only once
+  const openedTaskIdRef = useRef<string | null>(null);
   useEffect(() => {
     if (open && task?.id) {
-      const refreshTask = async () => {
-        try {
-          const response = await fetch(`/api/tasks/${task.id}`);
-          if (response.ok) {
-            const data = await response.json();
-            onTaskRefresh?.(data.task);
-          }
-        } catch (error) {
-          console.error("Error refreshing task:", error);
-        }
-      };
-      refreshTask();
+      // Only fetch dependencies if this is a new dialog open (different task or first open)
+      if (openedTaskIdRef.current !== task.id) {
+        openedTaskIdRef.current = task.id;
+        fetchDependencies(task.id);
+        // Reset change tracking when dialog opens
+        setHasChanges(false);
+      }
     }
-  }, [open, task?.id, onTaskRefresh]);
+    // Reset ref when dialog closes
+    if (!open) {
+      openedTaskIdRef.current = null;
+    }
+    // fetchDependencies is stable (empty deps), so we don't need it in the dependency array
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, task?.id]);
 
   if (!task) return null;
 
