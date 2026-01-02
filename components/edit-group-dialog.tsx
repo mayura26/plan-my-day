@@ -189,7 +189,11 @@ export function EditGroupDialog({
             <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isUpdating}>
               Cancel
             </Button>
-            <Button onClick={updateGroup} loading={isUpdating} disabled={!newGroupName.trim() || isUpdating}>
+            <Button
+              onClick={updateGroup}
+              loading={isUpdating}
+              disabled={!newGroupName.trim() || isUpdating}
+            >
               {isUpdating ? "Updating..." : "Update Group"}
             </Button>
           </div>

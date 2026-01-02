@@ -813,7 +813,11 @@ Todo,Home,Buy groceries,Get milk and eggs,30,2025-12-20,2,2`}
               <Button variant="outline" onClick={() => handleOpenChange(false)}>
                 Cancel
               </Button>
-              <Button onClick={handleParseCSV} loading={isParsing} disabled={!csvData.trim() || isParsing}>
+              <Button
+                onClick={handleParseCSV}
+                loading={isParsing}
+                disabled={!csvData.trim() || isParsing}
+              >
                 <Upload className="h-4 w-4 mr-2" />
                 {isParsing ? "Parsing..." : "Parse CSV"}
               </Button>
@@ -830,7 +834,11 @@ Todo,Home,Buy groceries,Get milk and eggs,30,2025-12-20,2,2`}
               >
                 Cancel
               </Button>
-              <Button onClick={handleImport} loading={isImporting} disabled={!hasValidTasks || isImporting}>
+              <Button
+                onClick={handleImport}
+                loading={isImporting}
+                disabled={!hasValidTasks || isImporting}
+              >
                 <Upload className="h-4 w-4 mr-2" />
                 {isImporting
                   ? "Importing..."

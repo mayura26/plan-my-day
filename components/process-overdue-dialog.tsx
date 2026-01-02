@@ -499,7 +499,11 @@ export function ProcessOverdueDialog({
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isProcessing}>
             Cancel
           </Button>
-          <Button onClick={handleProcessAll} loading={isProcessing} disabled={isProcessing || taskActions.size === 0}>
+          <Button
+            onClick={handleProcessAll}
+            loading={isProcessing}
+            disabled={isProcessing || taskActions.size === 0}
+          >
             {isProcessing ? "Processing..." : `Process ${taskActions.size} Task(s)`}
           </Button>
         </DialogFooter>

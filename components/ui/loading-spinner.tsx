@@ -1,5 +1,5 @@
-import type * as React from "react";
 import { Loader2 } from "lucide-react";
+import type * as React from "react";
 import { cn } from "@/lib/utils";
 
 interface LoadingSpinnerProps {
@@ -13,7 +13,11 @@ const sizeClasses = {
   lg: "h-6 w-6",
 };
 
-export function LoadingSpinner({ size = "md", className, ...props }: LoadingSpinnerProps & React.SVGProps<SVGSVGElement>) {
+export function LoadingSpinner({
+  size = "md",
+  className,
+  ...props
+}: LoadingSpinnerProps & React.SVGProps<SVGSVGElement>) {
   return (
     <Loader2
       className={cn("animate-spin", sizeClasses[size], className)}
@@ -22,4 +26,3 @@ export function LoadingSpinner({ size = "md", className, ...props }: LoadingSpin
     />
   );
 }
-

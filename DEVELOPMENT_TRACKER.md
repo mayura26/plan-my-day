@@ -4,7 +4,6 @@
 - [ ] AI-powered task scheduling engine
 - [ ] Task locking mechanism
 - [ ] Automatic rescheduling logic
-- [ ] Basic task templates
 - [ ] Push notification system
 - [ ] Notification preferences panel
 - [ ] Allow shopping list style saved templates

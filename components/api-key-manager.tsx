@@ -268,7 +268,11 @@ export function APIKeyManager() {
             >
               Cancel
             </Button>
-            <Button onClick={handleCreateKey} loading={isCreating} disabled={isCreating || !newKeyName.trim()}>
+            <Button
+              onClick={handleCreateKey}
+              loading={isCreating}
+              disabled={isCreating || !newKeyName.trim()}
+            >
               {isCreating ? "Creating..." : "Create Key"}
             </Button>
           </DialogFooter>

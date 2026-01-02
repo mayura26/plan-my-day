@@ -944,7 +944,11 @@ export function TaskGroupManager({
                 <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
                   Cancel
                 </Button>
-                <Button onClick={createGroup} loading={isCreating} disabled={!newGroupName.trim() || isCreating}>
+                <Button
+                  onClick={createGroup}
+                  loading={isCreating}
+                  disabled={!newGroupName.trim() || isCreating}
+                >
                   {isCreatingParentGroup ? "Create Parent Group" : "Create Group"}
                 </Button>
               </div>

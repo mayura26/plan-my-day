@@ -29,7 +29,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { useConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useUserTimezone } from "@/hooks/use-user-timezone";
-import { ENERGY_LABELS, PRIORITY_LABELS, TASK_TYPE_LABELS } from "@/lib/task-utils";
+import { ENERGY_LABELS, TASK_TYPE_LABELS } from "@/lib/task-utils";
 import { formatDateTimeFull } from "@/lib/timezone-utils";
 import type { Task, TaskDependency, TaskStatus } from "@/lib/types";
 
@@ -129,7 +129,14 @@ export function TaskDetailDialog({
     if (!open) {
       openedTaskIdRef.current = null;
     }
-  }, [open, task?.id, fetchDependencies, fetchSubtasksCount, task?.task_type, task?.parent_task_id]);
+  }, [
+    open,
+    task?.id,
+    fetchDependencies,
+    fetchSubtasksCount,
+    task?.task_type,
+    task?.parent_task_id,
+  ]);
 
   if (!task) return null;
 
@@ -322,8 +329,7 @@ export function TaskDetailDialog({
                 {TASK_TYPE_LABELS[task.task_type]}
               </Badge>
               <Badge className={`${getPriorityColor(task.priority)} text-xs px-1.5 py-0.5`}>
-                <Flag className="h-2.5 w-2.5 mr-0.5" />
-                P{task.priority}
+                <Flag className="h-2.5 w-2.5 mr-0.5" />P{task.priority}
               </Badge>
               {task.locked && (
                 <Badge variant="destructive" className="text-xs px-1.5 py-0.5">
@@ -456,13 +462,23 @@ export function TaskDetailDialog({
                   </Button>
                 )}
                 {task.status === "pending" && isBlocked && (
-                  <Button size="sm" variant="outline" disabled className="flex-1 sm:flex-initial text-xs sm:text-sm">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled
+                    className="flex-1 sm:flex-initial text-xs sm:text-sm"
+                  >
                     Blocked
                   </Button>
                 )}
 
                 {/* Edit and Delete */}
-                <Button size="sm" variant="outline" onClick={handleEdit} className="flex-1 sm:flex-initial text-xs sm:text-sm">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleEdit}
+                  className="flex-1 sm:flex-initial text-xs sm:text-sm"
+                >
                   <Edit className="h-4 w-4 mr-1" />
                   <span className="hidden sm:inline">Edit</span>
                 </Button>
@@ -526,7 +542,7 @@ export function TaskDetailDialog({
                         {Math.round(
                           (parseISO(task.scheduled_end).getTime() -
                             parseISO(task.scheduled_start).getTime()) /
-                          60000
+                            60000
                         )}{" "}
                         minutes
                       </span>

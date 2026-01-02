@@ -64,7 +64,7 @@ export default function CalendarPage() {
   const [activeDragId, setActiveDragId] = useState<string | null>(null);
   const [resizingTaskId, setResizingTaskId] = useState<string | null>(null);
   const [draggedTask, setDraggedTask] = useState<Task | null>(null);
-  const [processingTaskId, setProcessingTaskId] = useState<string | null>(null);
+  const [_processingTaskId, setProcessingTaskId] = useState<string | null>(null);
   const [hiddenGroups, setHiddenGroups] = useState<Set<string>>(new Set());
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [expandedSections, setExpandedSections] = useState<Set<string>>(

@@ -60,8 +60,7 @@ class PushNotificationService {
       const isDevelopment =
         process.env.NODE_ENV === "development" ||
         (typeof window !== "undefined" &&
-          (window.location.hostname === "localhost" ||
-            window.location.hostname === "127.0.0.1"));
+          (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1"));
 
       // Register service worker manually if not already registered
       // Following Next.js best practices with updateViaCache: 'none'
