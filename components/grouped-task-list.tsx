@@ -64,7 +64,12 @@ export function GroupedTaskList({
       setExpandedSections(new Set(["pending", "in_progress", "completed", "cancelled"]));
     } else if (groupBy === "group") {
       const hierarchy = buildGroupHierarchy();
-      const allIds: string[] = ["ungrouped"];
+      const allIds: string[] = [];
+      // Only add "ungrouped" if there are actually ungrouped tasks
+      const ungroupedCount = tasks.filter((task) => !task.group_id).length;
+      if (ungroupedCount > 0) {
+        allIds.push("ungrouped");
+      }
       hierarchy.forEach((item) => {
         allIds.push(item.id);
         if (item.isParent) {
@@ -73,7 +78,7 @@ export function GroupedTaskList({
       });
       setExpandedSections(new Set(allIds));
     }
-  }, [groupBy, groups]);
+  }, [groupBy, groups, tasks]);
 
   // Filter tasks
   const filteredTasks = tasks.filter((task) => {
@@ -227,7 +232,11 @@ export function GroupedTaskList({
       setExpandedSections(new Set(["pending", "in_progress", "completed", "cancelled"]));
     } else if (groupBy === "group") {
       const hierarchy = buildGroupHierarchy();
-      const allIds: string[] = ["ungrouped"];
+      const allIds: string[] = [];
+      // Only add "ungrouped" if there are actually ungrouped tasks
+      if ((groupedTasks.ungrouped || []).length > 0) {
+        allIds.push("ungrouped");
+      }
       hierarchy.forEach((item) => {
         allIds.push(item.id);
         if (item.isParent) {
@@ -267,6 +276,8 @@ export function GroupedTaskList({
         return "bg-green-500";
       case "cancelled":
         return "bg-red-500";
+      case "rescheduled":
+        return "bg-teal-500";
       default:
         return "bg-gray-500";
     }
@@ -524,34 +535,30 @@ export function GroupedTaskList({
 
       {groupBy === "group" && (
         <div className="space-y-3">
-          {/* Ungrouped tasks */}
-          <Card>
-            <CardHeader
-              className="cursor-pointer hover:bg-accent/50 transition-colors"
-              onClick={() => toggleSection("ungrouped")}
-            >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  {expandedSections.has("ungrouped") ? (
-                    <ChevronDown className="h-4 w-4" />
-                  ) : (
-                    <ChevronRight className="h-4 w-4" />
-                  )}
-                  <div className="w-3 h-3 rounded-full bg-gray-500" />
-                  <CardTitle className="text-lg">Ungrouped</CardTitle>
-                  <Badge variant="secondary">{(groupedTasks.ungrouped || []).length}</Badge>
+          {/* Ungrouped tasks - only show if there are ungrouped tasks */}
+          {(groupedTasks.ungrouped || []).length > 0 && (
+            <Card>
+              <CardHeader
+                className="cursor-pointer hover:bg-accent/50 transition-colors"
+                onClick={() => toggleSection("ungrouped")}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    {expandedSections.has("ungrouped") ? (
+                      <ChevronDown className="h-4 w-4" />
+                    ) : (
+                      <ChevronRight className="h-4 w-4" />
+                    )}
+                    <div className="w-3 h-3 rounded-full bg-gray-500" />
+                    <CardTitle className="text-lg">Ungrouped</CardTitle>
+                    <Badge variant="secondary">{(groupedTasks.ungrouped || []).length}</Badge>
+                  </div>
                 </div>
-              </div>
-            </CardHeader>
-            {expandedSections.has("ungrouped") && (
-              <CardContent className="pt-0">
-                <div className="space-y-3">
-                  {(groupedTasks.ungrouped || []).length === 0 ? (
-                    <p className="text-sm text-muted-foreground py-4 text-center">
-                      No ungrouped tasks
-                    </p>
-                  ) : (
-                    (groupedTasks.ungrouped || []).map((task) => (
+              </CardHeader>
+              {expandedSections.has("ungrouped") && (
+                <CardContent className="pt-0">
+                  <div className="space-y-3">
+                    {(groupedTasks.ungrouped || []).map((task) => (
                       <TaskCard
                         key={task.id}
                         task={task}
@@ -561,12 +568,12 @@ export function GroupedTaskList({
                         onUnschedule={onUnscheduleTask}
                         groups={groups}
                       />
-                    ))
-                  )}
-                </div>
-              </CardContent>
-            )}
-          </Card>
+                    ))}
+                  </div>
+                </CardContent>
+              )}
+            </Card>
+          )}
 
           {/* Group tasks - organized by parent groups */}
           {buildGroupHierarchy().map((hierarchyItem) => {

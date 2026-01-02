@@ -7,6 +7,7 @@ import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { EditGroupDialog } from "@/components/edit-group-dialog";
 import { GroupedTaskList } from "@/components/grouped-task-list";
+import { TaskDetailDialog } from "@/components/task-detail-dialog";
 import { TaskForm } from "@/components/task-form";
 import { TaskImportDialog } from "@/components/task-import-dialog";
 import { Button } from "@/components/ui/button";
@@ -29,6 +30,8 @@ export default function TasksPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const [showTaskDetail, setShowTaskDetail] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
@@ -115,12 +118,22 @@ export default function TasksPage() {
     }
   };
 
-  // Edit task
+  // Handle task click - opens detail dialog
+  const handleTaskClick = (taskId: string) => {
+    const task = tasks.find((t) => t.id === taskId);
+    if (task) {
+      setSelectedTask(task);
+      setShowTaskDetail(true);
+    }
+  };
+
+  // Edit task - called from detail dialog
   const handleEditTask = (taskId: string) => {
     const task = tasks.find((t) => t.id === taskId);
     if (task) {
       setEditingTask(task);
       setIsEditing(true);
+      setShowTaskDetail(false); // Close detail dialog when opening edit dialog
     }
   };
 
@@ -170,6 +183,10 @@ export default function TasksPage() {
       if (response.ok) {
         const data = await response.json();
         setTasks((prev) => prev.map((task) => (task.id === taskId ? data.task : task)));
+        // Update selected task if it's the one being updated
+        if (selectedTask?.id === taskId) {
+          setSelectedTask(data.task);
+        }
       } else {
         const error = await response.json();
         console.error("Failed to update task:", error);
@@ -179,6 +196,11 @@ export default function TasksPage() {
       console.error("Error updating task:", error);
       throw error;
     }
+  };
+
+  // Handle status change from detail dialog
+  const handleStatusChange = async (taskId: string, status: Task["status"]) => {
+    await handleUpdateTaskStatus(taskId, { status });
   };
 
   // Delete task
@@ -193,6 +215,11 @@ export default function TasksPage() {
         // Remove the deleted task and all its subtasks from the UI
         const deletedIds = data.deleted_task_ids || [taskId];
         setTasks((prev) => prev.filter((task) => !deletedIds.includes(task.id)));
+        // Clear selected task if it was deleted
+        if (selectedTask && deletedIds.includes(selectedTask.id)) {
+          setSelectedTask(null);
+          setShowTaskDetail(false);
+        }
         toast.success("Task deleted successfully");
       } else {
         const error = await response.json();
@@ -228,6 +255,10 @@ export default function TasksPage() {
       if (response.ok) {
         const data = await response.json();
         setTasks((prev) => prev.map((task) => (task.id === taskId ? data.task : task)));
+        // Update selected task if it's the one being unscheduled
+        if (selectedTask?.id === taskId) {
+          setSelectedTask(data.task);
+        }
         toast.success("Task unscheduled successfully");
       } else {
         const error = await response.json();
@@ -352,7 +383,7 @@ export default function TasksPage() {
           groups={groups}
           onUpdateTask={handleUpdateTaskStatus}
           onDeleteTask={handleDeleteTask}
-          onEditTask={handleEditTask}
+          onEditTask={handleTaskClick}
           onExtendTask={handleExtendTask}
           onUnscheduleTask={handleUnscheduleTask}
           onCreateTask={() => setShowCreateForm(true)}
@@ -364,6 +395,27 @@ export default function TasksPage() {
           onCreateParentGroup={() => setShowCreateParentDialog(true)}
         />
       </main>
+
+      {/* Task Detail Dialog */}
+      <TaskDetailDialog
+        task={selectedTask}
+        open={showTaskDetail}
+        onOpenChange={setShowTaskDetail}
+        onEdit={handleEditTask}
+        onDelete={handleDeleteTask}
+        onStatusChange={handleStatusChange}
+        onUnschedule={handleUnscheduleTask}
+        onTaskUpdate={async () => {
+          // Refresh the task list
+          await fetchTasks();
+        }}
+        onTaskRefresh={(updatedTask) => {
+          // Update the selected task with fresh data
+          setSelectedTask(updatedTask);
+          // Also update in tasks list
+          setTasks((prev) => prev.map((task) => (task.id === updatedTask.id ? updatedTask : task)));
+        }}
+      />
 
       {/* Create Task Dialog */}
       <Dialog open={showCreateForm} onOpenChange={setShowCreateForm}>

@@ -230,7 +230,7 @@ export function TaskDetailDialog({
       case "cancelled":
         return "bg-red-500";
       case "rescheduled":
-        return "bg-slate-500";
+        return "bg-teal-500";
       default:
         return "bg-gray-500";
     }
@@ -503,6 +503,26 @@ export function TaskDetailDialog({
           </Card>
 
           {/* Quick Status Change */}
+          {task.status === "completed" && (
+            <Card>
+              <CardContent className="pt-6">
+                <h3 className="text-sm font-semibold mb-3">Quick Actions</h3>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      setHasChanges(true);
+                      onStatusChange?.(task.id, "pending");
+                    }}
+                  >
+                    <Circle className="h-4 w-4 mr-1" />
+                    Mark as Incomplete
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
           {task.status !== "completed" &&
             task.status !== "cancelled" &&
             task.status !== "rescheduled" && (

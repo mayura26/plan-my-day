@@ -45,7 +45,7 @@ export const STATUS_COLORS = {
   cancelled:
     "text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/20 border-red-200 dark:border-red-800",
   rescheduled:
-    "text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-700",
+    "text-teal-600 dark:text-teal-400 bg-teal-50 dark:bg-teal-950/20 border-teal-200 dark:border-teal-800",
 } as const;
 
 // Task type helpers
