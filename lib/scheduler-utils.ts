@@ -44,10 +44,15 @@ export function findNearestAvailableSlot(
         t.status !== "completed" &&
         t.status !== "cancelled"
     )
-    .map((t) => ({
-      start: new Date(t.scheduled_start!),
-      end: new Date(t.scheduled_end!),
-    }))
+    .map((t) => {
+      if (!t.scheduled_start || !t.scheduled_end) {
+        throw new Error("Scheduled start and end must be defined");
+      }
+      return {
+        start: new Date(t.scheduled_start),
+        end: new Date(t.scheduled_end),
+      };
+    })
     .sort((a, b) => a.start.getTime() - b.start.getTime());
 
   // Helper to get what a date represents in the user's timezone

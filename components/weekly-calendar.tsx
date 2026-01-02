@@ -1,6 +1,6 @@
 "use client";
 
-import { addDays, addWeeks, format, isSameDay, parseISO, startOfWeek, subWeeks } from "date-fns";
+import { addDays, addWeeks, isSameDay, parseISO, startOfWeek, subWeeks } from "date-fns";
 import { ChevronLeft, ChevronRight, Menu, StickyNote } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { CalendarSlot } from "@/components/calendar-slot";
@@ -11,7 +11,7 @@ import {
   getDateInTimezone,
   getHoursAndMinutesInTimezone,
 } from "@/lib/timezone-utils";
-import type { DayNote, Task, TaskGroup } from "@/lib/types";
+import type { Task, TaskGroup } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 interface WeeklyCalendarProps {
@@ -25,7 +25,6 @@ interface WeeklyCalendarProps {
   onSidebarToggle?: () => void;
   mobileViewToggleButtons?: React.ReactNode;
   desktopViewToggleButtons?: React.ReactNode;
-  dayNotes?: Map<string, DayNote>;
   onNoteClick?: (date: Date) => void;
   onSlotDoubleClick?: (day: Date, hour: number, minute: number) => void;
 }
@@ -51,7 +50,6 @@ export function WeeklyCalendar({
   onSidebarToggle,
   mobileViewToggleButtons,
   desktopViewToggleButtons,
-  dayNotes = new Map(),
   onNoteClick,
   onSlotDoubleClick,
 }: WeeklyCalendarProps) {
@@ -399,74 +397,74 @@ export function WeeklyCalendar({
                   <div
                     key={dayColumnKey}
                     className="relative border-l"
-                  style={{ height: "1536px" }}
-                  data-day-column={dayIndex}
-                >
-                  {/* 15-minute interval slots with drop zones */}
-                  {TIME_SLOTS.slice(1).map(({ hour, minute, slotIndex }) => (
-                    <CalendarSlot
-                      key={slotIndex}
-                      day={day}
-                      hour={hour}
-                      minute={minute}
-                      onDoubleClick={onSlotDoubleClick}
-                    />
-                  ))}
-
-                  {/* Current time indicator (red line) */}
-                  {isSameDay(
-                    getDateInTimezone(day, timezone),
-                    getDateInTimezone(new Date(), timezone)
-                  ) && (
-                    <div
-                      className="absolute left-0 right-0 pointer-events-none z-20"
-                      style={{ top: getCurrentTimePosition() }}
-                    >
-                      <div className="relative">
-                        {/* Red dot */}
-                        <div className="absolute -left-1 -top-1.5 w-3 h-3 rounded-full bg-red-500 border-2 border-white" />
-                        {/* Red line */}
-                        <div className="h-0.5 bg-red-500 shadow-sm" />
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Tasks overlay */}
-                  {/* Position explicitly at top of day column with explicit height to match hour labels */}
-                  <div
-                    className="absolute top-0 left-0 right-0 pointer-events-none"
                     style={{ height: "1536px" }}
+                    data-day-column={dayIndex}
                   >
-                    {tasks
-                      .filter((task) => {
-                        if (!task.scheduled_start) return false;
-                        const taskStartUTC = parseISO(task.scheduled_start);
-                        const taskStartDate = getDateInTimezone(taskStartUTC, timezone);
-                        const dayDate = getDateInTimezone(day, timezone);
-                        const matches = isSameDay(taskStartDate, dayDate);
+                    {/* 15-minute interval slots with drop zones */}
+                    {TIME_SLOTS.slice(1).map(({ hour, minute, slotIndex }) => (
+                      <CalendarSlot
+                        key={slotIndex}
+                        day={day}
+                        hour={hour}
+                        minute={minute}
+                        onDoubleClick={onSlotDoubleClick}
+                      />
+                    ))}
 
-                        return matches;
-                      })
-                      .map((task) => {
-                        const position = getTaskPosition(task);
-                        if (!position) return null;
+                    {/* Current time indicator (red line) */}
+                    {isSameDay(
+                      getDateInTimezone(day, timezone),
+                      getDateInTimezone(new Date(), timezone)
+                    ) && (
+                      <div
+                        className="absolute left-0 right-0 pointer-events-none z-20"
+                        style={{ top: getCurrentTimePosition() }}
+                      >
+                        <div className="relative">
+                          {/* Red dot */}
+                          <div className="absolute -left-1 -top-1.5 w-3 h-3 rounded-full bg-red-500 border-2 border-white" />
+                          {/* Red line */}
+                          <div className="h-0.5 bg-red-500 shadow-sm" />
+                        </div>
+                      </div>
+                    )}
 
-                        return (
-                          <ResizableTask
-                            key={task.id}
-                            task={task}
-                            position={position}
-                            onTaskClick={onTaskClick}
-                            activeDragId={activeDragId}
-                            resizingTaskId={resizingTaskId}
-                            selectedGroupId={selectedGroupId}
-                            groups={groups}
-                            timezone={timezone}
-                          />
-                        );
-                      })}
+                    {/* Tasks overlay */}
+                    {/* Position explicitly at top of day column with explicit height to match hour labels */}
+                    <div
+                      className="absolute top-0 left-0 right-0 pointer-events-none"
+                      style={{ height: "1536px" }}
+                    >
+                      {tasks
+                        .filter((task) => {
+                          if (!task.scheduled_start) return false;
+                          const taskStartUTC = parseISO(task.scheduled_start);
+                          const taskStartDate = getDateInTimezone(taskStartUTC, timezone);
+                          const dayDate = getDateInTimezone(day, timezone);
+                          const matches = isSameDay(taskStartDate, dayDate);
+
+                          return matches;
+                        })
+                        .map((task) => {
+                          const position = getTaskPosition(task);
+                          if (!position) return null;
+
+                          return (
+                            <ResizableTask
+                              key={task.id}
+                              task={task}
+                              position={position}
+                              onTaskClick={onTaskClick}
+                              activeDragId={activeDragId}
+                              resizingTaskId={resizingTaskId}
+                              selectedGroupId={selectedGroupId}
+                              groups={groups}
+                              timezone={timezone}
+                            />
+                          );
+                        })}
+                    </div>
                   </div>
-                </div>
                 );
               })}
             </div>

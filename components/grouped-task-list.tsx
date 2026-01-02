@@ -1,7 +1,16 @@
 "use client";
 
-import { ChevronDown, ChevronRight, Edit, Folder, Plus, Search, Trash2, Upload } from "lucide-react";
-import { useEffect, useState } from "react";
+import {
+  ChevronDown,
+  ChevronRight,
+  Edit,
+  Folder,
+  Plus,
+  Search,
+  Trash2,
+  Upload,
+} from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -41,7 +50,7 @@ export function GroupedTaskList({
   onUpdateTask,
   onDeleteTask,
   onEditTask,
-  onExtendTask,
+  onExtendTask: _onExtendTask,
   onUnscheduleTask,
   onCreateTask,
   onImport,
@@ -58,6 +67,57 @@ export function GroupedTaskList({
   const [sortBy, setSortBy] = useState<"priority" | "scheduled" | "created">("priority");
   const [showCompleted, setShowCompleted] = useState(false);
 
+  // Build hierarchy of groups (parent groups with their children)
+  const buildGroupHierarchy = useCallback((): Array<{
+    id: string;
+    name: string;
+    color: string;
+    isParent: boolean;
+    children: Array<{ id: string; name: string; color: string }>;
+  }> => {
+    const parentGroups = groups.filter((g) => g.is_parent_group);
+    const regularGroups = groups.filter((g) => !g.is_parent_group);
+    const topLevelGroups = regularGroups.filter((g) => !g.parent_group_id);
+
+    // Build hierarchy
+    const hierarchy: Array<{
+      id: string;
+      name: string;
+      color: string;
+      isParent: boolean;
+      children: Array<{ id: string; name: string; color: string }>;
+    }> = [];
+
+    // Add top-level regular groups first (not under any parent)
+    topLevelGroups.forEach((group) => {
+      hierarchy.push({
+        id: group.id,
+        name: group.name,
+        color: group.color,
+        isParent: false,
+        children: [],
+      });
+    });
+
+    // Add parent groups
+    parentGroups.forEach((parentGroup) => {
+      const children = regularGroups.filter((g) => g.parent_group_id === parentGroup.id);
+      hierarchy.push({
+        id: parentGroup.id,
+        name: parentGroup.name,
+        color: parentGroup.color,
+        isParent: true,
+        children: children.map((g) => ({
+          id: g.id,
+          name: g.name,
+          color: g.color,
+        })),
+      });
+    });
+
+    return hierarchy;
+  }, [groups]);
+
   // Initialize with all sections expanded
   useEffect(() => {
     if (groupBy === "status") {
@@ -73,12 +133,13 @@ export function GroupedTaskList({
       hierarchy.forEach((item) => {
         allIds.push(item.id);
         if (item.isParent) {
+          // biome-ignore lint/suspicious/useIterableCallbackReturn: forEach callback doesn't need return value
           item.children.forEach((child) => allIds.push(child.id));
         }
       });
       setExpandedSections(new Set(allIds));
     }
-  }, [groupBy, groups, tasks]);
+  }, [groupBy, tasks, buildGroupHierarchy]);
 
   // Filter tasks
   const filteredTasks = tasks.filter((task) => {
@@ -128,55 +189,6 @@ export function GroupedTaskList({
         return filteredTasks;
     }
   })();
-
-  // Build hierarchy of groups (parent groups with their children)
-  const buildGroupHierarchy = (): Array<{
-    id: string;
-    name: string;
-    color: string;
-    isParent: boolean;
-    children: Array<{ id: string; name: string; color: string }>;
-  }> => {
-    const parentGroups = groups.filter((g) => g.is_parent_group);
-    const regularGroups = groups.filter((g) => !g.is_parent_group);
-    const topLevelGroups = regularGroups.filter((g) => !g.parent_group_id);
-
-    // Build hierarchy
-    const hierarchy: Array<{
-      id: string;
-      name: string;
-      color: string;
-      isParent: boolean;
-      children: Array<{ id: string; name: string; color: string }>;
-    }> = [];
-
-    // Add parent groups with their children
-    parentGroups.forEach((parent) => {
-      const children = regularGroups
-        .filter((g) => g.parent_group_id === parent.id)
-        .map((g) => ({ id: g.id, name: g.name, color: g.color }));
-      hierarchy.push({
-        id: parent.id,
-        name: parent.name,
-        color: parent.color,
-        isParent: true,
-        children,
-      });
-    });
-
-    // Add top-level regular groups (not under any parent)
-    topLevelGroups.forEach((group) => {
-      hierarchy.push({
-        id: group.id,
-        name: group.name,
-        color: group.color,
-        isParent: false,
-        children: [],
-      });
-    });
-
-    return hierarchy;
-  };
 
   // Group tasks
   const groupedTasks: Record<string, Task[]> = (() => {
@@ -240,6 +252,7 @@ export function GroupedTaskList({
       hierarchy.forEach((item) => {
         allIds.push(item.id);
         if (item.isParent) {
+          // biome-ignore lint/suspicious/useIterableCallbackReturn: forEach callback doesn't need return value
           item.children.forEach((child) => allIds.push(child.id));
         }
       });
@@ -304,7 +317,11 @@ export function GroupedTaskList({
         </div>
         <div className="flex items-center gap-2">
           {onCreateParentGroup && (
-            <Button onClick={onCreateParentGroup} variant="outline" className="h-11 px-4 md:h-10 md:px-4">
+            <Button
+              onClick={onCreateParentGroup}
+              variant="outline"
+              className="h-11 px-4 md:h-10 md:px-4"
+            >
               <Folder className="w-4 h-4 mr-2" />
               Manage Parent Groups
             </Button>
@@ -591,7 +608,11 @@ export function GroupedTaskList({
               if (hierarchyItem.children.length === 0 && totalTasks === 0) return null;
 
               return (
-                <Card key={hierarchyItem.id} className="border-2 border-dashed" style={{ borderColor: hierarchyItem.color }}>
+                <Card
+                  key={hierarchyItem.id}
+                  className="border-2 border-dashed"
+                  style={{ borderColor: hierarchyItem.color }}
+                >
                   <CardHeader
                     className="cursor-pointer hover:bg-accent/50 transition-colors"
                     onClick={() => toggleSection(hierarchyItem.id)}
@@ -602,14 +623,24 @@ export function GroupedTaskList({
                         {expandedSections.has(hierarchyItem.id) ? (
                           <ChevronDown className="h-4 w-4" style={{ color: hierarchyItem.color }} />
                         ) : (
-                          <ChevronRight className="h-4 w-4" style={{ color: hierarchyItem.color }} />
+                          <ChevronRight
+                            className="h-4 w-4"
+                            style={{ color: hierarchyItem.color }}
+                          />
                         )}
                         <Folder className="h-4 w-4" style={{ color: hierarchyItem.color }} />
                         <CardTitle className="text-lg" style={{ color: hierarchyItem.color }}>
                           {hierarchyItem.name}
                         </CardTitle>
-                        <Badge variant="secondary" style={{ backgroundColor: `${hierarchyItem.color}20`, color: hierarchyItem.color }}>
-                          {hierarchyItem.children.length} {hierarchyItem.children.length === 1 ? "group" : "groups"}
+                        <Badge
+                          variant="secondary"
+                          style={{
+                            backgroundColor: `${hierarchyItem.color}20`,
+                            color: hierarchyItem.color,
+                          }}
+                        >
+                          {hierarchyItem.children.length}{" "}
+                          {hierarchyItem.children.length === 1 ? "group" : "groups"}
                         </Badge>
                       </div>
                     </div>

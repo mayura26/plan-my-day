@@ -109,6 +109,7 @@ export class SyncManager {
   }
 
   private notifyListeners(): void {
+    // biome-ignore lint/suspicious/useIterableCallbackReturn: forEach callback doesn't need return value
     this.syncListeners.forEach((listener) => listener());
   }
 }

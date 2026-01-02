@@ -76,9 +76,10 @@ function getGroupDescendants(groupId: string, groups: TaskGroup[]): string[] {
   const queue = [groupId];
 
   while (queue.length > 0) {
-    const currentId = queue.shift()!;
+    const currentId = queue.shift();
+    if (!currentId) break;
     const children = groups.filter((g) => g.parent_group_id === currentId);
-    
+
     for (const child of children) {
       if (!descendants.includes(child.id)) {
         descendants.push(child.id);
@@ -100,7 +101,7 @@ interface HierarchicalGroup extends TaskGroup {
 function buildGroupHierarchy(groups: TaskGroup[]): HierarchicalGroup[] {
   // Create a map of all groups
   const groupMap = new Map<string, HierarchicalGroup>();
-  
+
   // Initialize all groups with empty children arrays
   groups.forEach((group) => {
     groupMap.set(group.id, {
@@ -112,10 +113,11 @@ function buildGroupHierarchy(groups: TaskGroup[]): HierarchicalGroup[] {
 
   // Build the tree structure
   const rootGroups: HierarchicalGroup[] = [];
-  
+
   groups.forEach((group) => {
-    const hierarchicalGroup = groupMap.get(group.id)!;
-    
+    const hierarchicalGroup = groupMap.get(group.id);
+    if (!hierarchicalGroup) return;
+
     if (group.parent_group_id) {
       const parent = groupMap.get(group.parent_group_id);
       if (parent) {
@@ -131,23 +133,39 @@ function buildGroupHierarchy(groups: TaskGroup[]): HierarchicalGroup[] {
   });
 
   // Sort groups alphabetically at each level
+  // Separate regular groups from parent groups, with regular groups first
   const sortGroups = (groupList: HierarchicalGroup[]): HierarchicalGroup[] => {
-    const sorted = [...groupList].sort((a, b) => a.name.localeCompare(b.name));
-    sorted.forEach((group) => {
+    // Separate regular groups (not parent groups) from parent groups
+    const regularGroups = groupList.filter((g) => !g.is_parent_group);
+    const parentGroups = groupList.filter((g) => g.is_parent_group);
+
+    // Sort each category alphabetically
+    const sortedRegular = [...regularGroups].sort((a, b) => a.name.localeCompare(b.name));
+    const sortedParent = [...parentGroups].sort((a, b) => a.name.localeCompare(b.name));
+
+    // Sort children recursively for both types
+    sortedRegular.forEach((group) => {
       if (group.children.length > 0) {
         group.children = sortGroups(group.children);
       }
     });
-    return sorted;
+    sortedParent.forEach((group) => {
+      if (group.children.length > 0) {
+        group.children = sortGroups(group.children);
+      }
+    });
+
+    // Return regular groups first, then parent groups
+    return [...sortedRegular, ...sortedParent];
   };
 
   return sortGroups(rootGroups);
 }
 
 // Flatten hierarchical structure back to array for processing
-function flattenGroupHierarchy(hierarchicalGroups: HierarchicalGroup[]): HierarchicalGroup[] {
+function _flattenGroupHierarchy(hierarchicalGroups: HierarchicalGroup[]): HierarchicalGroup[] {
   const result: HierarchicalGroup[] = [];
-  
+
   const traverse = (groups: HierarchicalGroup[]) => {
     for (const group of groups) {
       result.push(group);
@@ -156,7 +174,7 @@ function flattenGroupHierarchy(hierarchicalGroups: HierarchicalGroup[]): Hierarc
       }
     }
   };
-  
+
   traverse(hierarchicalGroups);
   return result;
 }
@@ -224,24 +242,14 @@ function GroupCard({
         }}
       >
         {/* Parent Group Header */}
-        <div
-          role="button"
-          tabIndex={0}
-          className="flex items-center justify-between gap-2 px-2 py-1 cursor-pointer rounded hover:bg-black/5"
+        <button
+          type="button"
+          className="flex items-center justify-between gap-2 px-2 py-1 cursor-pointer rounded hover:bg-black/5 w-full text-left"
           onClick={onSelect}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" || e.key === " ") {
-              e.preventDefault();
-              onSelect();
-            }
-          }}
         >
           <div className="flex items-center gap-2 flex-1 min-w-0">
             <Folder className="h-4 w-4 shrink-0" style={{ color: groupColor }} />
-            <span
-              className="truncate text-sm font-semibold"
-              style={{ color: groupColor }}
-            >
+            <span className="truncate text-sm font-semibold" style={{ color: groupColor }}>
               {groupName}
             </span>
           </div>
@@ -261,6 +269,7 @@ function GroupCard({
                 e.stopPropagation();
                 onToggleExpand();
               }}
+              type="button"
             >
               {isExpanded ? (
                 <ChevronDown className="h-3.5 w-3.5" style={{ color: groupColor }} />
@@ -269,7 +278,7 @@ function GroupCard({
               )}
             </Button>
           </div>
-        </div>
+        </button>
         {/* Child groups rendered here when expanded */}
         {children}
       </div>
@@ -288,25 +297,15 @@ function GroupCard({
       style={indentLevel > 0 ? { marginLeft: `${indentLevel * 16}px` } : undefined}
     >
       {/* Colored Header */}
-      <div
-        role="button"
-        tabIndex={0}
-        className="px-3 pt-[5px] pb-0.5 cursor-pointer"
+      <button
+        type="button"
+        className="px-3 pt-[5px] pb-0.5 cursor-pointer w-full text-left border-0 bg-transparent"
         style={{ backgroundColor: groupColor }}
         onClick={onSelect}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" || e.key === " ") {
-            e.preventDefault();
-            onSelect();
-          }
-        }}
       >
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2 flex-1 min-w-0">
-            <span
-              className="truncate text-sm font-medium"
-              style={{ color: textColor }}
-            >
+            <span className="truncate text-sm font-medium" style={{ color: textColor }}>
               {groupName}
             </span>
           </div>
@@ -318,7 +317,7 @@ function GroupCard({
             {taskCount}
           </Badge>
         </div>
-      </div>
+      </button>
 
       {/* Buttons Row - Shown when collapsed */}
       {!isExpanded && (
@@ -509,7 +508,7 @@ export function TaskGroupManager({
         body: JSON.stringify({
           name: newGroupName.trim(),
           color: newGroupColor,
-          parent_group_id: isCreatingParentGroup ? undefined : (newParentGroupId || undefined),
+          parent_group_id: isCreatingParentGroup ? undefined : newParentGroupId || undefined,
           is_parent_group: isCreatingParentGroup,
         } as CreateTaskGroupRequest),
       });
@@ -522,7 +521,11 @@ export function TaskGroupManager({
         setNewParentGroupId(null);
         setIsCreatingParentGroup(false);
         setIsCreateDialogOpen(false);
-        toast.success(isCreatingParentGroup ? "Parent group created successfully" : "Task group created successfully");
+        toast.success(
+          isCreatingParentGroup
+            ? "Parent group created successfully"
+            : "Task group created successfully"
+        );
       } else {
         const errorData = await response
           .json()
@@ -536,7 +539,7 @@ export function TaskGroupManager({
     }
   };
 
-  const updateGroup = async (groupId: string, updates: Partial<TaskGroup>) => {
+  const _updateGroup = async (groupId: string, updates: Partial<TaskGroup>) => {
     try {
       const response = await fetch(`/api/task-groups/${groupId}`, {
         method: "PUT",
@@ -607,19 +610,19 @@ export function TaskGroupManager({
   const getAvailableParentGroups = (excludeGroupId?: string): TaskGroup[] => {
     // Only return groups that are marked as parent groups
     let parentGroups = groups.filter((g) => g.is_parent_group);
-    
+
     if (excludeGroupId) {
       // When editing, exclude the current group and all its descendants
       const excludedIds = new Set([excludeGroupId, ...getGroupDescendants(excludeGroupId, groups)]);
       parentGroups = parentGroups.filter((g) => !excludedIds.has(g.id));
     }
-    
+
     return parentGroups;
   };
 
   // Get all parent groups
   const parentGroups = groups.filter((g) => g.is_parent_group);
-  
+
   // Get all regular groups (non-parent groups)
   const regularGroups = groups.filter((g) => !g.is_parent_group);
 
@@ -627,7 +630,7 @@ export function TaskGroupManager({
   // First, create a map of all groups (both parent and regular)
   const allGroupsForHierarchy = [...parentGroups, ...regularGroups];
   const hierarchicalGroups = buildGroupHierarchy(allGroupsForHierarchy);
-  
+
   // Filter out parent groups that have no children
   const filteredHierarchicalGroups = hierarchicalGroups.filter((group) => {
     // If it's a parent group, only show it if it has children
@@ -642,11 +645,12 @@ export function TaskGroupManager({
     setExpandedGroups((prev) => {
       const newSet = new Set(prev);
       const isCurrentlyExpanded = newSet.has(groupId);
-      
+
       if (isCurrentlyExpanded) {
         // Collapsing: remove this group and all its descendants
         newSet.delete(groupId);
         const descendants = getGroupDescendants(groupId, groups);
+        // biome-ignore lint/suspicious/useIterableCallbackReturn: forEach callback doesn't need return value
         descendants.forEach((descendantId) => newSet.delete(descendantId));
       } else {
         // Expanding: add this group
@@ -827,16 +831,19 @@ export function TaskGroupManager({
     <div className="flex flex-col h-full max-h-full overflow-hidden w-full">
       {/* Control buttons row */}
       <div className="flex-shrink-0 pb-2 px-3 pt-3 flex items-center gap-2">
-        <Dialog open={isCreateDialogOpen} onOpenChange={(open) => {
-          setIsCreateDialogOpen(open);
-          if (!open) {
-            setIsCreatingParentGroup(false);
-          }
-        }}>
+        <Dialog
+          open={isCreateDialogOpen}
+          onOpenChange={(open) => {
+            setIsCreateDialogOpen(open);
+            if (!open) {
+              setIsCreatingParentGroup(false);
+            }
+          }}
+        >
           <DialogTrigger asChild>
-            <Button 
-              size="sm" 
-              variant="outline" 
+            <Button
+              size="sm"
+              variant="outline"
               className="h-8 px-3"
               onClick={() => setIsCreatingParentGroup(false)}
             >
@@ -846,10 +853,12 @@ export function TaskGroupManager({
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>{isCreatingParentGroup ? "Create New Parent Group" : "Create New Group"}</DialogTitle>
+              <DialogTitle>
+                {isCreatingParentGroup ? "Create New Parent Group" : "Create New Group"}
+              </DialogTitle>
               <DialogDescription>
-                {isCreatingParentGroup 
-                  ? "Create a new parent group to organize your task groups." 
+                {isCreatingParentGroup
+                  ? "Create a new parent group to organize your task groups."
                   : "Create a new task group to organize your tasks."}
               </DialogDescription>
             </DialogHeader>
@@ -900,7 +909,9 @@ export function TaskGroupManager({
                   </label>
                   <Select
                     value={newParentGroupId || "__none__"}
-                    onValueChange={(value) => setNewParentGroupId(value === "__none__" ? null : value)}
+                    onValueChange={(value) =>
+                      setNewParentGroupId(value === "__none__" ? null : value)
+                    }
                   >
                     <SelectTrigger id="parent-group-select-create" className="mt-1 w-full">
                       <SelectValue placeholder="None (top-level group)" />
@@ -969,28 +980,30 @@ export function TaskGroupManager({
           </div>
         )}
 
-        {/* Ungrouped at the bottom */}
-        <GroupCard
-          groupName="Ungrouped"
-          groupColor="#6B7280"
-          taskCount={getTaskCountForGroup(null)}
-          tasks={getTasksForGroup(null)}
-          isExpanded={expandedGroups.has("ungrouped")}
-          isHidden={hiddenGroups.has("ungrouped")}
-          isOtherSelected={selectedGroupId !== null && selectedGroupId !== "ungrouped"}
-          showAllTasks={showAllTasks}
-          onToggleExpand={() => toggleGroupExpansion("ungrouped")}
-          onToggleVisibility={() => toggleGroupVisibility("ungrouped")}
-          onSelect={() => {
-            if (selectedGroupId === "ungrouped") {
-              onGroupSelect?.(null);
-            } else {
-              onGroupSelect?.("ungrouped");
-            }
-          }}
-          onTaskClick={onTaskClick}
-          isUngrouped
-        />
+        {/* Ungrouped at the bottom - only show if there are ungrouped tasks */}
+        {getTaskCountForGroup(null) > 0 && (
+          <GroupCard
+            groupName="Ungrouped"
+            groupColor="#6B7280"
+            taskCount={getTaskCountForGroup(null)}
+            tasks={getTasksForGroup(null)}
+            isExpanded={expandedGroups.has("ungrouped")}
+            isHidden={hiddenGroups.has("ungrouped")}
+            isOtherSelected={selectedGroupId !== null && selectedGroupId !== "ungrouped"}
+            showAllTasks={showAllTasks}
+            onToggleExpand={() => toggleGroupExpansion("ungrouped")}
+            onToggleVisibility={() => toggleGroupVisibility("ungrouped")}
+            onSelect={() => {
+              if (selectedGroupId === "ungrouped") {
+                onGroupSelect?.(null);
+              } else {
+                onGroupSelect?.("ungrouped");
+              }
+            }}
+            onTaskClick={onTaskClick}
+            isUngrouped
+          />
+        )}
       </div>
 
       {/* Edit Group Dialog */}

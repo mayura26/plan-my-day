@@ -127,8 +127,8 @@ export async function POST(request: NextRequest) {
         group.name,
         group.color,
         group.collapsed,
-        group.parent_group_id,
-        group.is_parent_group,
+        group.parent_group_id ?? null,
+        group.is_parent_group ?? false,
         group.created_at,
         group.updated_at,
       ]

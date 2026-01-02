@@ -1,8 +1,8 @@
+import { existsSync } from "node:fs";
+import { mkdir, writeFile } from "node:fs/promises";
+import { join } from "node:path";
 import { createClient } from "@libsql/client";
 import dotenv from "dotenv";
-import { writeFile, mkdir } from "fs/promises";
-import { existsSync } from "fs";
-import { join } from "path";
 
 dotenv.config({ path: ".env.local" });
 
@@ -14,7 +14,7 @@ const turso = createClient({
 async function backupDatabase() {
   try {
     console.log("📦 Creating database backup...");
-    
+
     const backupDir = join(process.cwd(), "backups");
     if (!existsSync(backupDir)) {
       await mkdir(backupDir, { recursive: true });
@@ -56,7 +56,7 @@ async function backupDatabase() {
     console.log(`✅ Backup created: ${backupFile}`);
     console.log(`   - ${groupsData.length} task groups backed up`);
     console.log(`   - ${tasksData.length} task-group relationships backed up`);
-    
+
     return backupFile;
   } catch (error) {
     console.error("❌ Error creating backup:", error);
@@ -68,7 +68,9 @@ async function migrateParentGroups() {
   let backupFile = null;
   try {
     console.log("Adding parent_group_id column to task_groups table...");
-    console.log("⚠️  IMPORTANT: This migration is safe for existing data. All groups and tasks will be preserved.");
+    console.log(
+      "⚠️  IMPORTANT: This migration is safe for existing data. All groups and tasks will be preserved."
+    );
 
     // Create backup first
     backupFile = await backupDatabase();
@@ -78,9 +80,7 @@ async function migrateParentGroups() {
 
     // Check if column already exists
     const tableInfo = await turso.execute("PRAGMA table_info(task_groups)");
-    const hasParentGroupId = tableInfo.rows.some(
-      (row) => row.name === "parent_group_id"
-    );
+    const hasParentGroupId = tableInfo.rows.some((row) => row.name === "parent_group_id");
 
     if (hasParentGroupId) {
       console.log("ℹ️ parent_group_id column already exists, skipping");
@@ -134,7 +134,7 @@ async function migrateParentGroups() {
       // Verify data was copied correctly
       const newCountResult = await turso.execute("SELECT COUNT(*) as count FROM task_groups_new");
       const newCount = newCountResult.rows[0]?.count || 0;
-      
+
       if (newCount !== originalCount) {
         throw new Error(
           `❌ Data verification failed: Expected ${originalCount} rows, got ${newCount}. Aborting migration to prevent data loss.`
@@ -178,7 +178,7 @@ async function migrateParentGroups() {
       // Verify final state
       const finalCountResult = await turso.execute("SELECT COUNT(*) as count FROM task_groups");
       const finalCount = finalCountResult.rows[0]?.count || 0;
-      
+
       if (finalCount !== originalCount) {
         throw new Error(
           `❌ Final verification failed: Expected ${originalCount} rows, got ${finalCount}.`
@@ -209,11 +209,17 @@ async function migrateParentGroups() {
           AND EXISTS (SELECT 1 FROM task_groups g WHERE g.id = t.group_id)
         `);
         const linkedCount = tasksStillLinked.rows[0]?.count || 0;
-        console.log(`✅ Verified: ${linkedCount} of ${taskCount} tasks still correctly linked to groups`);
-        
+        console.log(
+          `✅ Verified: ${linkedCount} of ${taskCount} tasks still correctly linked to groups`
+        );
+
         if (linkedCount < taskCount) {
-          console.warn(`⚠️  Warning: ${taskCount - linkedCount} tasks have group_id values that don't match any group`);
-          console.warn(`   This may indicate orphaned references, but tasks will still function normally`);
+          console.warn(
+            `⚠️  Warning: ${taskCount - linkedCount} tasks have group_id values that don't match any group`
+          );
+          console.warn(
+            `   This may indicate orphaned references, but tasks will still function normally`
+          );
         }
       }
 

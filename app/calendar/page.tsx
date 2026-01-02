@@ -1173,7 +1173,6 @@ export default function CalendarPage() {
               onSidebarToggle={() => setSidebarOpen(!sidebarOpen)}
               mobileViewToggleButtons={mobileViewToggleButtons}
               desktopViewToggleButtons={desktopViewToggleButtons}
-              dayNotes={dayNotes}
               onNoteClick={handleNoteClick}
               onSlotDoubleClick={handleSlotDoubleClick}
             />
@@ -1243,7 +1242,7 @@ export default function CalendarPage() {
           }
         }}
       >
-        <DialogContent 
+        <DialogContent
           className="max-w-2xl max-h-[90vh] overflow-y-auto w-[95vw] md:w-full mx-2 md:mx-auto"
           onInteractOutside={(e) => e.preventDefault()}
         >

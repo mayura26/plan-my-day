@@ -50,7 +50,13 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     }
 
     const { id } = await params;
-    const body: { name?: string; color?: string; collapsed?: boolean; parent_group_id?: string | null } = await request.json();
+    const body: {
+      name?: string;
+      color?: string;
+      collapsed?: boolean;
+      parent_group_id?: string | null;
+      is_parent_group?: boolean;
+    } = await request.json();
 
     // Check if group exists and belongs to user
     const existingGroup = await db.execute(
@@ -70,10 +76,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     if (body.parent_group_id !== undefined) {
       // Prevent setting a group as its own parent
       if (body.parent_group_id === id) {
-        return NextResponse.json(
-          { error: "A group cannot be its own parent" },
-          { status: 400 }
-        );
+        return NextResponse.json({ error: "A group cannot be its own parent" }, { status: 400 });
       }
 
       // If parent_group_id is provided (not null), validate it exists
@@ -91,13 +94,17 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
         }
 
         // Check for circular references: ensure the new parent is not a descendant of this group
-        const checkCircularReference = async (groupId: string, potentialParentId: string): Promise<boolean> => {
+        const checkCircularReference = async (
+          groupId: string,
+          potentialParentId: string
+        ): Promise<boolean> => {
           // Get all descendants of the current group
           const descendants = new Set<string>();
           const queue = [groupId];
 
           while (queue.length > 0) {
-            const currentId = queue.shift()!;
+            const currentId = queue.shift();
+            if (!currentId) break;
             const children = await db.execute(
               "SELECT id FROM task_groups WHERE parent_group_id = ? AND user_id = ?",
               [currentId, session.user.id]

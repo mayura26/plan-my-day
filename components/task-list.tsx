@@ -26,9 +26,7 @@ interface TaskListProps {
   onUpdateTask: (taskId: string, updates: Partial<Task>) => Promise<void>;
   onDeleteTask: (taskId: string) => Promise<void>;
   onEditTask?: (taskId: string) => void;
-  onExtendTask?: (taskId: string) => void;
   onCreateTask?: () => void;
-  showGroup?: boolean;
   compact?: boolean;
   groups?: TaskGroup[];
 }
@@ -38,9 +36,7 @@ export function TaskList({
   onUpdateTask,
   onDeleteTask,
   onEditTask,
-  onExtendTask,
   onCreateTask,
-  showGroup = false,
   compact = false,
   groups = [],
 }: TaskListProps) {

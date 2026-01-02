@@ -1,8 +1,8 @@
+import { existsSync } from "node:fs";
+import { mkdir, writeFile } from "node:fs/promises";
+import { join } from "node:path";
 import { createClient } from "@libsql/client";
 import dotenv from "dotenv";
-import { writeFile, mkdir } from "fs/promises";
-import { existsSync } from "fs";
-import { join } from "path";
 
 dotenv.config({ path: ".env.local" });
 
@@ -14,7 +14,7 @@ const turso = createClient({
 async function backupDatabase() {
   try {
     console.log("📦 Creating database backup...");
-    
+
     const backupDir = join(process.cwd(), "backups");
     if (!existsSync(backupDir)) {
       await mkdir(backupDir, { recursive: true });
@@ -44,7 +44,7 @@ async function backupDatabase() {
     await writeFile(backupFile, JSON.stringify(backup, null, 2));
     console.log(`✅ Backup created: ${backupFile}`);
     console.log(`   - ${groupsData.length} task groups backed up`);
-    
+
     return backupFile;
   } catch (error) {
     console.error("❌ Error creating backup:", error);
@@ -62,9 +62,7 @@ async function migrateIsParentGroup() {
 
     // Check if column already exists
     const tableInfo = await turso.execute("PRAGMA table_info(task_groups)");
-    const hasIsParentGroup = tableInfo.rows.some(
-      (row) => row.name === "is_parent_group"
-    );
+    const hasIsParentGroup = tableInfo.rows.some((row) => row.name === "is_parent_group");
 
     if (hasIsParentGroup) {
       console.log("ℹ️ is_parent_group column already exists, skipping");
@@ -87,11 +85,15 @@ async function migrateIsParentGroup() {
         WHERE is_parent_group IS NULL OR is_parent_group = 0
       `);
       const verifiedCount = verifyResult.rows[0]?.count || 0;
-      
+
       if (verifiedCount !== originalCount) {
-        console.warn(`⚠️  Warning: Expected ${originalCount} groups with is_parent_group=false, found ${verifiedCount}`);
+        console.warn(
+          `⚠️  Warning: Expected ${originalCount} groups with is_parent_group=false, found ${verifiedCount}`
+        );
       } else {
-        console.log(`✅ Verified: All ${verifiedCount} existing groups set as regular groups (is_parent_group=false)`);
+        console.log(
+          `✅ Verified: All ${verifiedCount} existing groups set as regular groups (is_parent_group=false)`
+        );
       }
 
       console.log("✅ Added is_parent_group column to task_groups table");

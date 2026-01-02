@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -74,9 +74,7 @@ export function EditGroupDialog({
       };
       findDescendants(excludeGroupId);
     }
-    return groups.filter(
-      (g) => g.is_parent_group && !excludeIds.has(g.id)
-    );
+    return groups.filter((g) => g.is_parent_group && !excludeIds.has(g.id));
   };
 
   const updateGroup = async () => {
@@ -97,12 +95,14 @@ export function EditGroupDialog({
       });
 
       if (response.ok) {
-        const data = await response.json();
+        const _data = await response.json();
         toast.success("Task group updated successfully");
         onGroupUpdated?.();
         onOpenChange(false);
       } else {
-        const errorData = await response.json().catch(() => ({ error: "Failed to update task group" }));
+        const errorData = await response
+          .json()
+          .catch(() => ({ error: "Failed to update task group" }));
         toast.error(errorData.error || "Failed to update task group. Please try again.");
       }
     } catch (error) {
@@ -198,4 +198,3 @@ export function EditGroupDialog({
     </Dialog>
   );
 }
-

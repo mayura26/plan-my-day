@@ -571,7 +571,9 @@ export default function TasksPage() {
                     <div className="text-center py-8 text-muted-foreground">
                       <Folder className="h-8 w-8 mx-auto mb-2 opacity-50" />
                       <p className="text-sm">No parent groups yet</p>
-                      <p className="text-xs">Create your first parent group to organize task groups</p>
+                      <p className="text-xs">
+                        Create your first parent group to organize task groups
+                      </p>
                     </div>
                   );
                 }

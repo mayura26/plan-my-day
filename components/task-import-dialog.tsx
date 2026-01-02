@@ -607,7 +607,7 @@ Todo,Home,Buy groceries,Get milk and eggs,30,2025-12-20,2,2`}
                   <tbody>
                     {parsedTasks.map((task, index) => {
                       const hasError = task.errors.length > 0 || !task.name || !task.type;
-                      const taskKey = `task-row-${task.rowNumber || index}-${task.name || 'unnamed'}`;
+                      const taskKey = `task-row-${task.rowNumber || index}-${task.name || "unnamed"}`;
                       return (
                         <tr
                           key={taskKey}
@@ -768,7 +768,10 @@ Todo,Home,Buy groceries,Get milk and eggs,30,2025-12-20,2,2`}
                   {parsedTasks
                     .filter((task) => task.errors.length > 0 || !task.name || !task.type)
                     .map((task) => (
-                      <div key={`error-${task.rowNumber}-${task.name || 'unnamed'}`} className="text-sm">
+                      <div
+                        key={`error-${task.rowNumber}-${task.name || "unnamed"}`}
+                        className="text-sm"
+                      >
                         <span className="font-medium">Row {task.rowNumber}:</span>{" "}
                         {task.errors.length > 0
                           ? task.errors.join(", ")

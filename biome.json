@@ -29,6 +29,22 @@
       }
     }
   },
+  "overrides": [
+    {
+      "includes": ["public/sw.js", "public/workbox-*.js"],
+      "linter": {
+        "rules": {
+          "suspicious": {
+            "useIterableCallbackReturn": "off",
+            "noAssignInExpressions": "off"
+          },
+          "correctness": {
+            "noConstantCondition": "off"
+          }
+        }
+      }
+    }
+  ],
   "javascript": {
     "formatter": {
       "quoteStyle": "double",

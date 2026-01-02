@@ -96,15 +96,6 @@ export function UpdatePrompt() {
       }
     };
 
-    // Initial check with delay
-    checkTimeout = setTimeout(checkForUpdate, 1000);
-
-    return () => {
-      if (checkTimeout) {
-        clearTimeout(checkTimeout);
-      }
-    };
-
     // Listen for controller change (service worker activated)
     // Only reload if user explicitly requested update AND version actually changed
     // This prevents false reloads when service worker updates but version is same
@@ -152,7 +143,13 @@ export function UpdatePrompt() {
       navigator.serviceWorker.addEventListener("controllerchange", handleControllerChange);
     }
 
+    // Initial check with delay
+    checkTimeout = setTimeout(checkForUpdate, 1000);
+
     return () => {
+      if (checkTimeout) {
+        clearTimeout(checkTimeout);
+      }
       if (!isDevelopment) {
         navigator.serviceWorker.removeEventListener("controllerchange", handleControllerChange);
       }
