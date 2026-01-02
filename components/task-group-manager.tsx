@@ -28,13 +28,6 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import type { CreateTaskGroupRequest, Task, TaskGroup } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -540,25 +533,34 @@ export function TaskGroupManager({
                 />
               </div>
               <div>
-                <div className="text-sm font-medium mb-1">Color</div>
-                <Select value={newGroupColor} onValueChange={setNewGroupColor}>
-                  <SelectTrigger className="mt-1">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {defaultColors.map((color) => (
-                      <SelectItem key={color.value} value={color.value}>
-                        <div className="flex items-center gap-2">
-                          <div
-                            className="w-4 h-4 rounded-full border"
-                            style={{ backgroundColor: color.value }}
-                          />
-                          {color.name}
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <label htmlFor="group-color-input-create" className="text-sm font-medium">
+                  Color
+                </label>
+                <div className="mt-1 flex items-center gap-3">
+                  <div className="relative">
+                    <input
+                      id="group-color-input-create"
+                      type="color"
+                      value={newGroupColor}
+                      onChange={(e) => setNewGroupColor(e.target.value)}
+                      className="h-10 w-20 cursor-pointer rounded-md border border-input bg-background"
+                      title="Pick a color"
+                    />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div
+                      className="h-10 w-10 rounded-md border border-input"
+                      style={{ backgroundColor: newGroupColor }}
+                    />
+                    <Input
+                      type="text"
+                      value={newGroupColor}
+                      onChange={(e) => setNewGroupColor(e.target.value)}
+                      placeholder="#3B82F6"
+                      className="w-24 font-mono text-sm"
+                    />
+                  </div>
+                </div>
               </div>
               <div className="flex justify-end gap-2">
                 <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
@@ -679,25 +681,34 @@ export function TaskGroupManager({
               />
             </div>
             <div>
-              <div className="text-sm font-medium mb-1">Color</div>
-              <Select value={newGroupColor} onValueChange={setNewGroupColor}>
-                <SelectTrigger className="mt-1">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {defaultColors.map((color) => (
-                    <SelectItem key={color.value} value={color.value}>
-                      <div className="flex items-center gap-2">
-                        <div
-                          className="w-4 h-4 rounded-full border"
-                          style={{ backgroundColor: color.value }}
-                        />
-                        {color.name}
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <label htmlFor="group-color-input-edit" className="text-sm font-medium">
+                Color
+              </label>
+              <div className="mt-1 flex items-center gap-3">
+                <div className="relative">
+                  <input
+                    id="group-color-input-edit"
+                    type="color"
+                    value={newGroupColor}
+                    onChange={(e) => setNewGroupColor(e.target.value)}
+                    className="h-10 w-20 cursor-pointer rounded-md border border-input bg-background"
+                    title="Pick a color"
+                  />
+                </div>
+                <div className="flex items-center gap-2">
+                  <div
+                    className="h-10 w-10 rounded-md border border-input"
+                    style={{ backgroundColor: newGroupColor }}
+                  />
+                  <Input
+                    type="text"
+                    value={newGroupColor}
+                    onChange={(e) => setNewGroupColor(e.target.value)}
+                    placeholder="#3B82F6"
+                    className="w-24 font-mono text-sm"
+                  />
+                </div>
+              </div>
             </div>
             <div className="flex justify-end gap-2">
               <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>

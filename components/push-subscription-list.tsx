@@ -12,7 +12,7 @@ import {
   WifiOff,
   XCircle,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -46,7 +46,7 @@ export function PushSubscriptionList({ className }: PushSubscriptionListProps) {
       window.location.hostname === "localhost" ||
       window.location.hostname === "127.0.0.1");
 
-  const fetchSubscriptions = async () => {
+  const fetchSubscriptions = useCallback(async () => {
     try {
       const response = await fetch("/api/push/subscriptions");
       if (response.ok) {
@@ -61,7 +61,7 @@ export function PushSubscriptionList({ className }: PushSubscriptionListProps) {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
   const removeSubscription = async (subscriptionId: string) => {
     try {
