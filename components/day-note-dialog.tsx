@@ -95,7 +95,7 @@ export function DayNoteDialog({ open, onOpenChange, date, note, onSave }: DayNot
           <Button variant="outline" onClick={() => handleOpenChange(false)} disabled={isSaving}>
             Cancel
           </Button>
-          <Button onClick={handleSave} disabled={isSaving || !content.trim()}>
+          <Button onClick={handleSave} loading={isSaving} disabled={isSaving || !content.trim()}>
             {isSaving ? "Saving..." : "Save"}
           </Button>
         </DialogFooter>

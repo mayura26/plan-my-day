@@ -4,6 +4,7 @@ import { CheckCircle2, Circle, Clock, Plus, Trash2, Zap } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Input } from "@/components/ui/input";
@@ -41,6 +42,8 @@ export function SubtaskManager({
   const [isLoading, setIsLoading] = useState(true);
   const [isAdding, setIsAdding] = useState(false);
   const [showAddForm, setShowAddForm] = useState(false);
+  const [togglingSubtaskId, setTogglingSubtaskId] = useState<string | null>(null);
+  const [deletingSubtaskId, setDeletingSubtaskId] = useState<string | null>(null);
   const [formData, setFormData] = useState<SubtaskFormData>({
     title: "",
     duration: undefined,
@@ -102,6 +105,7 @@ export function SubtaskManager({
 
   const handleToggleSubtask = async (subtask: Task) => {
     const newStatus = subtask.status === "completed" ? "pending" : "completed";
+    setTogglingSubtaskId(subtask.id);
     try {
       const response = await fetch(`/api/tasks/${subtask.id}`, {
         method: "PUT",
@@ -115,6 +119,8 @@ export function SubtaskManager({
       }
     } catch (error) {
       console.error("Error toggling subtask:", error);
+    } finally {
+      setTogglingSubtaskId(null);
     }
   };
 
@@ -128,6 +134,7 @@ export function SubtaskManager({
 
     if (!confirmed) return;
 
+    setDeletingSubtaskId(subtaskId);
     try {
       const response = await fetch(`/api/tasks/${subtaskId}`, {
         method: "DELETE",
@@ -143,6 +150,8 @@ export function SubtaskManager({
     } catch (error) {
       console.error("Error deleting subtask:", error);
       toast.error("Failed to delete subtask");
+    } finally {
+      setDeletingSubtaskId(null);
     }
   };
 
@@ -202,10 +211,12 @@ export function SubtaskManager({
                 <button
                   type="button"
                   onClick={() => !readOnly && handleToggleSubtask(subtask)}
-                  disabled={readOnly}
-                  className="flex-shrink-0 hover:opacity-70 disabled:cursor-not-allowed"
+                  disabled={readOnly || togglingSubtaskId === subtask.id}
+                  className="flex-shrink-0 hover:opacity-70 disabled:cursor-not-allowed relative"
                 >
-                  {subtask.status === "completed" ? (
+                  {togglingSubtaskId === subtask.id ? (
+                    <LoadingSpinner size="sm" className="h-5 w-5" />
+                  ) : subtask.status === "completed" ? (
                     <CheckCircle2 className="h-5 w-5 text-green-500" />
                   ) : (
                     <Circle className="h-5 w-5 text-muted-foreground" />
@@ -228,9 +239,14 @@ export function SubtaskManager({
                   <button
                     type="button"
                     onClick={() => handleDeleteSubtask(subtask.id)}
-                    className="flex-shrink-0 text-muted-foreground hover:text-destructive"
+                    disabled={deletingSubtaskId === subtask.id}
+                    className="flex-shrink-0 text-muted-foreground hover:text-destructive disabled:opacity-50"
                   >
-                    <Trash2 className="h-4 w-4" />
+                    {deletingSubtaskId === subtask.id ? (
+                      <LoadingSpinner size="sm" className="h-4 w-4" />
+                    ) : (
+                      <Trash2 className="h-4 w-4" />
+                    )}
                   </button>
                 )}
               </div>

@@ -199,6 +199,7 @@ interface GroupCardProps {
   isParent?: boolean;
   indentLevel?: number;
   children?: React.ReactNode;
+  isDeleting?: boolean;
 }
 
 function GroupCard({
@@ -221,6 +222,7 @@ function GroupCard({
   isParent = false,
   indentLevel = 0,
   children,
+  isDeleting = false,
 }: GroupCardProps) {
   const textColor = getContrastColor(groupColor);
 
@@ -358,6 +360,7 @@ function GroupCard({
                 onDelete();
               }}
               title="Delete group"
+              loading={isDeleting}
             >
               <Trash2 className="h-3.5 w-3.5" />
             </Button>
@@ -427,6 +430,8 @@ export function TaskGroupManager({
   const [newGroupColor, setNewGroupColor] = useState("#3B82F6");
   const [newParentGroupId, setNewParentGroupId] = useState<string | null>(null);
   const [isCreatingParentGroup, setIsCreatingParentGroup] = useState(false);
+  const [isCreating, setIsCreating] = useState(false);
+  const [deletingGroupId, setDeletingGroupId] = useState<string | null>(null);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const [hiddenGroups, setHiddenGroups] = useState<Set<string>>(new Set());
 
@@ -499,6 +504,7 @@ export function TaskGroupManager({
   const createGroup = async () => {
     if (!newGroupName.trim()) return;
 
+    setIsCreating(true);
     try {
       const response = await fetch("/api/task-groups", {
         method: "POST",
@@ -536,6 +542,8 @@ export function TaskGroupManager({
     } catch (error) {
       console.error("Error creating task group:", error);
       toast.error("An error occurred while creating the task group. Please try again.");
+    } finally {
+      setIsCreating(false);
     }
   };
 
@@ -577,6 +585,7 @@ export function TaskGroupManager({
       return;
     }
 
+    setDeletingGroupId(groupId);
     try {
       const response = await fetch(`/api/task-groups/${groupId}`, {
         method: "DELETE",
@@ -595,6 +604,8 @@ export function TaskGroupManager({
     } catch (error) {
       console.error("Error deleting task group:", error);
       toast.error("An error occurred while deleting the task group");
+    } finally {
+      setDeletingGroupId(null);
     }
   };
 
@@ -772,6 +783,7 @@ export function TaskGroupManager({
             onDelete={() => deleteGroup(group.id)}
             isParent={isParentGroup}
             indentLevel={level}
+            isDeleting={deletingGroupId === group.id}
           >
             {/* Render children inside parent wireframe when expanded */}
             {isExpanded && group.children.length > 0 && (
@@ -811,6 +823,7 @@ export function TaskGroupManager({
           onDelete={() => deleteGroup(group.id)}
           isParent={isParentGroup}
           indentLevel={level}
+          isDeleting={deletingGroupId === group.id}
         />
       </div>
     );
@@ -931,7 +944,7 @@ export function TaskGroupManager({
                 <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
                   Cancel
                 </Button>
-                <Button onClick={createGroup} disabled={!newGroupName.trim()}>
+                <Button onClick={createGroup} loading={isCreating} disabled={!newGroupName.trim() || isCreating}>
                   {isCreatingParentGroup ? "Create Parent Group" : "Create Group"}
                 </Button>
               </div>
@@ -1002,6 +1015,7 @@ export function TaskGroupManager({
             }}
             onTaskClick={onTaskClick}
             isUngrouped
+            isDeleting={false}
           />
         )}
       </div>

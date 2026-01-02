@@ -544,7 +544,7 @@ export function TaskForm({ onSubmit, onCancel, initialData, isLoading = false }:
         )}
         <Button
           type="submit"
-          disabled={isLoading}
+          loading={isLoading}
           className={`h-11 ${onCancel ? "flex-1" : "w-full"}`}
         >
           {isLoading

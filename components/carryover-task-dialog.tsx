@@ -171,17 +171,12 @@ export function CarryoverTaskDialog({
           </Button>
           <Button
             onClick={handleCreateCarryover}
+            loading={isCreating}
             disabled={isCreating || !additionalDuration || additionalDuration <= 0}
             className="w-full sm:w-auto"
           >
-            {isCreating ? (
-              "Creating..."
-            ) : (
-              <>
-                <RotateCcw className="h-4 w-4 mr-2" />
-                Create Carryover
-              </>
-            )}
+            <RotateCcw className="h-4 w-4 mr-2" />
+            {isCreating ? "Creating..." : "Create Carryover"}
           </Button>
         </DialogFooter>
       </DialogContent>

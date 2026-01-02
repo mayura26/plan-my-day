@@ -196,17 +196,11 @@ export function APIKeyManager() {
                         variant="outline"
                         size="sm"
                         onClick={() => handleRevokeKey(key.id)}
-                        disabled={isRevoking === key.id}
+                        loading={isRevoking === key.id}
                         className="ml-4"
                       >
-                        {isRevoking === key.id ? (
-                          "Revoking..."
-                        ) : (
-                          <>
-                            <Trash2 className="h-4 w-4 mr-2" />
-                            Revoke
-                          </>
-                        )}
+                        <Trash2 className="h-4 w-4 mr-2" />
+                        {isRevoking === key.id ? "Revoking..." : "Revoke"}
                       </Button>
                     </div>
                   ))}
@@ -274,7 +268,7 @@ export function APIKeyManager() {
             >
               Cancel
             </Button>
-            <Button onClick={handleCreateKey} disabled={isCreating || !newKeyName.trim()}>
+            <Button onClick={handleCreateKey} loading={isCreating} disabled={isCreating || !newKeyName.trim()}>
               {isCreating ? "Creating..." : "Create Key"}
             </Button>
           </DialogFooter>

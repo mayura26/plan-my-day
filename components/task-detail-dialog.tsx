@@ -62,6 +62,7 @@ export function TaskDetailDialog({
   const [isDeleting, setIsDeleting] = useState(false);
   const [isUnscheduling, setIsUnscheduling] = useState(false);
   const [isUnignoring, setIsUnignoring] = useState(false);
+  const [isChangingStatus, setIsChangingStatus] = useState(false);
   const [dependencies, setDependencies] = useState<DependencyInfo[]>([]);
   const [blockedBy, setBlockedBy] = useState<Task[]>([]);
   const [isBlocked, setIsBlocked] = useState(false);
@@ -317,7 +318,7 @@ export function TaskDetailDialog({
                   variant="outline"
                   size="sm"
                   onClick={handleUnignore}
-                  disabled={isUnignoring}
+                  loading={isUnignoring}
                   className="h-7 text-xs"
                 >
                   {isUnignoring ? "Removing..." : "Remove Ignore"}
@@ -417,7 +418,7 @@ export function TaskDetailDialog({
                       size="sm"
                       variant="outline"
                       onClick={handleUnschedule}
-                      disabled={isUnscheduling}
+                      loading={isUnscheduling}
                     >
                       <CalendarX className="h-4 w-4 mr-2" />
                       {isUnscheduling ? "Unscheduling..." : "Unschedule"}
@@ -502,10 +503,16 @@ export function TaskDetailDialog({
                   <Button
                     size="sm"
                     variant="outline"
-                    onClick={() => {
-                      setHasChanges(true);
-                      onStatusChange?.(task.id, "pending");
+                    onClick={async () => {
+                      setIsChangingStatus(true);
+                      try {
+                        await onStatusChange?.(task.id, "pending");
+                        setHasChanges(true);
+                      } finally {
+                        setIsChangingStatus(false);
+                      }
                     }}
+                    loading={isChangingStatus}
                   >
                     <Circle className="h-4 w-4 mr-1" />
                     Mark as Incomplete
@@ -525,11 +532,17 @@ export function TaskDetailDialog({
                       <Button
                         size="sm"
                         variant="outline"
-                        onClick={() => {
-                          setHasChanges(true);
-                          onStatusChange?.(task.id, "in_progress");
+                        onClick={async () => {
+                          setIsChangingStatus(true);
+                          try {
+                            await onStatusChange?.(task.id, "in_progress");
+                            setHasChanges(true);
+                          } finally {
+                            setIsChangingStatus(false);
+                          }
                         }}
                         disabled={isBlocked}
+                        loading={isChangingStatus}
                       >
                         {isBlocked ? "Blocked" : "Start Task"}
                       </Button>
@@ -538,10 +551,16 @@ export function TaskDetailDialog({
                       <Button
                         size="sm"
                         variant="default"
-                        onClick={() => {
-                          setHasChanges(true);
-                          onStatusChange?.(task.id, "completed");
+                        onClick={async () => {
+                          setIsChangingStatus(true);
+                          try {
+                            await onStatusChange?.(task.id, "completed");
+                            setHasChanges(true);
+                          } finally {
+                            setIsChangingStatus(false);
+                          }
                         }}
+                        loading={isChangingStatus}
                       >
                         <CheckCircle2 className="h-4 w-4 mr-1" />
                         Mark Complete
@@ -551,10 +570,16 @@ export function TaskDetailDialog({
                       <Button
                         size="sm"
                         variant="default"
-                        onClick={() => {
-                          setHasChanges(true);
-                          onStatusChange?.(task.id, "completed");
+                        onClick={async () => {
+                          setIsChangingStatus(true);
+                          try {
+                            await onStatusChange?.(task.id, "completed");
+                            setHasChanges(true);
+                          } finally {
+                            setIsChangingStatus(false);
+                          }
                         }}
+                        loading={isChangingStatus}
                       >
                         <CheckCircle2 className="h-4 w-4 mr-1" />
                         Mark Complete
@@ -570,7 +595,7 @@ export function TaskDetailDialog({
             <Button
               variant="destructive"
               onClick={handleDelete}
-              disabled={isDeleting}
+              loading={isDeleting}
               className="h-11 px-4 md:h-10 md:px-4 w-full sm:w-auto"
             >
               <Trash2 className="h-4 w-4 mr-2" />

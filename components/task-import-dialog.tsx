@@ -58,6 +58,7 @@ export function TaskImportDialog({ open, onOpenChange, groups, onImport }: TaskI
   const [csvData, setCsvData] = useState("");
   const [parsedTasks, setParsedTasks] = useState<ParsedTask[]>([]);
   const [isImporting, setIsImporting] = useState(false);
+  const [isParsing, setIsParsing] = useState(false);
   const [importResults, setImportResults] = useState<{ success: number; failed: number } | null>(
     null
   );
@@ -267,117 +268,123 @@ export function TaskImportDialog({ open, onOpenChange, groups, onImport }: TaskI
       return;
     }
 
-    const lines = csvData
-      .trim()
-      .split(/\r?\n/)
-      .filter((line) => line.trim());
-    if (lines.length === 0) {
-      return;
-    }
-
-    const tasks: ParsedTask[] = [];
-    let startIndex = 0;
-
-    // Check if first row is header
-    const firstRow = parseCSVRow(lines[0]);
-    if (isHeaderRow(firstRow)) {
-      startIndex = 1;
-    }
-
-    // Group lookup map
-    const groupMap = new Map<string, string>();
-    groups.forEach((group) => {
-      groupMap.set(group.name, group.id);
-    });
-
-    // Parse each row
-    for (let i = startIndex; i < lines.length; i++) {
-      const row = parseCSVRow(lines[i]);
-      const rowNumber = i + 1; // 1-indexed for display
-
-      const errors: string[] = [];
-
-      // Extract columns (type, group, name, description, duration, due date, priority, energy)
-      const typeStr = row[0]?.trim() || "";
-      const groupStr = row[1]?.trim() || "";
-      const nameStr = row[2]?.trim() || "";
-      const descriptionStr = row[3]?.trim() || "";
-      const durationStr = row[4]?.trim() || "";
-      const dueDateStr = row[5]?.trim() || "";
-      const priorityStr = row[6]?.trim() || "";
-      const energyStr = row[7]?.trim() || "";
-
-      // Validate type (required)
-      const type = normalizeTaskType(typeStr);
-      if (!type) {
-        errors.push("Type is required and must be Task, Event, or Todo");
+    setIsParsing(true);
+    // Use setTimeout to allow UI to update before parsing
+    setTimeout(() => {
+      const lines = csvData
+        .trim()
+        .split(/\r?\n/)
+        .filter((line) => line.trim());
+      if (lines.length === 0) {
+        setIsParsing(false);
+        return;
       }
 
-      // Validate name (required)
-      if (!nameStr) {
-        errors.push("Name is required");
+      const tasks: ParsedTask[] = [];
+      let startIndex = 0;
+
+      // Check if first row is header
+      const firstRow = parseCSVRow(lines[0]);
+      if (isHeaderRow(firstRow)) {
+        startIndex = 1;
       }
 
-      // Parse duration
-      let duration: number | null = null;
-      if (durationStr) {
-        const parsed = parseFloat(durationStr);
-        if (Number.isNaN(parsed) || parsed < 0) {
-          errors.push("Duration must be a valid positive number");
-        } else {
-          duration = parsed;
-        }
-      }
-
-      // Parse due date
-      let dueDate: string | null = null;
-      if (dueDateStr) {
-        const parsed = parseDueDate(dueDateStr);
-        if (!parsed) {
-          errors.push("Due date format is invalid");
-        } else {
-          dueDate = parsed;
-        }
-      }
-
-      // Parse priority (1-5 scale, optional)
-      let priority: number | null = null;
-      if (priorityStr) {
-        const parsed = parseInt(priorityStr, 10);
-        if (Number.isNaN(parsed) || parsed < 1 || parsed > 5) {
-          errors.push("Priority must be a number between 1 and 5");
-        } else {
-          priority = parsed;
-        }
-      }
-
-      // Parse energy level (1-5 scale, optional)
-      let energyLevel: number | null = null;
-      if (energyStr) {
-        const parsed = parseInt(energyStr, 10);
-        if (Number.isNaN(parsed) || parsed < 1 || parsed > 5) {
-          errors.push("Energy level must be a number between 1 and 5");
-        } else {
-          energyLevel = parsed;
-        }
-      }
-
-      tasks.push({
-        type: type || "task", // Default to task if invalid (will show error)
-        group: groupStr || null,
-        name: nameStr,
-        description: descriptionStr || null,
-        duration,
-        dueDate,
-        priority,
-        energyLevel,
-        errors,
-        rowNumber,
+      // Group lookup map
+      const groupMap = new Map<string, string>();
+      groups.forEach((group) => {
+        groupMap.set(group.name, group.id);
       });
-    }
 
-    setParsedTasks(tasks);
-    setStep("preview");
+      // Parse each row
+      for (let i = startIndex; i < lines.length; i++) {
+        const row = parseCSVRow(lines[i]);
+        const rowNumber = i + 1; // 1-indexed for display
+
+        const errors: string[] = [];
+
+        // Extract columns (type, group, name, description, duration, due date, priority, energy)
+        const typeStr = row[0]?.trim() || "";
+        const groupStr = row[1]?.trim() || "";
+        const nameStr = row[2]?.trim() || "";
+        const descriptionStr = row[3]?.trim() || "";
+        const durationStr = row[4]?.trim() || "";
+        const dueDateStr = row[5]?.trim() || "";
+        const priorityStr = row[6]?.trim() || "";
+        const energyStr = row[7]?.trim() || "";
+
+        // Validate type (required)
+        const type = normalizeTaskType(typeStr);
+        if (!type) {
+          errors.push("Type is required and must be Task, Event, or Todo");
+        }
+
+        // Validate name (required)
+        if (!nameStr) {
+          errors.push("Name is required");
+        }
+
+        // Parse duration
+        let duration: number | null = null;
+        if (durationStr) {
+          const parsed = parseFloat(durationStr);
+          if (Number.isNaN(parsed) || parsed < 0) {
+            errors.push("Duration must be a valid positive number");
+          } else {
+            duration = parsed;
+          }
+        }
+
+        // Parse due date
+        let dueDate: string | null = null;
+        if (dueDateStr) {
+          const parsed = parseDueDate(dueDateStr);
+          if (!parsed) {
+            errors.push("Due date format is invalid");
+          } else {
+            dueDate = parsed;
+          }
+        }
+
+        // Parse priority (1-5 scale, optional)
+        let priority: number | null = null;
+        if (priorityStr) {
+          const parsed = parseInt(priorityStr, 10);
+          if (Number.isNaN(parsed) || parsed < 1 || parsed > 5) {
+            errors.push("Priority must be a number between 1 and 5");
+          } else {
+            priority = parsed;
+          }
+        }
+
+        // Parse energy level (1-5 scale, optional)
+        let energyLevel: number | null = null;
+        if (energyStr) {
+          const parsed = parseInt(energyStr, 10);
+          if (Number.isNaN(parsed) || parsed < 1 || parsed > 5) {
+            errors.push("Energy level must be a number between 1 and 5");
+          } else {
+            energyLevel = parsed;
+          }
+        }
+
+        tasks.push({
+          type: type || "task", // Default to task if invalid (will show error)
+          group: groupStr || null,
+          name: nameStr,
+          description: descriptionStr || null,
+          duration,
+          dueDate,
+          priority,
+          energyLevel,
+          errors,
+          rowNumber,
+        });
+      }
+
+      setParsedTasks(tasks);
+      setStep("preview");
+      setIsParsing(false);
+    }, 0);
   };
 
   // Execute import
@@ -806,9 +813,9 @@ Todo,Home,Buy groceries,Get milk and eggs,30,2025-12-20,2,2`}
               <Button variant="outline" onClick={() => handleOpenChange(false)}>
                 Cancel
               </Button>
-              <Button onClick={handleParseCSV} disabled={!csvData.trim()}>
+              <Button onClick={handleParseCSV} loading={isParsing} disabled={!csvData.trim() || isParsing}>
                 <Upload className="h-4 w-4 mr-2" />
-                Parse CSV
+                {isParsing ? "Parsing..." : "Parse CSV"}
               </Button>
             </>
           ) : (
@@ -823,17 +830,11 @@ Todo,Home,Buy groceries,Get milk and eggs,30,2025-12-20,2,2`}
               >
                 Cancel
               </Button>
-              <Button onClick={handleImport} disabled={!hasValidTasks || isImporting}>
-                {isImporting ? (
-                  "Importing..."
-                ) : (
-                  <>
-                    <Upload className="h-4 w-4 mr-2" />
-                    Import{" "}
-                    {parsedTasks.filter((t) => t.errors.length === 0 && t.name && t.type).length}{" "}
-                    Task(s)
-                  </>
-                )}
+              <Button onClick={handleImport} loading={isImporting} disabled={!hasValidTasks || isImporting}>
+                <Upload className="h-4 w-4 mr-2" />
+                {isImporting
+                  ? "Importing..."
+                  : `Import ${parsedTasks.filter((t) => t.errors.length === 0 && t.name && t.type).length} Task(s)`}
               </Button>
             </>
           )}

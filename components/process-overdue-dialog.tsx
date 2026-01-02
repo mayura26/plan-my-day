@@ -415,17 +415,12 @@ export function ProcessOverdueDialog({
                               processingTaskId === task.id ||
                               !(actionState.additionalDuration || task.duration || 30)
                             }
+                            loading={processingTaskId === task.id}
                             className="w-full"
                             size="sm"
                           >
-                            {processingTaskId === task.id ? (
-                              "Creating..."
-                            ) : (
-                              <>
-                                <RotateCcw className="h-4 w-4 mr-2" />
-                                Create
-                              </>
-                            )}
+                            <RotateCcw className="h-4 w-4 mr-2" />
+                            {processingTaskId === task.id ? "Creating..." : "Create"}
                           </Button>
                         </div>
                       </div>
@@ -504,7 +499,7 @@ export function ProcessOverdueDialog({
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isProcessing}>
             Cancel
           </Button>
-          <Button onClick={handleProcessAll} disabled={isProcessing || taskActions.size === 0}>
+          <Button onClick={handleProcessAll} loading={isProcessing} disabled={isProcessing || taskActions.size === 0}>
             {isProcessing ? "Processing..." : `Process ${taskActions.size} Task(s)`}
           </Button>
         </DialogFooter>

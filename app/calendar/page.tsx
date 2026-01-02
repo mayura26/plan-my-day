@@ -64,6 +64,7 @@ export default function CalendarPage() {
   const [activeDragId, setActiveDragId] = useState<string | null>(null);
   const [resizingTaskId, setResizingTaskId] = useState<string | null>(null);
   const [draggedTask, setDraggedTask] = useState<Task | null>(null);
+  const [processingTaskId, setProcessingTaskId] = useState<string | null>(null);
   const [hiddenGroups, setHiddenGroups] = useState<Set<string>>(new Set());
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [expandedSections, setExpandedSections] = useState<Set<string>>(
@@ -428,6 +429,7 @@ export default function CalendarPage() {
   };
 
   const handleStatusChange = async (taskId: string, status: Task["status"]) => {
+    setProcessingTaskId(taskId);
     try {
       const response = await fetch(`/api/tasks/${taskId}`, {
         method: "PUT",
@@ -452,6 +454,8 @@ export default function CalendarPage() {
     } catch (error) {
       console.error("Error updating task status:", error);
       throw error;
+    } finally {
+      setProcessingTaskId(null);
     }
   };
 
@@ -656,6 +660,7 @@ export default function CalendarPage() {
     const totalMinutes = (newEndTime.getTime() - startDate.getTime()) / 60000;
     const duration = Math.max(15, Math.round(totalMinutes / 15) * 15); // Minimum 15 minutes
 
+    setProcessingTaskId(taskId);
     try {
       const response = await fetch(`/api/tasks/${taskId}`, {
         method: "PUT",
@@ -674,6 +679,8 @@ export default function CalendarPage() {
       }
     } catch (error) {
       console.error("Error resizing task:", error);
+    } finally {
+      setProcessingTaskId(null);
     }
   };
 
@@ -692,6 +699,7 @@ export default function CalendarPage() {
     const snappedMinutes = Math.max(15, Math.round(totalMinutes / 15) * 15); // Minimum 15 minutes
     const duration = snappedMinutes;
 
+    setProcessingTaskId(taskId);
     try {
       const response = await fetch(`/api/tasks/${taskId}`, {
         method: "PUT",
@@ -710,6 +718,8 @@ export default function CalendarPage() {
       }
     } catch (error) {
       console.error("Error resizing task start:", error);
+    } finally {
+      setProcessingTaskId(null);
     }
   };
 
@@ -733,6 +743,7 @@ export default function CalendarPage() {
     const startDate = createDateInTimezone(day, hours, minutes, timezone);
     const endDate = new Date(startDate.getTime() + duration * 60000);
 
+    setProcessingTaskId(taskId);
     try {
       const response = await fetch(`/api/tasks/${taskId}`, {
         method: "PUT",
@@ -751,6 +762,8 @@ export default function CalendarPage() {
       }
     } catch (error) {
       console.error("Error scheduling task:", error);
+    } finally {
+      setProcessingTaskId(null);
     }
   };
 
@@ -777,6 +790,7 @@ export default function CalendarPage() {
     const startDate = createDateInTimezone(day, hours, minutes, timezone);
     const endDate = new Date(startDate.getTime() + duration * 60000);
 
+    setProcessingTaskId(taskId);
     try {
       const response = await fetch(`/api/tasks/${taskId}`, {
         method: "PUT",
@@ -795,6 +809,8 @@ export default function CalendarPage() {
       }
     } catch (error) {
       console.error("Error rescheduling task:", error);
+    } finally {
+      setProcessingTaskId(null);
     }
   };
 

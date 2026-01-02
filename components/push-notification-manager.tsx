@@ -270,7 +270,7 @@ export function PushNotificationManager() {
               <BellOff className="h-4 w-4" />
               Disable Push Notifications
             </Button>
-            <Button onClick={testNotification} variant="outline" disabled={isTesting}>
+            <Button onClick={testNotification} variant="outline" loading={isTesting}>
               {isTesting ? "Sending..." : "Test Notification"}
             </Button>
           </>

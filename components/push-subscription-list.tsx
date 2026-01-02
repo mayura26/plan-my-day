@@ -263,13 +263,9 @@ export function PushSubscriptionList({ className }: PushSubscriptionListProps) {
                   variant="outline"
                   size="sm"
                   onClick={cleanupSubscriptions}
-                  disabled={isCleaning}
+                  loading={isCleaning}
                 >
-                  {isCleaning ? (
-                    <RefreshCw className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <CheckCircle className="w-4 h-4" />
-                  )}
+                  {!isCleaning && <CheckCircle className="w-4 h-4" />}
                   Cleanup
                 </Button>
               </div>
