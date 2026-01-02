@@ -23,6 +23,7 @@ interface SubtaskManagerProps {
   parentTaskId: string;
   onSubtaskChange?: () => void;
   readOnly?: boolean;
+  noCard?: boolean; // If true, don't render the Card wrapper
 }
 
 interface SubtaskFormData {
@@ -36,6 +37,7 @@ export function SubtaskManager({
   parentTaskId,
   onSubtaskChange,
   readOnly = false,
+  noCard = false,
 }: SubtaskManagerProps) {
   const { confirm } = useConfirmDialog();
   const [subtasks, setSubtasks] = useState<Task[]>([]);
@@ -159,43 +161,29 @@ export function SubtaskManager({
   const totalCount = subtasks.length;
   const progressPercentage = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
 
-  // Reserve space during loading to prevent layout shift
-  if (isLoading) {
-    return (
-      <Card>
+  const content = (
+    <>
+      {!noCard && (
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
             <CardTitle className="text-sm font-semibold">Subtasks</CardTitle>
+            {totalCount > 0 && (
+              <span className="text-xs text-muted-foreground">
+                {completedCount}/{totalCount} ({progressPercentage}%)
+              </span>
+            )}
           </div>
-        </CardHeader>
-        <CardContent>
-          <div className="text-sm text-muted-foreground py-2">Loading subtasks...</div>
-        </CardContent>
-      </Card>
-    );
-  }
-
-  return (
-    <Card>
-      <CardHeader className="pb-3">
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-sm font-semibold">Subtasks</CardTitle>
           {totalCount > 0 && (
-            <span className="text-xs text-muted-foreground">
-              {completedCount}/{totalCount} ({progressPercentage}%)
-            </span>
+            <div className="w-full bg-secondary rounded-full h-1.5 mt-2">
+              <div
+                className="bg-primary h-1.5 rounded-full transition-all"
+                style={{ width: `${progressPercentage}%` }}
+              />
+            </div>
           )}
-        </div>
-        {totalCount > 0 && (
-          <div className="w-full bg-secondary rounded-full h-1.5 mt-2">
-            <div
-              className="bg-primary h-1.5 rounded-full transition-all"
-              style={{ width: `${progressPercentage}%` }}
-            />
-          </div>
-        )}
-      </CardHeader>
-      <CardContent className="space-y-3">
+        </CardHeader>
+      )}
+      <CardContent className={noCard ? "p-0 space-y-3" : "space-y-3"}>
         {/* Subtask List */}
         {subtasks.length > 0 && (
           <div className="space-y-2">
@@ -365,6 +353,31 @@ export function SubtaskManager({
           <p className="text-sm text-muted-foreground text-center py-2">No subtasks yet</p>
         )}
       </CardContent>
-    </Card>
+    </>
   );
+
+  // Reserve space during loading to prevent layout shift
+  if (isLoading) {
+    if (noCard) {
+      return <div className="text-sm text-muted-foreground py-2">Loading subtasks...</div>;
+    }
+    return (
+      <Card>
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-sm font-semibold">Subtasks</CardTitle>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="text-sm text-muted-foreground py-2">Loading subtasks...</div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (noCard) {
+    return <div className="space-y-3">{content}</div>;
+  }
+
+  return <Card>{content}</Card>;
 }

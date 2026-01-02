@@ -5,6 +5,8 @@ import {
   Calendar,
   CalendarX,
   CheckCircle2,
+  ChevronDown,
+  ChevronRight,
   Circle,
   Clock,
   Edit,
@@ -67,6 +69,11 @@ export function TaskDetailDialog({
   const [blockedBy, setBlockedBy] = useState<Task[]>([]);
   const [isBlocked, setIsBlocked] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
+  const [subtasksExpanded, setSubtasksExpanded] = useState(false);
+  const [subtasksCount, setSubtasksCount] = useState<{ completed: number; total: number }>({
+    completed: 0,
+    total: 0,
+  });
   const { timezone } = useUserTimezone();
 
   const fetchDependencies = useCallback(async (taskId: string) => {
@@ -83,6 +90,22 @@ export function TaskDetailDialog({
     }
   }, []);
 
+  const fetchSubtasksCount = useCallback(async (taskId: string) => {
+    try {
+      const response = await fetch(`/api/tasks/${taskId}/subtasks`);
+      if (response.ok) {
+        const data = await response.json();
+        const subtasks = data.subtasks || [];
+        const completed = subtasks.filter((st: Task) => st.status === "completed").length;
+        setSubtasksCount({ completed, total: subtasks.length });
+        // Auto-expand if subtasks exist, collapse if empty
+        setSubtasksExpanded(subtasks.length > 0);
+      }
+    } catch (error) {
+      console.error("Error fetching subtasks count:", error);
+    }
+  }, []);
+
   // Track when dialog opens to fetch dependencies only once
   const openedTaskIdRef = useRef<string | null>(null);
   useEffect(() => {
@@ -91,6 +114,10 @@ export function TaskDetailDialog({
       if (openedTaskIdRef.current !== task.id) {
         openedTaskIdRef.current = task.id;
         fetchDependencies(task.id);
+        // Fetch subtasks count for non-subtask tasks
+        if (!(task.task_type === "subtask" || !!task.parent_task_id)) {
+          fetchSubtasksCount(task.id);
+        }
         // Reset change tracking when dialog opens
         setHasChanges(false);
       }
@@ -99,7 +126,7 @@ export function TaskDetailDialog({
     if (!open) {
       openedTaskIdRef.current = null;
     }
-  }, [open, task?.id, fetchDependencies]);
+  }, [open, task?.id, fetchDependencies, fetchSubtasksCount, task?.task_type, task?.parent_task_id]);
 
   if (!task) return null;
 
@@ -207,6 +234,10 @@ export function TaskDetailDialog({
           // Update the task in parent component so dialog shows fresh data
           onTaskRefresh?.(data.task);
         }
+        // Refresh subtasks count
+        if (!(task.task_type === "subtask" || !!task.parent_task_id)) {
+          await fetchSubtasksCount(task.id);
+        }
       } catch (error) {
         console.error("Error refreshing task:", error);
       }
@@ -270,144 +301,170 @@ export function TaskDetailDialog({
           <DialogTitle className="text-2xl">{task.title}</DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-6">
-          {/* Status and Type Badges */}
-          <div className="flex flex-wrap gap-2">
-            <Badge className={getStatusColor(task.status)}>
-              {task.status === "completed" ? (
-                <CheckCircle2 className="h-3 w-3 mr-1" />
-              ) : (
-                <Circle className="h-3 w-3 mr-1" />
-              )}
-              {getStatusLabel(task.status)}
-            </Badge>
-            <Badge variant="outline">
-              <Tag className="h-3 w-3 mr-1" />
-              {TASK_TYPE_LABELS[task.task_type]}
-            </Badge>
-            <Badge className={getPriorityColor(task.priority)}>
-              <Flag className="h-3 w-3 mr-1" />
-              Priority {task.priority} -{" "}
-              {PRIORITY_LABELS[task.priority as keyof typeof PRIORITY_LABELS]}
-            </Badge>
-            {task.locked && (
-              <Badge variant="destructive">
-                <Lock className="h-3 w-3 mr-1" />
-                Locked
+        <div className="space-y-4">
+          {/* Top Action Bar */}
+          <div className="space-y-3">
+            {/* Compact Status Badges */}
+            <div className="flex flex-wrap items-center gap-1.5">
+              <Badge className={`${getStatusColor(task.status)} text-xs px-1.5 py-0.5`}>
+                {task.status === "completed" ? (
+                  <CheckCircle2 className="h-2.5 w-2.5 mr-0.5" />
+                ) : (
+                  <Circle className="h-2.5 w-2.5 mr-0.5" />
+                )}
+                {getStatusLabel(task.status)}
               </Badge>
-            )}
-            {isBlocked && (
-              <Badge variant="destructive">
-                <GitBranch className="h-3 w-3 mr-1" />
-                Blocked
+              <Badge variant="outline" className="text-xs px-1.5 py-0.5">
+                <Tag className="h-2.5 w-2.5 mr-0.5" />
+                {TASK_TYPE_LABELS[task.task_type]}
               </Badge>
-            )}
-            {isCarryover && (
-              <Badge variant="secondary">
-                <Link2 className="h-3 w-3 mr-1" />
-                Continued
+              <Badge className={`${getPriorityColor(task.priority)} text-xs px-1.5 py-0.5`}>
+                <Flag className="h-2.5 w-2.5 mr-0.5" />
+                P{task.priority}
               </Badge>
-            )}
-            {task.ignored && (
-              <div className="flex items-center gap-2">
-                <Badge variant="outline" className="opacity-60">
-                  <XCircle className="h-3 w-3 mr-1" />
-                  Ignored
+              {task.locked && (
+                <Badge variant="destructive" className="text-xs px-1.5 py-0.5">
+                  <Lock className="h-2.5 w-2.5 mr-0.5" />
+                  Locked
                 </Badge>
+              )}
+              {isBlocked && (
+                <Badge variant="destructive" className="text-xs px-1.5 py-0.5">
+                  <GitBranch className="h-2.5 w-2.5 mr-0.5" />
+                  Blocked
+                </Badge>
+              )}
+              {isCarryover && (
+                <Badge variant="secondary" className="text-xs px-1.5 py-0.5">
+                  <Link2 className="h-2.5 w-2.5 mr-0.5" />
+                  Continued
+                </Badge>
+              )}
+              {task.ignored && (
+                <>
+                  <Badge variant="outline" className="opacity-60 text-xs px-1.5 py-0.5">
+                    <XCircle className="h-2.5 w-2.5 mr-0.5" />
+                    Ignored
+                  </Badge>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleUnignore}
+                    loading={isUnignoring}
+                    className="h-6 text-xs px-2"
+                  >
+                    {isUnignoring ? "Removing..." : "Remove Ignore"}
+                  </Button>
+                </>
+              )}
+            </div>
+            {/* Action Buttons */}
+            <div className="border rounded-lg bg-muted/30 p-3">
+              <div className="flex flex-wrap items-center gap-2">
+                {/* Status Change Actions */}
+                {task.status === "completed" && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={async () => {
+                      setIsChangingStatus(true);
+                      try {
+                        await onStatusChange?.(task.id, "pending");
+                        setHasChanges(true);
+                      } finally {
+                        setIsChangingStatus(false);
+                      }
+                    }}
+                    loading={isChangingStatus}
+                  >
+                    <Circle className="h-4 w-4 mr-1" />
+                    Mark Incomplete
+                  </Button>
+                )}
+                {task.status === "pending" && !isBlocked && (
+                  <Button
+                    size="sm"
+                    variant="default"
+                    onClick={async () => {
+                      setIsChangingStatus(true);
+                      try {
+                        await onStatusChange?.(task.id, "in_progress");
+                        setHasChanges(true);
+                      } finally {
+                        setIsChangingStatus(false);
+                      }
+                    }}
+                    loading={isChangingStatus}
+                  >
+                    Start Task
+                  </Button>
+                )}
+                {task.status === "pending" && !isBlocked && (
+                  <Button
+                    size="sm"
+                    variant="default"
+                    onClick={async () => {
+                      setIsChangingStatus(true);
+                      try {
+                        await onStatusChange?.(task.id, "completed");
+                        setHasChanges(true);
+                      } finally {
+                        setIsChangingStatus(false);
+                      }
+                    }}
+                    loading={isChangingStatus}
+                  >
+                    <CheckCircle2 className="h-4 w-4 mr-1" />
+                    Mark Complete
+                  </Button>
+                )}
+                {task.status === "in_progress" && (
+                  <Button
+                    size="sm"
+                    variant="default"
+                    onClick={async () => {
+                      setIsChangingStatus(true);
+                      try {
+                        await onStatusChange?.(task.id, "completed");
+                        setHasChanges(true);
+                      } finally {
+                        setIsChangingStatus(false);
+                      }
+                    }}
+                    loading={isChangingStatus}
+                  >
+                    <CheckCircle2 className="h-4 w-4 mr-1" />
+                    Mark Complete
+                  </Button>
+                )}
+                {task.status === "pending" && isBlocked && (
+                  <Button size="sm" variant="outline" disabled>
+                    Blocked
+                  </Button>
+                )}
+
+                {/* Edit and Delete */}
+                <Button size="sm" variant="outline" onClick={handleEdit}>
+                  <Edit className="h-4 w-4 mr-1" />
+                  Edit
+                </Button>
                 <Button
-                  variant="outline"
                   size="sm"
-                  onClick={handleUnignore}
-                  loading={isUnignoring}
-                  className="h-7 text-xs"
+                  variant="destructive"
+                  onClick={handleDelete}
+                  loading={isDeleting}
                 >
-                  {isUnignoring ? "Removing..." : "Remove Ignore"}
+                  <Trash2 className="h-4 w-4 mr-1" />
+                  Delete
                 </Button>
               </div>
-            )}
+            </div>
           </div>
-
-          {/* Blocked By Warning */}
-          {isBlocked && blockedBy.length > 0 && (
-            <Card className="border-destructive bg-destructive/10">
-              <CardContent className="pt-6">
-                <h3 className="text-sm font-semibold mb-2 text-destructive flex items-center gap-2">
-                  <GitBranch className="h-4 w-4" />
-                  Blocked by incomplete tasks
-                </h3>
-                <ul className="text-sm space-y-1">
-                  {blockedBy.map((dep) => (
-                    <li key={dep.id} className="flex items-center gap-2">
-                      <Circle className="h-3 w-3 text-muted-foreground" />
-                      <span>{dep.title}</span>
-                    </li>
-                  ))}
-                </ul>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Description */}
-          {task.description && (
-            <Card>
-              <CardContent className="pt-6">
-                <h3 className="text-sm font-semibold mb-2">Description</h3>
-                <p className="text-sm text-muted-foreground whitespace-pre-wrap">
-                  {task.description}
-                </p>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Subtasks - Only show for non-subtask tasks */}
-          {!isSubtask && (
-            <SubtaskManager
-              parentTaskId={task.id}
-              onSubtaskChange={handleSubtaskChange}
-              readOnly={
-                task.status === "completed" ||
-                task.status === "cancelled" ||
-                task.status === "rescheduled"
-              }
-            />
-          )}
-
-          {/* Dependencies */}
-          {dependencies.length > 0 && (
-            <Card>
-              <CardContent className="pt-6">
-                <h3 className="text-sm font-semibold mb-2 flex items-center gap-2">
-                  <GitBranch className="h-4 w-4" />
-                  Dependencies
-                </h3>
-                <ul className="text-sm space-y-1">
-                  {dependencies.map((dep) => (
-                    <li key={dep.id} className="flex items-center gap-2">
-                      {dep.dependency_status === "completed" ? (
-                        <CheckCircle2 className="h-3 w-3 text-green-500" />
-                      ) : (
-                        <Circle className="h-3 w-3 text-muted-foreground" />
-                      )}
-                      <span
-                        className={
-                          dep.dependency_status === "completed"
-                            ? "line-through text-muted-foreground"
-                            : ""
-                        }
-                      >
-                        {dep.dependency_title}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              </CardContent>
-            </Card>
-          )}
 
           {/* Schedule Information */}
           {(task.scheduled_start || task.scheduled_end) && (
             <Card>
-              <CardContent className="pt-6">
+              <CardContent className="pt-4">
                 <div className="flex items-center justify-between mb-3">
                   <h3 className="text-sm font-semibold flex items-center gap-2">
                     <Calendar className="h-4 w-4" />
@@ -449,7 +506,7 @@ export function TaskDetailDialog({
                         {Math.round(
                           (parseISO(task.scheduled_end).getTime() -
                             parseISO(task.scheduled_start).getTime()) /
-                            60000
+                          60000
                         )}{" "}
                         minutes
                       </span>
@@ -460,9 +517,117 @@ export function TaskDetailDialog({
             </Card>
           )}
 
+          {/* Subtasks - Only show for non-subtask tasks */}
+          {!isSubtask && (
+            <Card>
+              <CardContent className="p-0">
+                <button
+                  type="button"
+                  onClick={() => setSubtasksExpanded(!subtasksExpanded)}
+                  className="w-full flex items-center justify-between p-4 hover:bg-accent/50 transition-colors"
+                >
+                  <div className="flex items-center gap-2">
+                    {subtasksExpanded ? (
+                      <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                    ) : (
+                      <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                    )}
+                    <h3 className="text-sm font-semibold">Subtasks</h3>
+                    {subtasksCount.total > 0 && (
+                      <span className="text-xs text-muted-foreground">
+                        ({subtasksCount.completed}/{subtasksCount.total})
+                      </span>
+                    )}
+                  </div>
+                  {subtasksCount.total === 0 && !subtasksExpanded && (
+                    <span className="text-xs text-muted-foreground">No subtasks</span>
+                  )}
+                </button>
+                {subtasksExpanded && (
+                  <div className="border-t p-4">
+                    <SubtaskManager
+                      parentTaskId={task.id}
+                      onSubtaskChange={handleSubtaskChange}
+                      readOnly={
+                        task.status === "completed" ||
+                        task.status === "cancelled" ||
+                        task.status === "rescheduled"
+                      }
+                      noCard={true}
+                    />
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Description */}
+          {task.description && (
+            <Card>
+              <CardContent className="pt-4">
+                <h3 className="text-sm font-semibold mb-2">Description</h3>
+                <p className="text-sm text-muted-foreground whitespace-pre-wrap">
+                  {task.description}
+                </p>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Blocked By Warning */}
+          {isBlocked && blockedBy.length > 0 && (
+            <Card className="border-destructive bg-destructive/10">
+              <CardContent className="pt-4">
+                <h3 className="text-sm font-semibold mb-2 text-destructive flex items-center gap-2">
+                  <GitBranch className="h-4 w-4" />
+                  Blocked by incomplete tasks
+                </h3>
+                <ul className="text-sm space-y-1">
+                  {blockedBy.map((dep) => (
+                    <li key={dep.id} className="flex items-center gap-2">
+                      <Circle className="h-3 w-3 text-muted-foreground" />
+                      <span>{dep.title}</span>
+                    </li>
+                  ))}
+                </ul>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Dependencies */}
+          {dependencies.length > 0 && (
+            <Card>
+              <CardContent className="pt-4">
+                <h3 className="text-sm font-semibold mb-2 flex items-center gap-2">
+                  <GitBranch className="h-4 w-4" />
+                  Dependencies
+                </h3>
+                <ul className="text-sm space-y-1">
+                  {dependencies.map((dep) => (
+                    <li key={dep.id} className="flex items-center gap-2">
+                      {dep.dependency_status === "completed" ? (
+                        <CheckCircle2 className="h-3 w-3 text-green-500" />
+                      ) : (
+                        <Circle className="h-3 w-3 text-muted-foreground" />
+                      )}
+                      <span
+                        className={
+                          dep.dependency_status === "completed"
+                            ? "line-through text-muted-foreground"
+                            : ""
+                        }
+                      >
+                        {dep.dependency_title}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </CardContent>
+            </Card>
+          )}
+
           {/* Task Properties */}
           <Card>
-            <CardContent className="pt-6">
+            <CardContent className="pt-4">
               <h3 className="text-sm font-semibold mb-3">Task Properties</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {task.duration && (
@@ -494,121 +659,8 @@ export function TaskDetailDialog({
             </CardContent>
           </Card>
 
-          {/* Quick Status Change */}
-          {task.status === "completed" && (
-            <Card>
-              <CardContent className="pt-6">
-                <h3 className="text-sm font-semibold mb-3">Quick Actions</h3>
-                <div className="flex flex-wrap gap-2">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={async () => {
-                      setIsChangingStatus(true);
-                      try {
-                        await onStatusChange?.(task.id, "pending");
-                        setHasChanges(true);
-                      } finally {
-                        setIsChangingStatus(false);
-                      }
-                    }}
-                    loading={isChangingStatus}
-                  >
-                    <Circle className="h-4 w-4 mr-1" />
-                    Mark as Incomplete
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-          {task.status !== "completed" &&
-            task.status !== "cancelled" &&
-            task.status !== "rescheduled" && (
-              <Card>
-                <CardContent className="pt-6">
-                  <h3 className="text-sm font-semibold mb-3">Quick Actions</h3>
-                  <div className="flex flex-wrap gap-2">
-                    {task.status === "pending" && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={async () => {
-                          setIsChangingStatus(true);
-                          try {
-                            await onStatusChange?.(task.id, "in_progress");
-                            setHasChanges(true);
-                          } finally {
-                            setIsChangingStatus(false);
-                          }
-                        }}
-                        disabled={isBlocked}
-                        loading={isChangingStatus}
-                      >
-                        {isBlocked ? "Blocked" : "Start Task"}
-                      </Button>
-                    )}
-                    {task.status === "in_progress" && (
-                      <Button
-                        size="sm"
-                        variant="default"
-                        onClick={async () => {
-                          setIsChangingStatus(true);
-                          try {
-                            await onStatusChange?.(task.id, "completed");
-                            setHasChanges(true);
-                          } finally {
-                            setIsChangingStatus(false);
-                          }
-                        }}
-                        loading={isChangingStatus}
-                      >
-                        <CheckCircle2 className="h-4 w-4 mr-1" />
-                        Mark Complete
-                      </Button>
-                    )}
-                    {task.status === "pending" && !isBlocked && (
-                      <Button
-                        size="sm"
-                        variant="default"
-                        onClick={async () => {
-                          setIsChangingStatus(true);
-                          try {
-                            await onStatusChange?.(task.id, "completed");
-                            setHasChanges(true);
-                          } finally {
-                            setIsChangingStatus(false);
-                          }
-                        }}
-                        loading={isChangingStatus}
-                      >
-                        <CheckCircle2 className="h-4 w-4 mr-1" />
-                        Mark Complete
-                      </Button>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
-          {/* Action Buttons */}
-          <div className="flex flex-col sm:flex-row justify-between gap-2 sm:gap-0 pt-4 border-t">
-            <Button
-              variant="destructive"
-              onClick={handleDelete}
-              loading={isDeleting}
-              className="h-11 px-4 md:h-10 md:px-4 w-full sm:w-auto"
-            >
-              <Trash2 className="h-4 w-4 mr-2" />
-              {isDeleting ? "Deleting..." : "Delete Task"}
-            </Button>
-            <Button onClick={handleEdit} className="h-11 px-4 md:h-10 md:px-4 w-full sm:w-auto">
-              <Edit className="h-4 w-4 mr-2" />
-              Edit Task
-            </Button>
-          </div>
-
           {/* Metadata */}
-          <div className="text-xs text-muted-foreground space-y-1 pt-4 border-t">
+          <div className="text-[10px] text-muted-foreground space-y-0.5 pt-3 border-t">
             <div>Created: {formatDateTimeFull(task.created_at, timezone)}</div>
             <div>Updated: {formatDateTimeFull(task.updated_at, timezone)}</div>
             {task.id && <div className="font-mono">ID: {task.id}</div>}
