@@ -2,6 +2,7 @@
 
 import { AlertTriangle, ChevronDown, ChevronRight, Clock, PlayCircle, Star } from "lucide-react";
 import { useState } from "react";
+import { RefreshButton } from "@/components/refresh-button";
 import { SlimTaskCard } from "@/components/slim-task-card";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -20,6 +21,7 @@ interface TaskMetricsProps {
   tasks: Task[];
   onTaskClick?: (taskId: string) => void;
   onProcessOverdue?: () => void;
+  onRefresh?: () => void | Promise<void>;
   className?: string;
 }
 
@@ -110,7 +112,7 @@ function MetricSection({
   );
 }
 
-export function TaskMetrics({ tasks, onTaskClick, onProcessOverdue, className }: TaskMetricsProps) {
+export function TaskMetrics({ tasks, onTaskClick, onProcessOverdue, onRefresh, className }: TaskMetricsProps) {
   const [expandedSections, setExpandedSections] = useState<Set<MetricType>>(new Set());
 
   const overdueTasks = getOverdueTasks(tasks);
@@ -138,7 +140,18 @@ export function TaskMetrics({ tasks, onTaskClick, onProcessOverdue, className }:
   return (
     <Card className={className}>
       <CardHeader className="pb-2 pt-3 px-3">
-        <CardTitle className="text-sm">Task Metrics</CardTitle>
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-sm">Task Metrics</CardTitle>
+          {onRefresh && (
+            <RefreshButton
+              onRefresh={onRefresh}
+              size="sm"
+              variant="ghost"
+              className="h-7 w-7"
+              aria-label="Refresh task metrics"
+            />
+          )}
+        </div>
       </CardHeader>
       <CardContent className="px-1 pb-2 pt-0">
         <MetricSection

@@ -14,6 +14,7 @@ import {
 } from "date-fns";
 import { ChevronLeft, ChevronRight, Menu, Zap } from "lucide-react";
 import { useEffect, useState } from "react";
+import { RefreshButton } from "@/components/refresh-button";
 import { Button } from "@/components/ui/button";
 import { getEnergyLevelColor, isTaskOverdue } from "@/lib/task-utils";
 import { formatDateInTimezone, formatTimeShort, getDateInTimezone } from "@/lib/timezone-utils";
@@ -31,6 +32,7 @@ interface MonthCalendarProps {
   onDateClick?: (date: Date) => void;
   mobileViewToggleButtons?: React.ReactNode;
   desktopViewToggleButtons?: React.ReactNode;
+  onRefresh?: () => void | Promise<void>;
 }
 
 const WEEK_DAYS = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
@@ -46,6 +48,7 @@ export function MonthCalendar({
   onDateClick,
   mobileViewToggleButtons,
   desktopViewToggleButtons,
+  onRefresh,
 }: MonthCalendarProps) {
   const [currentDate, setCurrentDate] = useState(externalCurrentDate || new Date());
 
@@ -165,6 +168,15 @@ export function MonthCalendar({
           <Button variant="ghost" size="icon" onClick={goToNextMonth} className="h-10 w-10">
             <ChevronRight className="h-4 w-4" />
           </Button>
+          {onRefresh && (
+            <RefreshButton
+              onRefresh={onRefresh}
+              size="icon"
+              variant="ghost"
+              className="h-10 w-10"
+              aria-label="Refresh calendar"
+            />
+          )}
         </div>
       </div>
 

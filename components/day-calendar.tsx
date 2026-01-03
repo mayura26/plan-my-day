@@ -5,6 +5,7 @@ import { ChevronLeft, ChevronRight, Menu, StickyNote } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { CalendarSlot } from "@/components/calendar-slot";
 import { ResizableTask } from "@/components/calendar-task";
+import { RefreshButton } from "@/components/refresh-button";
 import { Button } from "@/components/ui/button";
 import { sortTasksByScheduledTime } from "@/lib/task-utils";
 import {
@@ -29,6 +30,7 @@ interface DayCalendarProps {
   desktopViewToggleButtons?: React.ReactNode;
   onNoteClick?: (date: Date) => void;
   onSlotDoubleClick?: (day: Date, hour: number, minute: number) => void;
+  onRefresh?: () => void | Promise<void>;
 }
 
 const HOURS = Array.from({ length: 24 }, (_, i) => i); // 0-23 hours
@@ -55,6 +57,7 @@ export function DayCalendar({
   desktopViewToggleButtons,
   onNoteClick,
   onSlotDoubleClick,
+  onRefresh,
 }: DayCalendarProps) {
   const [currentDate, setCurrentDate] = useState(externalCurrentDate || new Date());
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -227,6 +230,15 @@ export function DayCalendar({
             <Button variant="ghost" size="icon" onClick={goToNextDay} className="h-10 w-10">
               <ChevronRight className="h-4 w-4" />
             </Button>
+            {onRefresh && (
+              <RefreshButton
+                onRefresh={onRefresh}
+                size="icon"
+                variant="ghost"
+                className="h-10 w-10"
+                aria-label="Refresh calendar"
+              />
+            )}
           </div>
         </div>
         {/* Second row on mobile: Today button and view toggles */}
@@ -260,6 +272,15 @@ export function DayCalendar({
           <Button variant="ghost" size="icon" onClick={goToNextDay} className="h-10 w-10">
             <ChevronRight className="h-4 w-4" />
           </Button>
+          {onRefresh && (
+            <RefreshButton
+              onRefresh={onRefresh}
+              size="icon"
+              variant="ghost"
+              className="h-10 w-10"
+              aria-label="Refresh calendar"
+            />
+          )}
         </div>
       </div>
 

@@ -25,6 +25,7 @@ import { ProcessOverdueDialog } from "@/components/process-overdue-dialog";
 import { SlimTaskCard } from "@/components/slim-task-card";
 import { TaskDetailDialog } from "@/components/task-detail-dialog";
 import { TaskForm } from "@/components/task-form";
+import { RefreshButton } from "@/components/refresh-button";
 import { TaskGroupManager } from "@/components/task-group-manager";
 import { TaskMetrics } from "@/components/task-metrics";
 import { Badge } from "@/components/ui/badge";
@@ -101,9 +102,11 @@ export default function CalendarPage() {
     })
   );
 
-  const fetchTasks = useCallback(async () => {
+  const fetchTasks = useCallback(async (setLoading = true) => {
     try {
-      setIsLoading(true);
+      if (setLoading) {
+        setIsLoading(true);
+      }
       const response = await fetch("/api/tasks");
       if (response.ok) {
         const data = await response.json();
@@ -114,7 +117,9 @@ export default function CalendarPage() {
     } catch (error) {
       console.error("Error fetching tasks:", error);
     } finally {
-      setIsLoading(false);
+      if (setLoading) {
+        setIsLoading(false);
+      }
     }
   }, []);
 
@@ -354,10 +359,12 @@ export default function CalendarPage() {
       if (response.ok) {
         const data = await response.json();
         setTasks((prev) => prev.map((task) => (task.id === editingTask.id ? data.task : task)));
+        // Update selected task if it's the one being edited
+        if (selectedTask?.id === editingTask.id) {
+          setSelectedTask(data.task);
+        }
         setEditingTask(null);
         setIsEditing(false);
-        // Refresh tasks after successful update
-        await fetchTasks();
       } else {
         const error = await response.json();
         console.error("Failed to update task:", error);
@@ -1049,6 +1056,16 @@ export default function CalendarPage() {
                   )}
                   <h3 className="text-sm font-semibold">Task Groups</h3>
                 </div>
+                <RefreshButton
+                  onRefresh={async () => {
+                    await fetchTasks(false); // Don't set loading state for refresh
+                    await fetchGroups();
+                  }}
+                  size="sm"
+                  variant="ghost"
+                  className="h-7 w-7"
+                  aria-label="Refresh task groups"
+                />
               </div>
               {expandedSections.has("task-groups") && (
                 <div>
@@ -1070,6 +1087,10 @@ export default function CalendarPage() {
               tasks={filteredTasks}
               onTaskClick={handleTaskClick}
               onProcessOverdue={() => setProcessOverdueOpen(true)}
+              onRefresh={async () => {
+                await fetchTasks(false); // Don't set loading state for refresh
+                await fetchGroups();
+              }}
             />
 
             {/* Unscheduled Tasks */}
@@ -1099,6 +1120,16 @@ export default function CalendarPage() {
                         Unscheduled ({unscheduledTasks.length})
                       </CardTitle>
                     </div>
+                    <RefreshButton
+                      onRefresh={async () => {
+                        await fetchTasks(false); // Don't set loading state for refresh
+                        await fetchGroups();
+                      }}
+                      size="sm"
+                      variant="ghost"
+                      className="h-7 w-7"
+                      aria-label="Refresh unscheduled tasks"
+                    />
                   </div>
                 </CardHeader>
                 {expandedSections.has("unscheduled-tasks") && (
@@ -1175,6 +1206,7 @@ export default function CalendarPage() {
               desktopViewToggleButtons={desktopViewToggleButtons}
               onNoteClick={handleNoteClick}
               onSlotDoubleClick={handleSlotDoubleClick}
+              onRefresh={() => fetchTasks(false)}
             />
           )}
           {viewMode === "week" && (
@@ -1191,6 +1223,7 @@ export default function CalendarPage() {
               desktopViewToggleButtons={desktopViewToggleButtons}
               onNoteClick={handleNoteClick}
               onSlotDoubleClick={handleSlotDoubleClick}
+              onRefresh={() => fetchTasks(false)}
             />
           )}
           {viewMode === "month" && (
@@ -1208,6 +1241,7 @@ export default function CalendarPage() {
               }}
               mobileViewToggleButtons={mobileViewToggleButtons}
               desktopViewToggleButtons={desktopViewToggleButtons}
+              onRefresh={() => fetchTasks(false)}
             />
           )}
         </div>
@@ -1223,12 +1257,14 @@ export default function CalendarPage() {
         onStatusChange={handleStatusChange}
         onUnschedule={handleUnscheduleTask}
         onTaskUpdate={async () => {
-          // Refresh the task list
-          await fetchTasks();
+          // Task updates are handled via onTaskRefresh callback
+          // No need to refresh the entire list
         }}
         onTaskRefresh={(updatedTask) => {
           // Update the selected task with fresh data
           setSelectedTask(updatedTask);
+          // Also update the task in the tasks array
+          setTasks((prev) => prev.map((task) => (task.id === updatedTask.id ? updatedTask : task)));
         }}
       />
 
@@ -1241,8 +1277,7 @@ export default function CalendarPage() {
           note={dayNotes.get(formatDateKey(noteDialogDate)) || null}
           onSave={async (date, content) => {
             await createOrUpdateDayNote(date, content);
-            // Refresh the note to ensure sidebar updates
-            await fetchDayNote(date);
+            // Day note is already updated in state via createOrUpdateDayNote
           }}
         />
       )}
