@@ -22,6 +22,7 @@ import {
 import { useCallback, useEffect, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import { toast } from "sonner";
+import { NotesManager } from "@/components/notes-manager";
 import { SubtaskManager } from "@/components/subtask-manager";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -77,6 +78,11 @@ export function TaskDetailDialog({
     completed: 0,
     total: 0,
   });
+  const [notesExpanded, setNotesExpanded] = useState(false);
+  const [notesCount, setNotesCount] = useState<{ completed: number; total: number }>({
+    completed: 0,
+    total: 0,
+  });
   const { timezone } = useUserTimezone();
 
   const fetchDependencies = useCallback(async (taskId: string) => {
@@ -109,6 +115,20 @@ export function TaskDetailDialog({
     }
   }, []);
 
+  const fetchNotesCount = useCallback(async (taskId: string) => {
+    try {
+      const response = await fetch(`/api/tasks/${taskId}/todos`);
+      if (response.ok) {
+        const data = await response.json();
+        const todos = data.todos || [];
+        const completed = todos.filter((todo: { completed: boolean }) => todo.completed).length;
+        setNotesCount({ completed, total: todos.length });
+      }
+    } catch (error) {
+      console.error("Error fetching notes count:", error);
+    }
+  }, []);
+
   // Track when dialog opens to fetch dependencies only once
   const openedTaskIdRef = useRef<string | null>(null);
   useEffect(() => {
@@ -121,6 +141,8 @@ export function TaskDetailDialog({
         if (!(task.task_type === "subtask" || !!task.parent_task_id)) {
           fetchSubtasksCount(task.id);
         }
+        // Fetch notes count for all tasks
+        fetchNotesCount(task.id);
         // Reset change tracking when dialog opens
         setHasChanges(false);
       }
@@ -134,6 +156,7 @@ export function TaskDetailDialog({
     task?.id,
     fetchDependencies,
     fetchSubtasksCount,
+    fetchNotesCount,
     task?.task_type,
     task?.parent_task_id,
   ]);
@@ -248,9 +271,20 @@ export function TaskDetailDialog({
         if (!(task.task_type === "subtask" || !!task.parent_task_id)) {
           await fetchSubtasksCount(task.id);
         }
+        // Refresh notes count
+        await fetchNotesCount(task.id);
       } catch (error) {
         console.error("Error refreshing task:", error);
       }
+    }
+  };
+
+  const handleNotesChange = async () => {
+    // Mark that changes were made
+    setHasChanges(true);
+    // Refresh notes count
+    if (task) {
+      await fetchNotesCount(task.id);
     }
   };
 
@@ -596,6 +630,48 @@ export function TaskDetailDialog({
               </CardContent>
             </Card>
           )}
+
+          {/* Notes */}
+          <Card className="py-0">
+            <CardContent className="p-0">
+              <button
+                type="button"
+                onClick={() => setNotesExpanded(!notesExpanded)}
+                className="w-full flex items-center justify-between py-2 px-3 sm:py-4 sm:px-6 hover:bg-accent/50 transition-colors"
+              >
+                <div className="flex items-center gap-2">
+                  {notesExpanded ? (
+                    <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                  ) : (
+                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                  )}
+                  <h3 className="text-sm font-semibold">Notes</h3>
+                  {notesCount.total > 0 && (
+                    <span className="text-xs text-muted-foreground">
+                      ({notesCount.completed}/{notesCount.total} checked)
+                    </span>
+                  )}
+                </div>
+                {notesCount.total === 0 && !notesExpanded && (
+                  <span className="text-xs text-muted-foreground">No notes</span>
+                )}
+              </button>
+              {notesExpanded && (
+                <div className="border-t py-2 px-3 sm:py-4 sm:px-6">
+                  <NotesManager
+                    taskId={task.id}
+                    onNotesChange={handleNotesChange}
+                    readOnly={
+                      task.status === "completed" ||
+                      task.status === "cancelled" ||
+                      task.status === "rescheduled"
+                    }
+                    noCard={true}
+                  />
+                </div>
+              )}
+            </CardContent>
+          </Card>
 
           {/* Description */}
           {task.description && (
