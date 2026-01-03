@@ -2,6 +2,7 @@
 
 import { AlertTriangle, Calendar, CalendarClock, Clock, RotateCcw, X, XCircle } from "lucide-react";
 import { useState } from "react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -14,6 +15,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useUserTimezone } from "@/hooks/use-user-timezone";
 import { getOverdueTasks } from "@/lib/task-utils";
 import { formatDateTimeLocalForTimezone, parseDateTimeLocalToUTC } from "@/lib/timezone-utils";
@@ -34,6 +36,7 @@ interface TaskActionState {
   additionalDuration?: number;
   notes?: string;
   newDueDate?: string;
+  autoSchedule?: boolean;
 }
 
 export function ProcessOverdueDialog({
@@ -129,6 +132,7 @@ export function ProcessOverdueDialog({
             body: JSON.stringify({
               additional_duration: actionState.additionalDuration || task.duration || 30,
               notes: actionState.notes,
+              auto_schedule: actionState.autoSchedule ?? false,
             }),
           }).then(async (res) => {
             if (!res.ok) {
@@ -361,6 +365,22 @@ export function ProcessOverdueDialog({
                               disabled={processingTaskId === task.id}
                             />
                           </div>
+                          <div className="flex items-center space-x-2">
+                            <Checkbox
+                              id={`auto-schedule-${task.id}`}
+                              checked={actionState.autoSchedule ?? false}
+                              onCheckedChange={(checked) =>
+                                updateTaskAction(task.id, { autoSchedule: checked === true })
+                              }
+                              disabled={processingTaskId === task.id}
+                            />
+                            <Label
+                              htmlFor={`auto-schedule-${task.id}`}
+                              className="text-sm font-normal cursor-pointer"
+                            >
+                              Auto-schedule to next available slot
+                            </Label>
+                          </div>
                           <Button
                             onClick={async () => {
                               const duration =
@@ -380,6 +400,7 @@ export function ProcessOverdueDialog({
                                   body: JSON.stringify({
                                     additional_duration: duration,
                                     notes: actionState.notes,
+                                    auto_schedule: actionState.autoSchedule ?? false,
                                   }),
                                 });
 
@@ -398,8 +419,14 @@ export function ProcessOverdueDialog({
                                 setTaskActions(newActions);
                                 setSelectedTaskId(null);
 
+                                // Show success message
+                                toast.success(`Carryover created for "${task.title}"`, {
+                                  description: "The dialog will stay open so you can process more tasks.",
+                                });
+
                                 // Refresh tasks to update the list (this will filter out rescheduled tasks)
                                 // The task should now be filtered out by getOverdueTasks since it's rescheduled
+                                // Note: Dialog stays open intentionally so user can process more tasks
                                 onTasksUpdated();
                               } catch (err) {
                                 setError(

@@ -1,6 +1,8 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { generateTaskId } from "@/lib/task-utils";
+import { findNearestAvailableSlot } from "@/lib/scheduler-utils";
+import { getUserTimezone } from "@/lib/timezone-utils";
 import { db } from "@/lib/turso";
 import type { CreateCarryoverTaskRequest, Task, TaskStatus, TaskType } from "@/lib/types";
 
@@ -172,6 +174,56 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       );
     }
 
+    // Auto-schedule the carryover task if requested
+    if (body.auto_schedule) {
+      // Get user's timezone
+      const userResult = await db.execute("SELECT timezone FROM users WHERE id = ?", [
+        session.user.id,
+      ]);
+      const userTimezone =
+        userResult.rows.length > 0
+          ? getUserTimezone(userResult.rows[0].timezone as string | null)
+          : "UTC";
+
+      // Get all tasks for the user to check for conflicts (including the newly created carryover)
+      const allTasksResult = await db.execute("SELECT * FROM tasks WHERE user_id = ?", [
+        session.user.id,
+      ]);
+      const allTasks = allTasksResult.rows.map(mapRowToTask);
+
+      // Determine start time - use due_date if it's in the future, otherwise use now
+      const nowDate = new Date();
+      const startFrom =
+        carryoverTask.due_date && new Date(carryoverTask.due_date) > nowDate
+          ? new Date(carryoverTask.due_date)
+          : nowDate;
+
+      // Find nearest available slot
+      const slot = findNearestAvailableSlot(
+        carryoverTask,
+        allTasks,
+        startFrom,
+        9,
+        17,
+        7,
+        userTimezone
+      );
+
+      if (slot) {
+        // Update the carryover task with scheduled times
+        const updatedAt = new Date().toISOString();
+        await db.execute(
+          `UPDATE tasks SET scheduled_start = ?, scheduled_end = ?, updated_at = ? WHERE id = ?`,
+          [slot.start.toISOString(), slot.end.toISOString(), updatedAt, taskId]
+        );
+
+        // Update the carryoverTask object with scheduled times
+        carryoverTask.scheduled_start = slot.start.toISOString();
+        carryoverTask.scheduled_end = slot.end.toISOString();
+        carryoverTask.updated_at = updatedAt;
+      }
+    }
+
     // Mark the original task as rescheduled (not cancelled, so it remains visible)
     await db.execute(`UPDATE tasks SET status = 'rescheduled', updated_at = ? WHERE id = ?`, [
       now,
@@ -183,7 +235,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       {
         carryover_task: carryoverTask,
         original_task: { ...originalTask, status: "rescheduled" as TaskStatus, updated_at: now },
-        message: "Carryover task created successfully. Original task marked as rescheduled.",
+        message: body.auto_schedule
+          ? "Carryover task created and scheduled successfully. Original task marked as rescheduled."
+          : "Carryover task created successfully. Original task marked as rescheduled.",
       },
       { status: 201 }
     );

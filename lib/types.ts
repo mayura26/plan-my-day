@@ -214,6 +214,7 @@ export interface APIKeyResponse {
 export interface CreateCarryoverTaskRequest {
   additional_duration: number; // Extra time needed in minutes
   notes?: string; // Optional notes about what's left to do
+  auto_schedule?: boolean; // If true, automatically schedule the carryover task to the next available slot
 }
 
 export interface CreateTaskGroupRequest {
