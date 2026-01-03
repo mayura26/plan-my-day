@@ -12,6 +12,48 @@ interface ServiceWorkerState {
   version: string | null;
 }
 
+// Helper function to get server version
+async function getServerVersion(): Promise<string> {
+  try {
+    const response = await fetch("/api/version");
+    if (response.ok) {
+      const data = await response.json();
+      return data.version || "1";
+    }
+  } catch (error) {
+    console.error("Error fetching server version:", error);
+  }
+  return "1";
+}
+
+// Helper function to get cached version from cache names
+async function getCachedVersion(): Promise<string | null> {
+  try {
+    if (!("caches" in window)) {
+      return null;
+    }
+    const cacheNames = await caches.keys();
+    const versionCache = cacheNames.find((name) => name.startsWith("planmyday-v"));
+    if (versionCache) {
+      // Extract version from cache name like "planmyday-v16"
+      const match = versionCache.match(/planmyday-v(\d+)/);
+      if (match && match[1]) {
+        return match[1];
+      }
+    }
+  } catch (error) {
+    console.error("Error getting cached version:", error);
+  }
+  return null;
+}
+
+// Helper function to compare versions (simple numeric comparison)
+function compareVersions(version1: string, version2: string): number {
+  const v1 = parseInt(version1, 10) || 0;
+  const v2 = parseInt(version2, 10) || 0;
+  return v1 - v2;
+}
+
 export function ForceUpdateButton() {
   const [swState, setSwState] = useState<ServiceWorkerState>({
     status: null,
@@ -57,22 +99,38 @@ export function ForceUpdateButton() {
         status = "active";
       }
 
-      const newVersion = activeWorker?.scriptURL
-        ? new URL(activeWorker.scriptURL).searchParams.get("v") || "unknown"
-        : null;
+      // Get versions for comparison
+      const serverVersion = await getServerVersion();
+      const cachedVersion = await getCachedVersion();
+      
+      // Determine if update is available
+      // Update is available if:
+      // 1. There's a waiting service worker, OR
+      // 2. Server version is newer than cached version
+      let updateAvailable = !!waitingWorker;
+      
+      if (!updateAvailable && cachedVersion) {
+        // Compare server version with cached version
+        if (compareVersions(serverVersion, cachedVersion) > 0) {
+          updateAvailable = true;
+        }
+      }
+
+      // Use server version as the displayed version
+      const newVersion = serverVersion;
 
       setSwState((prev) => {
         // Only update if something actually changed
         if (
           prev.status === status &&
-          prev.updateAvailable === !!waitingWorker &&
+          prev.updateAvailable === updateAvailable &&
           prev.version === newVersion
         ) {
           return prev; // No change, don't update
         }
         return {
           status,
-          updateAvailable: !!waitingWorker,
+          updateAvailable,
           version: newVersion,
         };
       });
@@ -174,12 +232,53 @@ export function ForceUpdateButton() {
         });
       }
 
-      if (registration) {
-        await registration.update();
-        await checkServiceWorker();
-        toast.success("Checked for updates");
-      } else {
+      if (!registration) {
         toast.error("No service worker registered");
+        setIsChecking(false);
+        return;
+      }
+
+      // Set up listener for updatefound event before calling update()
+      let updateFound = false;
+      const handleUpdateFound = () => {
+        updateFound = true;
+        const newWorker = registration.installing;
+        if (newWorker) {
+          const handleStateChange = async () => {
+            if (newWorker.state === "installed") {
+              // Check versions when new service worker is installed
+              await checkServiceWorker();
+            }
+          };
+          newWorker.addEventListener("statechange", handleStateChange);
+        }
+      };
+
+      registration.addEventListener("updatefound", handleUpdateFound);
+
+      // Call update() to check for new service worker
+      await registration.update();
+
+      // Wait a bit for updatefound event to fire if there's an update
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+
+      // Remove the listener
+      registration.removeEventListener("updatefound", handleUpdateFound);
+
+      // Check service worker state and versions
+      await checkServiceWorker();
+
+      // Get current state to provide feedback
+      const serverVersion = await getServerVersion();
+      const cachedVersion = await getCachedVersion();
+      const hasUpdate = registration.waiting || (cachedVersion && compareVersions(serverVersion, cachedVersion) > 0);
+
+      if (hasUpdate) {
+        toast.success("Update available! Click 'Force Update' to install.");
+      } else if (updateFound) {
+        toast.success("Update check completed. No new updates available.");
+      } else {
+        toast.success("Checked for updates. You're up to date.");
       }
     } catch (error) {
       console.error("Error checking for updates:", error);
@@ -332,17 +431,16 @@ export function ForceUpdateButton() {
             Clear cache and reload to get the newest app version. Use this if the app seems
             outdated.
           </p>
-          <Button onClick={forceUpdate} disabled={isUpdating} className="w-full sm:w-auto">
-            <RefreshCw className={`h-4 w-4 mr-2 ${isUpdating ? "animate-spin" : ""}`} />
-            {isUpdating ? "Updating..." : "Force Update"}
-          </Button>
-        </div>
-
-        <div className="flex flex-wrap gap-2">
-          <Button onClick={checkForUpdates} variant="outline" disabled={isChecking || isUpdating}>
-            <RefreshCw className={`h-4 w-4 ${isChecking ? "animate-spin" : ""}`} />
-            {isChecking ? "Checking..." : "Check for Updates"}
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button onClick={forceUpdate} disabled={isUpdating} className="w-full sm:w-auto">
+              <RefreshCw className={`h-4 w-4 mr-2 ${isUpdating ? "animate-spin" : ""}`} />
+              {isUpdating ? "Updating..." : "Force Update"}
+            </Button>
+            <Button onClick={checkForUpdates} variant="outline" disabled={isChecking || isUpdating} className="w-full sm:w-auto">
+              <RefreshCw className={`h-4 w-4 mr-2 ${isChecking ? "animate-spin" : ""}`} />
+              {isChecking ? "Checking..." : "Check for Updates"}
+            </Button>
+          </div>
         </div>
       </div>
     </div>

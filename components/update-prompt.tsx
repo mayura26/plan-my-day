@@ -7,6 +7,48 @@ import { Button } from "@/components/ui/button";
 // Track if user requested reload to prevent auto-reload loops
 let userRequestedReload = false;
 
+// Helper function to get server version
+async function getServerVersion(): Promise<string> {
+  try {
+    const response = await fetch("/api/version");
+    if (response.ok) {
+      const data = await response.json();
+      return data.version || "1";
+    }
+  } catch (error) {
+    console.error("Error fetching server version:", error);
+  }
+  return "1";
+}
+
+// Helper function to get cached version from cache names
+async function getCachedVersion(): Promise<string | null> {
+  try {
+    if (!("caches" in window)) {
+      return null;
+    }
+    const cacheNames = await caches.keys();
+    const versionCache = cacheNames.find((name) => name.startsWith("planmyday-v"));
+    if (versionCache) {
+      // Extract version from cache name like "planmyday-v16"
+      const match = versionCache.match(/planmyday-v(\d+)/);
+      if (match && match[1]) {
+        return match[1];
+      }
+    }
+  } catch (error) {
+    console.error("Error getting cached version:", error);
+  }
+  return null;
+}
+
+// Helper function to compare versions (simple numeric comparison)
+function compareVersions(version1: string, version2: string): number {
+  const v1 = parseInt(version1, 10) || 0;
+  const v2 = parseInt(version2, 10) || 0;
+  return v1 - v2;
+}
+
 export function UpdatePrompt() {
   const [showPrompt, setShowPrompt] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
@@ -27,74 +69,108 @@ export function UpdatePrompt() {
       return;
     }
 
-    // Debounce to prevent checking too frequently
-    let checkTimeout: NodeJS.Timeout;
-    let lastCheckTime = 0;
-    const CHECK_INTERVAL = 10000; // Only check every 10 seconds in production
+    let mounted = true;
+    let checkInterval: NodeJS.Timeout | null = null;
+    let checkTimeout: NodeJS.Timeout | null = null;
 
-    const checkForUpdate = async () => {
-      const now = Date.now();
-      if (now - lastCheckTime < CHECK_INTERVAL) {
-        return; // Skip if checked recently
+    // Function to check if update is available by comparing versions
+    const checkVersionUpdate = async (): Promise<boolean> => {
+      try {
+        const serverVersion = await getServerVersion();
+        const cachedVersion = await getCachedVersion();
+        
+        // If we have a cached version and server version is newer, update is available
+        if (cachedVersion && compareVersions(serverVersion, cachedVersion) > 0) {
+          return true;
+        }
+        
+        // Also check for waiting service worker
+        const registration = await navigator.serviceWorker.getRegistration();
+        if (registration && registration.waiting) {
+          return true;
+        }
+        
+        return false;
+      } catch (error) {
+        console.error("Error checking version update:", error);
+        return false;
       }
-      lastCheckTime = now;
+    };
+
+    // Function to check for updates and show prompt if needed
+    const checkForUpdate = async () => {
+      if (!mounted) return;
 
       try {
         const registration = await navigator.serviceWorker.getRegistration();
         if (!registration) return;
 
-        // Check for waiting service worker
+        // Check for waiting service worker first
         const waitingWorker = registration.waiting;
         if (waitingWorker) {
-          // Only show if we don't already have a prompt showing
+          // Check versions to confirm update is real
+          const hasVersionUpdate = await checkVersionUpdate();
+          if (hasVersionUpdate) {
+            setShowPrompt((prev) => {
+              if (prev) return prev; // Already showing
+              return true;
+            });
+          }
+          return;
+        }
+
+        // Also check versions even if no waiting worker (in case service worker hasn't updated yet)
+        const hasVersionUpdate = await checkVersionUpdate();
+        if (hasVersionUpdate) {
           setShowPrompt((prev) => {
             if (prev) return prev; // Already showing
             return true;
           });
         }
-
-        // Listen for new service worker installing (only once)
-        // Only show prompt if version actually changed (like reference implementation)
-        const handleUpdateFound = () => {
-          const newWorker = registration.installing;
-          if (newWorker) {
-            const handleStateChange = async () => {
-              if (newWorker.state === "installed" && navigator.serviceWorker.controller) {
-                // Check version before showing prompt to avoid false positives
-                try {
-                  const response = await fetch("/api/version");
-                  if (response.ok) {
-                    const data = await response.json();
-                    const currentVersion = data.version || "1";
-                    const cacheNames = await caches.keys();
-                    const versionCache = cacheNames.find(
-                      (name) => name.startsWith("planmyday-v") || name.includes("v")
-                    );
-
-                    // Only show if version actually changed
-                    if (!versionCache || !versionCache.includes(currentVersion)) {
-                      setShowPrompt((prev) => {
-                        if (prev) return prev; // Already showing
-                        return true;
-                      });
-                    }
-                  }
-                } catch (error) {
-                  // If version check fails, don't show prompt to be safe
-                  console.error("Error checking version:", error);
-                }
-              }
-            };
-            newWorker.addEventListener("statechange", handleStateChange);
-          }
-        };
-
-        // Only add listener once
-        registration.addEventListener("updatefound", handleUpdateFound, { once: true });
       } catch (error) {
         console.error("Error checking for updates:", error);
       }
     };
+
+    // Listen for new service worker installing (not just once - can detect multiple updates)
+    const handleUpdateFound = async () => {
+      const registration = await navigator.serviceWorker.getRegistration();
+      if (!registration) return;
+
+      const newWorker = registration.installing;
+      if (newWorker) {
+        const handleStateChange = async () => {
+          if (newWorker.state === "installed" && navigator.serviceWorker.controller) {
+            // Check version before showing prompt to avoid false positives
+            const hasVersionUpdate = await checkVersionUpdate();
+            if (hasVersionUpdate) {
+              setShowPrompt((prev) => {
+                if (prev) return prev; // Already showing
+                return true;
+              });
+            }
+          }
+        };
+        newWorker.addEventListener("statechange", handleStateChange);
+      }
+    };
+
+    // Set up updatefound listener (not once - can detect multiple updates)
+    const setupUpdateListener = async () => {
+      const registration = await navigator.serviceWorker.getRegistration();
+      if (registration) {
+        registration.addEventListener("updatefound", handleUpdateFound);
+      }
+    };
+
+    // Initial setup
+    setupUpdateListener();
+
+    // Initial check with delay
+    checkTimeout = setTimeout(checkForUpdate, 2000);
+
+    // Check periodically for updates (every 5 minutes)
+    checkInterval = setInterval(checkForUpdate, 5 * 60 * 1000);
 
     // Listen for controller change (service worker activated)
     // Only reload if user explicitly requested update AND version actually changed
@@ -108,27 +184,19 @@ export function UpdatePrompt() {
       if (userRequestedReload) {
         // Check version before reloading to ensure it actually changed
         try {
-          const response = await fetch("/api/version");
-          if (response.ok) {
-            const data = await response.json();
-            const currentVersion = data.version || "1";
-            // Get cache names to check service worker version
-            const cacheNames = await caches.keys();
-            const versionCache = cacheNames.find(
-              (name) => name.startsWith("planmyday-v") || name.includes("v")
-            );
+          const serverVersion = await getServerVersion();
+          const cachedVersion = await getCachedVersion();
 
-            // Only reload if we can confirm version changed, or if we can't check (assume it did)
-            if (!versionCache || !versionCache.includes(currentVersion)) {
-              userRequestedReload = false;
-              // Small delay to ensure service worker is ready
-              setTimeout(() => {
-                window.location.reload();
-              }, 100);
-            } else {
-              // Version didn't change, don't reload
-              userRequestedReload = false;
-            }
+          // Only reload if we can confirm version changed, or if we can't check (assume it did)
+          if (!cachedVersion || compareVersions(serverVersion, cachedVersion) > 0) {
+            userRequestedReload = false;
+            // Small delay to ensure service worker is ready
+            setTimeout(() => {
+              window.location.reload();
+            }, 100);
+          } else {
+            // Version didn't change, don't reload
+            userRequestedReload = false;
           }
         } catch (error) {
           // If version check fails, don't reload to be safe
@@ -139,20 +207,26 @@ export function UpdatePrompt() {
     };
 
     // Only listen for controller changes in production
-    if (!isDevelopment) {
-      navigator.serviceWorker.addEventListener("controllerchange", handleControllerChange);
-    }
-
-    // Initial check with delay
-    checkTimeout = setTimeout(checkForUpdate, 1000);
+    navigator.serviceWorker.addEventListener("controllerchange", handleControllerChange);
 
     return () => {
+      mounted = false;
       if (checkTimeout) {
         clearTimeout(checkTimeout);
       }
-      if (!isDevelopment) {
-        navigator.serviceWorker.removeEventListener("controllerchange", handleControllerChange);
+      if (checkInterval) {
+        clearInterval(checkInterval);
       }
+      navigator.serviceWorker.removeEventListener("controllerchange", handleControllerChange);
+      
+      // Clean up updatefound listener
+      navigator.serviceWorker.getRegistration().then((registration) => {
+        if (registration) {
+          registration.removeEventListener("updatefound", handleUpdateFound);
+        }
+      }).catch(() => {
+        // Ignore errors during cleanup
+      });
     };
   }, []);
 
