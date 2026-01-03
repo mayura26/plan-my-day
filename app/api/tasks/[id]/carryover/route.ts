@@ -4,7 +4,7 @@ import { generateTaskId } from "@/lib/task-utils";
 import { findNearestAvailableSlot } from "@/lib/scheduler-utils";
 import { getUserTimezone } from "@/lib/timezone-utils";
 import { db } from "@/lib/turso";
-import type { CreateCarryoverTaskRequest, Task, TaskStatus, TaskType } from "@/lib/types";
+import type { CreateCarryoverTaskRequest, GroupScheduleHours, Task, TaskStatus, TaskType } from "@/lib/types";
 
 // Helper to map database row to Task object
 function mapRowToTask(row: any): Task {
@@ -176,14 +176,24 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     // Auto-schedule the carryover task if requested
     if (body.auto_schedule) {
-      // Get user's timezone
-      const userResult = await db.execute("SELECT timezone FROM users WHERE id = ?", [
+      // Get user's timezone and working hours
+      const userResult = await db.execute("SELECT timezone, working_hours FROM users WHERE id = ?", [
         session.user.id,
       ]);
       const userTimezone =
         userResult.rows.length > 0
           ? getUserTimezone(userResult.rows[0].timezone as string | null)
           : "UTC";
+      
+      let workingHours = null;
+      if (userResult.rows.length > 0 && userResult.rows[0].working_hours) {
+        try {
+          workingHours = JSON.parse(userResult.rows[0].working_hours as string);
+        } catch (e) {
+          console.error("Error parsing working_hours JSON:", e);
+          workingHours = null;
+        }
+      }
 
       // Get all tasks for the user to check for conflicts (including the newly created carryover)
       const allTasksResult = await db.execute("SELECT * FROM tasks WHERE user_id = ?", [
@@ -203,8 +213,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         carryoverTask,
         allTasks,
         startFrom,
-        9,
-        17,
+        workingHours,
         7,
         userTimezone
       );

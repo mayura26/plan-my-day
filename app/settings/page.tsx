@@ -1,6 +1,6 @@
 "use client";
 
-import { Bell, Clock, Key, RefreshCw } from "lucide-react";
+import { Bell, Clock, Key, RefreshCw, Briefcase } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { useEffect } from "react";
@@ -9,6 +9,7 @@ import { ForceUpdateButton } from "@/components/force-update-button";
 import { PushNotificationManager } from "@/components/push-notification-manager";
 import { PushSubscriptionList } from "@/components/push-subscription-list";
 import { TimezoneSelector } from "@/components/timezone-selector";
+import { WorkingHoursSelector } from "@/components/working-hours-selector";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 
@@ -67,6 +68,25 @@ export default function SettingsPage() {
               Changing your timezone will update how all dates and times are displayed throughout
               the application.
             </p>
+          </CardContent>
+        </Card>
+
+        <Separator />
+
+        {/* Working Hours Settings */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <Briefcase className="h-5 w-5" />
+              <CardTitle>Working Hours</CardTitle>
+            </div>
+            <CardDescription>
+              Configure your working hours for each day of the week. These hours will be used when
+              automatically scheduling tasks.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <WorkingHoursSelector />
           </CardContent>
         </Card>
 

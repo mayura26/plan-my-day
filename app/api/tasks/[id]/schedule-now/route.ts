@@ -3,7 +3,7 @@ import { auth } from "@/lib/auth";
 import { findNearestAvailableSlot } from "@/lib/scheduler-utils";
 import { getUserTimezone } from "@/lib/timezone-utils";
 import { db } from "@/lib/turso";
-import type { Task, TaskStatus, TaskType } from "@/lib/types";
+import type { GroupScheduleHours, Task, TaskStatus, TaskType } from "@/lib/types";
 
 // Helper to map database row to Task object
 function mapRowToTask(row: any): Task {
@@ -64,14 +64,24 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
       );
     }
 
-    // Get user's timezone
-    const userResult = await db.execute("SELECT timezone FROM users WHERE id = ?", [
+    // Get user's timezone and working hours
+    const userResult = await db.execute("SELECT timezone, working_hours FROM users WHERE id = ?", [
       session.user.id,
     ]);
     const userTimezone =
       userResult.rows.length > 0
         ? getUserTimezone(userResult.rows[0].timezone as string | null)
         : "UTC";
+    
+    let workingHours = null;
+    if (userResult.rows.length > 0 && userResult.rows[0].working_hours) {
+      try {
+        workingHours = JSON.parse(userResult.rows[0].working_hours as string);
+      } catch (e) {
+        console.error("Error parsing working_hours JSON:", e);
+        workingHours = null;
+      }
+    }
 
     // Get all tasks for the user to check for conflicts
     const allTasksResult = await db.execute("SELECT * FROM tasks WHERE user_id = ?", [
@@ -84,8 +94,8 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
     const startFrom =
       task.due_date && new Date(task.due_date) > now ? new Date(task.due_date) : now;
 
-    // Find nearest available slot (pass timezone so it works in user's timezone)
-    const slot = findNearestAvailableSlot(task, allTasks, startFrom, 9, 17, 7, userTimezone);
+    // Find nearest available slot (pass working hours and timezone)
+    const slot = findNearestAvailableSlot(task, allTasks, startFrom, workingHours, 7, userTimezone);
 
     if (!slot) {
       return NextResponse.json(

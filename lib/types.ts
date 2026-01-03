@@ -6,6 +6,7 @@ export interface User {
   email?: string | null;
   image?: string | null;
   timezone?: string | null;
+  working_hours?: GroupScheduleHours | null;
   created_at: string;
   updated_at: string;
 }
