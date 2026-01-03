@@ -537,6 +537,9 @@ export default function CalendarPage() {
     const isUnscheduled = !task.scheduled_start || !task.scheduled_end;
     if (!isUnscheduled) return false;
 
+    // Only show pending tasks
+    if (task.status !== "pending") return false;
+
     // Exclude parent tasks that have subtasks (only show subtasks in unscheduled view)
     if (!task.parent_task_id && (task.subtask_count || 0) > 0) {
       return false;
@@ -1133,22 +1136,12 @@ export default function CalendarPage() {
                   </div>
                 </CardHeader>
                 {expandedSections.has("unscheduled-tasks") && (
-                  <CardContent className="space-y-1 px-2 pb-2 pt-0">
-                    {sortTasksByCreatedTimeDesc(unscheduledTasks)
-                      .slice(0, 5)
-                      .map((task) => (
+                  <CardContent className="px-2 pb-2 pt-0">
+                    <div className="max-h-[400px] overflow-y-auto space-y-1 pr-1">
+                      {sortTasksByCreatedTimeDesc(unscheduledTasks).map((task) => (
                         <SlimTaskCard key={task.id} task={task} onTaskClick={handleTaskClick} />
                       ))}
-                    {unscheduledTasks.length > 5 && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="w-full"
-                        onClick={() => router.push("/tasks")}
-                      >
-                        View all {unscheduledTasks.length} tasks
-                      </Button>
-                    )}
+                    </div>
                   </CardContent>
                 )}
               </Card>
