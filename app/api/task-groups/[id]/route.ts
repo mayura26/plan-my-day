@@ -22,6 +22,15 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
     }
 
     const row = result.rows[0];
+    let autoScheduleHours = null;
+    if (row.auto_schedule_hours) {
+      try {
+        autoScheduleHours = JSON.parse(row.auto_schedule_hours as string);
+      } catch (e) {
+        console.error("Error parsing auto_schedule_hours JSON:", e);
+        autoScheduleHours = null;
+      }
+    }
     const group: TaskGroup = {
       id: row.id as string,
       user_id: row.user_id as string,
@@ -30,6 +39,8 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
       collapsed: Boolean(row.collapsed),
       parent_group_id: (row.parent_group_id as string) || null,
       is_parent_group: Boolean(row.is_parent_group),
+      auto_schedule_enabled: Boolean(row.auto_schedule_enabled ?? false),
+      auto_schedule_hours: autoScheduleHours,
       created_at: row.created_at as string,
       updated_at: row.updated_at as string,
     };
@@ -56,6 +67,8 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       collapsed?: boolean;
       parent_group_id?: string | null;
       is_parent_group?: boolean;
+      auto_schedule_enabled?: boolean;
+      auto_schedule_hours?: import("@/lib/types").GroupScheduleHours | null;
     } = await request.json();
 
     // Check if group exists and belongs to user
@@ -68,8 +81,50 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       return NextResponse.json({ error: "Task group not found" }, { status: 404 });
     }
 
+    const existingGroupData = existingGroup.rows[0];
+    const isParentGroup = Boolean(existingGroupData.is_parent_group);
+
+    // Validate that auto-schedule settings can only be set for non-parent groups
+    if (
+      (body.auto_schedule_enabled !== undefined || body.auto_schedule_hours !== undefined) &&
+      isParentGroup
+    ) {
+      return NextResponse.json(
+        { error: "Auto-schedule settings cannot be set for parent groups" },
+        { status: 400 }
+      );
+    }
+
     if (body.name !== undefined && body.name.trim().length === 0) {
       return NextResponse.json({ error: "Group name cannot be empty" }, { status: 400 });
+    }
+
+    // Validate auto_schedule_hours structure if provided
+    if (body.auto_schedule_hours !== undefined && body.auto_schedule_hours !== null) {
+      const validDays = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"];
+      const scheduleHours = body.auto_schedule_hours;
+
+      for (const day of validDays) {
+        const daySchedule = scheduleHours[day as keyof typeof scheduleHours];
+        if (daySchedule !== undefined && daySchedule !== null) {
+          if (
+            typeof daySchedule.start !== "number" ||
+            typeof daySchedule.end !== "number" ||
+            daySchedule.start < 0 ||
+            daySchedule.start > 23 ||
+            daySchedule.end < 0 ||
+            daySchedule.end > 23 ||
+            daySchedule.start >= daySchedule.end
+          ) {
+            return NextResponse.json(
+              {
+                error: `Invalid time range for ${day}. Start and end must be valid hours (0-23) and start must be before end.`,
+              },
+              { status: 400 }
+            );
+          }
+        }
+      }
     }
 
     // Validate parent_group_id if provided
@@ -159,6 +214,14 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       updateFields.push("is_parent_group = ?");
       values.push(body.is_parent_group);
     }
+    if (body.auto_schedule_enabled !== undefined) {
+      updateFields.push("auto_schedule_enabled = ?");
+      values.push(body.auto_schedule_enabled);
+    }
+    if (body.auto_schedule_hours !== undefined) {
+      updateFields.push("auto_schedule_hours = ?");
+      values.push(body.auto_schedule_hours === null ? null : JSON.stringify(body.auto_schedule_hours));
+    }
 
     updateFields.push("updated_at = ?");
     values.push(now);
@@ -177,6 +240,15 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     ]);
 
     const row = result.rows[0];
+    let autoScheduleHours = null;
+    if (row.auto_schedule_hours) {
+      try {
+        autoScheduleHours = JSON.parse(row.auto_schedule_hours as string);
+      } catch (e) {
+        console.error("Error parsing auto_schedule_hours JSON:", e);
+        autoScheduleHours = null;
+      }
+    }
     const group: TaskGroup = {
       id: row.id as string,
       user_id: row.user_id as string,
@@ -185,6 +257,8 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       collapsed: Boolean(row.collapsed),
       parent_group_id: (row.parent_group_id as string) || null,
       is_parent_group: Boolean(row.is_parent_group),
+      auto_schedule_enabled: Boolean(row.auto_schedule_enabled ?? false),
+      auto_schedule_hours: autoScheduleHours,
       created_at: row.created_at as string,
       updated_at: row.updated_at as string,
     };

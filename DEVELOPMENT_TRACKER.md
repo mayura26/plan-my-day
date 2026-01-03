@@ -10,6 +10,7 @@
 - [ ] Allow AI to optimise tasks lists, need space for one on one with AI
 - [ ] Allow open text mode which then geenrates into task/event
 - [ ] SUpport voice
+- [] each group has auto schedule rules. enable/disable schedule, time to schedule, and prioity 1-10 1 is highest
 
 ---
 

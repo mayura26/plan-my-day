@@ -61,6 +61,16 @@ export interface TaskWithDependencies extends Task {
   blocked_by?: Task[]; // Tasks that must be completed before this one
 }
 
+export interface GroupScheduleHours {
+  monday?: { start: number; end: number } | null;
+  tuesday?: { start: number; end: number } | null;
+  wednesday?: { start: number; end: number } | null;
+  thursday?: { start: number; end: number } | null;
+  friday?: { start: number; end: number } | null;
+  saturday?: { start: number; end: number } | null;
+  sunday?: { start: number; end: number } | null;
+}
+
 export interface TaskGroup {
   id: string;
   user_id: string;
@@ -69,6 +79,8 @@ export interface TaskGroup {
   collapsed: boolean;
   parent_group_id?: string | null;
   is_parent_group?: boolean;
+  auto_schedule_enabled?: boolean;
+  auto_schedule_hours?: GroupScheduleHours | null;
   created_at: string;
   updated_at: string;
 }
@@ -209,6 +221,8 @@ export interface CreateTaskGroupRequest {
   color?: string;
   parent_group_id?: string;
   is_parent_group?: boolean;
+  auto_schedule_enabled?: boolean;
+  auto_schedule_hours?: GroupScheduleHours | null;
 }
 
 export interface CreateTaskTemplateRequest {

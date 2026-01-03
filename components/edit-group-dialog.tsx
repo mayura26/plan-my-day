@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import { ChevronDown, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -18,7 +19,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import type { TaskGroup } from "@/lib/types";
+import { Switch } from "@/components/ui/switch";
+import { Checkbox } from "@/components/ui/checkbox";
+import type { TaskGroup, GroupScheduleHours } from "@/lib/types";
 
 interface EditGroupDialogProps {
   open: boolean;
@@ -39,6 +42,9 @@ export function EditGroupDialog({
   const [newGroupColor, setNewGroupColor] = useState("#3B82F6");
   const [newParentGroupId, setNewParentGroupId] = useState<string | null>(null);
   const [isUpdating, setIsUpdating] = useState(false);
+  const [autoScheduleEnabled, setAutoScheduleEnabled] = useState(false);
+  const [autoScheduleHours, setAutoScheduleHours] = useState<GroupScheduleHours>({});
+  const [isAutoScheduleExpanded, setIsAutoScheduleExpanded] = useState(false);
 
   // Initialize form when group changes
   useEffect(() => {
@@ -46,6 +52,8 @@ export function EditGroupDialog({
       setNewGroupName(group.name);
       setNewGroupColor(group.color);
       setNewParentGroupId(group.parent_group_id || null);
+      setAutoScheduleEnabled(group.auto_schedule_enabled ?? false);
+      setAutoScheduleHours(group.auto_schedule_hours || {});
     }
   }, [group]);
 
@@ -55,6 +63,9 @@ export function EditGroupDialog({
       setNewGroupName("");
       setNewGroupColor("#3B82F6");
       setNewParentGroupId(null);
+      setAutoScheduleEnabled(false);
+      setAutoScheduleHours({});
+      setIsAutoScheduleExpanded(false);
     }
   }, [open]);
 
@@ -91,6 +102,8 @@ export function EditGroupDialog({
           name: newGroupName.trim(),
           color: newGroupColor,
           parent_group_id: newParentGroupId || null,
+          auto_schedule_enabled: autoScheduleEnabled,
+          auto_schedule_hours: autoScheduleEnabled ? autoScheduleHours : null,
         }),
       });
 
@@ -183,6 +196,162 @@ export function EditGroupDialog({
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+          )}
+          {!group.is_parent_group && (
+            <div className="border rounded-lg overflow-hidden">
+              <div
+                role="button"
+                tabIndex={0}
+                className="px-4 py-3 border-b cursor-pointer hover:bg-accent/50 transition-colors flex items-center justify-between bg-card"
+                onClick={() => setIsAutoScheduleExpanded(!isAutoScheduleExpanded)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    setIsAutoScheduleExpanded(!isAutoScheduleExpanded);
+                  }
+                }}
+              >
+                <div className="flex items-center gap-2">
+                  {isAutoScheduleExpanded ? (
+                    <ChevronDown className="h-4 w-4" />
+                  ) : (
+                    <ChevronRight className="h-4 w-4" />
+                  )}
+                  <h3 className="text-sm font-semibold">Auto-Schedule Settings</h3>
+                </div>
+              </div>
+              {isAutoScheduleExpanded && (
+                <div className="p-4 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <label htmlFor="auto-schedule-enabled" className="text-sm font-medium">
+                      Enable Auto-Scheduling
+                    </label>
+                    <Switch
+                      id="auto-schedule-enabled"
+                      checked={autoScheduleEnabled}
+                      onCheckedChange={setAutoScheduleEnabled}
+                    />
+                  </div>
+                  {autoScheduleEnabled && (
+                    <div className="space-y-3 pt-2 border-t">
+                      <div className="text-xs text-muted-foreground mb-2">
+                        Select days and time ranges when tasks can be automatically scheduled
+                      </div>
+                      {(
+                        [
+                          { key: "monday", label: "Monday" },
+                          { key: "tuesday", label: "Tuesday" },
+                          { key: "wednesday", label: "Wednesday" },
+                          { key: "thursday", label: "Thursday" },
+                          { key: "friday", label: "Friday" },
+                          { key: "saturday", label: "Saturday" },
+                          { key: "sunday", label: "Sunday" },
+                        ] as const
+                      ).map((day) => {
+                        const daySchedule = autoScheduleHours[day.key as keyof GroupScheduleHours];
+                        const isDayEnabled = daySchedule !== null && daySchedule !== undefined;
+                        const startHour = daySchedule?.start ?? 9;
+                        const endHour = daySchedule?.end ?? 17;
+
+                        return (
+                          <div key={day.key} className="space-y-2">
+                            <div className="flex items-center gap-2">
+                              <Checkbox
+                                id={`day-${day.key}`}
+                                checked={isDayEnabled}
+                                onCheckedChange={(checked) => {
+                                  setAutoScheduleHours((prev) => ({
+                                    ...prev,
+                                    [day.key]: checked
+                                      ? { start: startHour, end: endHour }
+                                      : null,
+                                  }));
+                                }}
+                              />
+                              <label
+                                htmlFor={`day-${day.key}`}
+                                className="text-sm font-medium flex-1 cursor-pointer"
+                              >
+                                {day.label}
+                              </label>
+                            </div>
+                            {isDayEnabled && (
+                              <div className="ml-6 flex items-center gap-4 py-2 px-2">
+                                <div className="flex items-center gap-2.5">
+                                  <label htmlFor={`start-${day.key}`} className="text-xs text-muted-foreground whitespace-nowrap">
+                                    Start:
+                                  </label>
+                                  <Select
+                                    value={startHour.toString()}
+                                    onValueChange={(value) => {
+                                      const newStart = parseInt(value, 10);
+                                      const currentEnd =
+                                        autoScheduleHours[day.key as keyof GroupScheduleHours]?.end ?? 17;
+                                      setAutoScheduleHours((prev) => ({
+                                        ...prev,
+                                        [day.key]: {
+                                          start: newStart,
+                                          end: currentEnd > newStart ? currentEnd : newStart + 1,
+                                        },
+                                      }));
+                                    }}
+                                  >
+                                    <SelectTrigger id={`start-${day.key}`} className="h-8 min-w-[5rem] px-3">
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {Array.from({ length: 24 }, (_, i) => (
+                                        <SelectItem key={i} value={i.toString()}>
+                                          {i.toString().padStart(2, "0")}:00
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                                <span className="text-xs text-muted-foreground px-1">to</span>
+                                <div className="flex items-center gap-2.5">
+                                  <label htmlFor={`end-${day.key}`} className="text-xs text-muted-foreground whitespace-nowrap">
+                                    End:
+                                  </label>
+                                  <Select
+                                    value={endHour.toString()}
+                                    onValueChange={(value) => {
+                                      const newEnd = parseInt(value, 10);
+                                      const currentStart =
+                                        autoScheduleHours[day.key as keyof GroupScheduleHours]?.start ?? 9;
+                                      setAutoScheduleHours((prev) => ({
+                                        ...prev,
+                                        [day.key]: { start: currentStart, end: newEnd },
+                                      }));
+                                    }}
+                                  >
+                                    <SelectTrigger id={`end-${day.key}`} className="h-8 min-w-[5rem] px-3">
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {Array.from({ length: 24 }, (_, i) => {
+                                        const currentStart =
+                                          autoScheduleHours[day.key as keyof GroupScheduleHours]?.start ?? 9;
+                                        if (i <= currentStart) return null;
+                                        return (
+                                          <SelectItem key={i} value={i.toString()}>
+                                            {i.toString().padStart(2, "0")}:00
+                                          </SelectItem>
+                                        );
+                                      })}
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
           <div className="flex justify-end gap-2">
