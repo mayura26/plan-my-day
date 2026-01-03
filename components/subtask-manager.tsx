@@ -41,6 +41,7 @@ export function SubtaskManager({
 }: SubtaskManagerProps) {
   const { confirm } = useConfirmDialog();
   const [subtasks, setSubtasks] = useState<Task[]>([]);
+  const [parentTaskDuration, setParentTaskDuration] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isAdding, setIsAdding] = useState(false);
   const [showAddForm, setShowAddForm] = useState(false);
@@ -52,6 +53,18 @@ export function SubtaskManager({
     priority: 3,
     energy_level_required: 3,
   });
+
+  const fetchParentTask = useCallback(async () => {
+    try {
+      const response = await fetch(`/api/tasks/${parentTaskId}`);
+      if (response.ok) {
+        const data = await response.json();
+        setParentTaskDuration(data.task?.duration ?? null);
+      }
+    } catch (error) {
+      console.error("Error fetching parent task:", error);
+    }
+  }, [parentTaskId]);
 
   const fetchSubtasks = useCallback(async () => {
     try {
@@ -68,12 +81,72 @@ export function SubtaskManager({
   }, [parentTaskId]);
 
   useEffect(() => {
+    fetchParentTask();
     fetchSubtasks();
-  }, [fetchSubtasks]);
+  }, [fetchParentTask, fetchSubtasks]);
+
+  // Calculate duration metrics
+  const calculateDurationMetrics = (includeNewSubtask: boolean = false) => {
+    const totalUsed = subtasks.reduce((sum, st) => sum + (st.duration || 0), 0);
+    const newSubtaskDuration = includeNewSubtask ? (formData.duration || 0) : 0;
+    const totalUsedWithNew = totalUsed + newSubtaskDuration;
+    const remaining = parentTaskDuration !== null ? parentTaskDuration - totalUsedWithNew : null;
+    return {
+      used: totalUsedWithNew,
+      remaining,
+      total: parentTaskDuration,
+    };
+  };
 
   const handleAddSubtask = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.title.trim()) return;
+
+    // Check if adding this subtask would exceed parent duration
+    if (parentTaskDuration !== null) {
+      const metricsWithNew = calculateDurationMetrics(true);
+      if (metricsWithNew.remaining !== null && metricsWithNew.remaining < 0) {
+        // Calculate new parent duration needed
+        const newParentDuration = parentTaskDuration + Math.abs(metricsWithNew.remaining);
+        const confirmed = await confirm({
+          title: "Extend Parent Task Duration?",
+          description: `Adding this subtask would exceed the parent task duration by ${formatDuration(
+            Math.abs(metricsWithNew.remaining)
+          )}. Would you like to extend the parent task duration from ${formatDuration(
+            parentTaskDuration
+          )} to ${formatDuration(newParentDuration)}?`,
+          variant: "default",
+          confirmText: "Extend & Add",
+          cancelText: "Cancel",
+        });
+
+        if (!confirmed) {
+          toast.error("Subtask not added. Please reduce the subtask duration or extend the parent task duration.");
+          return;
+        }
+
+        // Update parent task duration
+        try {
+          const updateResponse = await fetch(`/api/tasks/${parentTaskId}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ duration: newParentDuration }),
+          });
+
+          if (!updateResponse.ok) {
+            toast.error("Failed to update parent task duration");
+            return;
+          }
+
+          // Update local state
+          setParentTaskDuration(newParentDuration);
+        } catch (error) {
+          console.error("Error updating parent task duration:", error);
+          toast.error("Failed to update parent task duration");
+          return;
+        }
+      }
+    }
 
     setIsAdding(true);
     try {
@@ -92,10 +165,12 @@ export function SubtaskManager({
         });
         setShowAddForm(false);
         await fetchSubtasks();
+        await fetchParentTask(); // Refresh parent task to get updated duration
         onSubtaskChange?.();
         toast.success("Subtask added successfully");
       } else {
-        toast.error("Failed to add subtask");
+        const errorData = await response.json().catch(() => ({}));
+        toast.error(errorData.error || "Failed to add subtask");
       }
     } catch (error) {
       console.error("Error adding subtask:", error);
@@ -117,6 +192,7 @@ export function SubtaskManager({
 
       if (response.ok) {
         await fetchSubtasks();
+        await fetchParentTask(); // Refresh parent task duration
         onSubtaskChange?.();
       }
     } catch (error) {
@@ -144,6 +220,7 @@ export function SubtaskManager({
 
       if (response.ok) {
         await fetchSubtasks();
+        await fetchParentTask(); // Refresh parent task duration
         onSubtaskChange?.();
         toast.success("Subtask deleted successfully");
       } else {
@@ -160,6 +237,45 @@ export function SubtaskManager({
   const completedCount = subtasks.filter((st) => st.status === "completed").length;
   const totalCount = subtasks.length;
   const progressPercentage = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
+
+  const durationMetrics = calculateDurationMetrics();
+
+  const durationDisplay = (
+    <>
+      {parentTaskDuration !== null && (
+        <div className="flex items-center gap-2 text-xs">
+          <div className="flex items-center gap-1 text-muted-foreground">
+            <Clock className="h-3 w-3" />
+            <span>
+              Used: {formatDuration(durationMetrics.used)}
+              {durationMetrics.total !== null && ` / Total: ${formatDuration(durationMetrics.total)}`}
+            </span>
+          </div>
+          {durationMetrics.remaining !== null && (
+            <span
+              className={
+                durationMetrics.remaining < 0
+                  ? "text-destructive font-medium"
+                  : durationMetrics.remaining < durationMetrics.total! * 0.1
+                    ? "text-yellow-600 font-medium"
+                    : "text-muted-foreground"
+              }
+            >
+              {durationMetrics.remaining < 0
+                ? `Over by ${formatDuration(Math.abs(durationMetrics.remaining))}`
+                : `Remaining: ${formatDuration(durationMetrics.remaining)}`}
+            </span>
+          )}
+        </div>
+      )}
+      {parentTaskDuration === null && subtasks.length > 0 && (
+        <div className="text-xs text-muted-foreground flex items-center gap-1">
+          <Clock className="h-3 w-3" />
+          <span>Used: {formatDuration(durationMetrics.used)} (No parent duration set)</span>
+        </div>
+      )}
+    </>
+  );
 
   const content = (
     <>
@@ -181,9 +297,13 @@ export function SubtaskManager({
               />
             </div>
           )}
+          <div className="mt-2">{durationDisplay}</div>
         </CardHeader>
       )}
       <CardContent className={noCard ? "p-0 space-y-3" : "space-y-3"}>
+        {noCard && (parentTaskDuration !== null || subtasks.length > 0) && (
+          <div className="pb-2 border-b">{durationDisplay}</div>
+        )}
         {/* Subtask List */}
         {subtasks.length > 0 && (
           <div className="space-y-2">

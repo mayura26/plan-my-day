@@ -111,6 +111,51 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       return NextResponse.json({ error: "Validation failed", details: errors }, { status: 400 });
     }
 
+    // Validate subtask duration doesn't exceed parent duration
+    const subtaskDuration = body.duration !== undefined ? body.duration : 30; // Default to 30 minutes
+    if (parentTask.duration !== null && parentTask.duration !== undefined) {
+      // Get total duration of existing subtasks
+      const existingSubtasksResult = await db.execute(
+        `SELECT duration FROM tasks WHERE parent_task_id = ? AND user_id = ?`,
+        [parentId, session.user.id]
+      );
+      const totalExistingDuration = existingSubtasksResult.rows.reduce(
+        (sum, row) => sum + (Number(row.duration) || 0),
+        0
+      );
+      const totalDurationWithNew = totalExistingDuration + subtaskDuration;
+
+      if (totalDurationWithNew > parentTask.duration) {
+        // Check if extend_parent_duration flag is set
+        const extendParentDuration = (body as any).extend_parent_duration === true;
+        
+        if (extendParentDuration) {
+          // Update parent task duration
+          const newParentDuration = totalDurationWithNew;
+          const now = new Date().toISOString();
+          await db.execute(
+            `UPDATE tasks SET duration = ?, updated_at = ? WHERE id = ? AND user_id = ?`,
+            [newParentDuration, now, parentId, session.user.id]
+          );
+        } else {
+          return NextResponse.json(
+            {
+              error: "Subtask duration exceeds parent task duration",
+              details: [
+                `Total subtask duration (${totalDurationWithNew} min) exceeds parent task duration (${parentTask.duration} min) by ${totalDurationWithNew - parentTask.duration} min`,
+              ],
+              current_total: totalExistingDuration,
+              new_subtask_duration: subtaskDuration,
+              total_with_new: totalDurationWithNew,
+              parent_duration: parentTask.duration,
+              required_extension: totalDurationWithNew - parentTask.duration,
+            },
+            { status: 400 }
+          );
+        }
+      }
+    }
+
     const taskId = generateTaskId();
     const now = new Date().toISOString();
 
