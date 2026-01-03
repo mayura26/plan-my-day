@@ -48,7 +48,15 @@ export async function PUT(request: NextRequest) {
 
     // Validate working_hours structure if provided
     if (body.working_hours !== null && body.working_hours !== undefined) {
-      const validDays = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"];
+      const validDays = [
+        "monday",
+        "tuesday",
+        "wednesday",
+        "thursday",
+        "friday",
+        "saturday",
+        "sunday",
+      ];
       const scheduleHours = body.working_hours;
 
       for (const day of validDays) {
@@ -81,10 +89,11 @@ export async function PUT(request: NextRequest) {
 
     const now = new Date().toISOString();
 
-    await db.execute(
-      `UPDATE users SET working_hours = ?, updated_at = ? WHERE id = ?`,
-      [workingHoursJson, now, session.user.id]
-    );
+    await db.execute(`UPDATE users SET working_hours = ?, updated_at = ? WHERE id = ?`, [
+      workingHoursJson,
+      now,
+      session.user.id,
+    ]);
 
     return NextResponse.json({
       working_hours: body.working_hours,
@@ -95,4 +104,3 @@ export async function PUT(request: NextRequest) {
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
-

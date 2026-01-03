@@ -156,9 +156,7 @@ export function NotesManager({
               <div
                 key={todo.id}
                 className={`flex items-center gap-2 p-2 rounded-md border ${
-                  todo.completed
-                    ? "bg-muted/50 border-muted"
-                    : "bg-background border-border"
+                  todo.completed ? "bg-muted/50 border-muted" : "bg-background border-border"
                 }`}
               >
                 <button

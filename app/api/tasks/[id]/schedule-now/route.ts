@@ -3,7 +3,7 @@ import { auth } from "@/lib/auth";
 import { findNearestAvailableSlot } from "@/lib/scheduler-utils";
 import { getUserTimezone } from "@/lib/timezone-utils";
 import { db } from "@/lib/turso";
-import type { GroupScheduleHours, Task, TaskStatus, TaskType } from "@/lib/types";
+import type { Task, TaskStatus, TaskType } from "@/lib/types";
 
 // Helper to map database row to Task object
 function mapRowToTask(row: any): Task {
@@ -72,7 +72,7 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
       userResult.rows.length > 0
         ? getUserTimezone(userResult.rows[0].timezone as string | null)
         : "UTC";
-    
+
     let workingHours = null;
     if (userResult.rows.length > 0 && userResult.rows[0].working_hours) {
       try {

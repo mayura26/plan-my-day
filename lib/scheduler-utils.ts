@@ -9,7 +9,7 @@ interface TimeSlot {
 /**
  * Find the nearest available time slot for a task
  * All date math is done in UTC. Working hours are converted to UTC boundaries for each day.
- * 
+ *
  * @param task The task to schedule
  * @param existingTasks All existing scheduled tasks (scheduled_start/end are in UTC)
  * @param startFrom The earliest time to start searching from (in UTC)
@@ -31,7 +31,7 @@ export function findNearestAvailableSlot(
   }
 
   const durationMs = task.duration * 60 * 1000; // Convert minutes to milliseconds
-  
+
   // All times are in UTC from here on
   const nowUTC = new Date();
   const maxSearchTime = new Date(startFrom);
@@ -75,12 +75,21 @@ export function findNearestAvailableSlot(
   };
 
   // Helper: Get day of week name from a UTC date (in user's timezone)
-  const getDayOfWeek = (utcDate: Date): "monday" | "tuesday" | "wednesday" | "thursday" | "friday" | "saturday" | "sunday" => {
+  const getDayOfWeek = (
+    utcDate: Date
+  ): "monday" | "tuesday" | "wednesday" | "thursday" | "friday" | "saturday" | "sunday" => {
     const formatter = new Intl.DateTimeFormat("en-US", {
       timeZone: timezone,
       weekday: "long",
     });
-    const dayName = formatter.format(utcDate).toLowerCase() as "monday" | "tuesday" | "wednesday" | "thursday" | "friday" | "saturday" | "sunday";
+    const dayName = formatter.format(utcDate).toLowerCase() as
+      | "monday"
+      | "tuesday"
+      | "wednesday"
+      | "thursday"
+      | "friday"
+      | "saturday"
+      | "sunday";
     return dayName;
   };
 
@@ -99,14 +108,14 @@ export function findNearestAvailableSlot(
   // Returns null if the day has no working hours configured
   const getWorkingHoursInUTC = (utcDate: Date): { dayStartUTC: Date; dayEndUTC: Date } | null => {
     // Get what date this UTC timestamp represents in user's timezone
-    const dateInTz = getDateInTimezone(utcDate);
+    const _dateInTz = getDateInTimezone(utcDate);
     const dayOfWeek = getDayOfWeek(utcDate);
     const dayHours = getWorkingHoursForDay(dayOfWeek);
-    
+
     // Create a Date object representing this date at the working hours start/end in the timezone
     const dayStartUTC = createDateInTimezone(utcDate, dayHours.start, 0, timezone);
     const dayEndUTC = createDateInTimezone(utcDate, dayHours.end, 0, timezone);
-    
+
     return { dayStartUTC, dayEndUTC };
   };
 
@@ -117,7 +126,7 @@ export function findNearestAvailableSlot(
   while (currentTimeUTC < maxSearchTime) {
     // Get working hours boundaries for this day in UTC
     const dayWorkingHours = getWorkingHoursInUTC(currentTimeUTC);
-    
+
     // Skip days with no working hours configured
     if (!dayWorkingHours) {
       // Move to next day at midnight in user's timezone
@@ -127,18 +136,19 @@ export function findNearestAvailableSlot(
       currentTimeUTC = new Date(nextDayStart);
       continue;
     }
-    
+
     const { dayStartUTC, dayEndUTC } = dayWorkingHours;
-    
+
     // Start from the later of: current time or day start
-    let slotStartUTC = currentTimeUTC > dayStartUTC ? new Date(currentTimeUTC) : new Date(dayStartUTC);
+    let slotStartUTC =
+      currentTimeUTC > dayStartUTC ? new Date(currentTimeUTC) : new Date(dayStartUTC);
 
     // Check if we're past working hours
     if (slotStartUTC >= dayEndUTC) {
       // Check if this is "today" in user's timezone - allow after-hours scheduling up to 11 PM
       const nowDateInTz = getDateInTimezone(nowUTC);
       const slotDateInTz = getDateInTimezone(slotStartUTC);
-      const isToday = 
+      const isToday =
         nowDateInTz.year === slotDateInTz.year &&
         nowDateInTz.month === slotDateInTz.month &&
         nowDateInTz.day === slotDateInTz.day;
@@ -200,16 +210,16 @@ export function findNearestAvailableSlot(
       currentTimeUTC = new Date(nextDayStart);
       continue;
     }
-    const { dayStartUTC: roundedDayStart, dayEndUTC: roundedDayEnd } = roundedDayWorkingHours;
+    const { dayEndUTC: roundedDayEnd } = roundedDayWorkingHours;
     const nowDateInTz = getDateInTimezone(nowUTC);
     const slotDateInTz = getDateInTimezone(slotStartUTC);
-    const isStillToday = 
+    const isStillToday =
       nowDateInTz.year === slotDateInTz.year &&
       nowDateInTz.month === slotDateInTz.month &&
       nowDateInTz.day === slotDateInTz.day;
 
     // Use 11 PM as end if after hours today, otherwise use working hours end
-    const effectiveDayEndUTC = 
+    const effectiveDayEndUTC =
       isStillToday && slotStartUTC >= roundedDayEnd
         ? createDateInTimezone(nowUTC, 23, 0, timezone)
         : roundedDayEnd;

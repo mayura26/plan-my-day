@@ -22,10 +22,10 @@ import { DayNoteDialog } from "@/components/day-note-dialog";
 import { DayNotesSection } from "@/components/day-notes-section";
 import { MonthCalendar } from "@/components/month-calendar";
 import { ProcessOverdueDialog } from "@/components/process-overdue-dialog";
+import { RefreshButton } from "@/components/refresh-button";
 import { SlimTaskCard } from "@/components/slim-task-card";
 import { TaskDetailDialog } from "@/components/task-detail-dialog";
 import { TaskForm } from "@/components/task-form";
-import { RefreshButton } from "@/components/refresh-button";
 import { TaskGroupManager } from "@/components/task-group-manager";
 import { TaskMetrics } from "@/components/task-metrics";
 import { Badge } from "@/components/ui/badge";
@@ -584,8 +584,7 @@ export default function CalendarPage() {
         fetchSubtasks(task.id);
       }
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [unscheduledTasks]);
+  }, [unscheduledTasks, fetchSubtasks, subtasksMap]);
 
   // For display in calendar - only show scheduled tasks
   const calendarTasks = scheduledTasks;
@@ -1182,8 +1181,7 @@ export default function CalendarPage() {
                         // Filter to only show unscheduled subtasks (matching the unscheduled filter)
                         const filteredSubtasks = allSubtasks.filter(
                           (st) =>
-                            st.status === "pending" &&
-                            (!st.scheduled_start || !st.scheduled_end)
+                            st.status === "pending" && (!st.scheduled_start || !st.scheduled_end)
                         );
                         return (
                           <SlimTaskCard

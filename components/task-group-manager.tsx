@@ -409,9 +409,7 @@ function GroupCard({
             const filteredSubtasks = showAllTasks
               ? allSubtasks.filter((st) => st.status !== "completed")
               : allSubtasks.filter(
-                  (st) =>
-                    st.status !== "completed" &&
-                    (!st.scheduled_start || !st.scheduled_end)
+                  (st) => st.status !== "completed" && (!st.scheduled_start || !st.scheduled_end)
                 );
             return (
               <SlimTaskCard
@@ -517,7 +515,7 @@ export function TaskGroupManager({
   useEffect(() => {
     // Clear the subtasks map to force refetch with fresh data
     setSubtasksMap(new Map());
-    
+
     // Filter tasks to get parent tasks with subtasks
     const parentTasksWithSubtasks = tasks.filter(
       (task) => !task.parent_task_id && (task.subtask_count || 0) > 0
@@ -526,8 +524,7 @@ export function TaskGroupManager({
     parentTasksWithSubtasks.forEach((task) => {
       fetchSubtasks(task.id);
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tasks.length, tasks.map((t) => t.id).join(',')]);
+  }, [tasks, fetchSubtasks]);
 
   // Auto-rotate color when create dialog opens
   useEffect(() => {
@@ -863,33 +860,33 @@ export function TaskGroupManager({
     // Regular groups
     return (
       <div key={group.id}>
-          <GroupCard
-            groupName={group.name}
-            groupColor={group.color}
-            taskCount={getTaskCountForGroup(group.id)}
-            childGroupCount={childGroupCount}
-            tasks={getTasksForGroup(group.id)}
-            isExpanded={isExpanded}
-            isHidden={hiddenGroups.has(group.id)}
-            isOtherSelected={selectedGroupId !== null && selectedGroupId !== group.id}
-            showAllTasks={showAllTasks}
-            onToggleExpand={() => toggleGroupExpansion(group.id)}
-            onToggleVisibility={() => toggleGroupVisibility(group.id)}
-            onSelect={() => {
-              if (selectedGroupId === group.id) {
-                onGroupSelect?.(null);
-              } else {
-                onGroupSelect?.(group.id);
-              }
-            }}
-            onTaskClick={onTaskClick}
-            onEdit={() => handleEditGroup(group)}
-            onDelete={() => deleteGroup(group.id)}
-            isParent={isParentGroup}
-            indentLevel={level}
-            isDeleting={deletingGroupId === group.id}
-            subtasksMap={subtasksMap}
-          />
+        <GroupCard
+          groupName={group.name}
+          groupColor={group.color}
+          taskCount={getTaskCountForGroup(group.id)}
+          childGroupCount={childGroupCount}
+          tasks={getTasksForGroup(group.id)}
+          isExpanded={isExpanded}
+          isHidden={hiddenGroups.has(group.id)}
+          isOtherSelected={selectedGroupId !== null && selectedGroupId !== group.id}
+          showAllTasks={showAllTasks}
+          onToggleExpand={() => toggleGroupExpansion(group.id)}
+          onToggleVisibility={() => toggleGroupVisibility(group.id)}
+          onSelect={() => {
+            if (selectedGroupId === group.id) {
+              onGroupSelect?.(null);
+            } else {
+              onGroupSelect?.(group.id);
+            }
+          }}
+          onTaskClick={onTaskClick}
+          onEdit={() => handleEditGroup(group)}
+          onDelete={() => deleteGroup(group.id)}
+          isParent={isParentGroup}
+          indentLevel={level}
+          isDeleting={deletingGroupId === group.id}
+          subtasksMap={subtasksMap}
+        />
       </div>
     );
   };

@@ -1,9 +1,10 @@
 "use client";
 
+import { ChevronDown, ChevronRight } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { ChevronDown, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -20,8 +21,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { Checkbox } from "@/components/ui/checkbox";
-import type { TaskGroup, GroupScheduleHours } from "@/lib/types";
+import type { GroupScheduleHours, TaskGroup } from "@/lib/types";
 
 interface EditGroupDialogProps {
   open: boolean;
@@ -263,9 +263,7 @@ export function EditGroupDialog({
                                 onCheckedChange={(checked) => {
                                   setAutoScheduleHours((prev) => ({
                                     ...prev,
-                                    [day.key]: checked
-                                      ? { start: startHour, end: endHour }
-                                      : null,
+                                    [day.key]: checked ? { start: startHour, end: endHour } : null,
                                   }));
                                 }}
                               />
@@ -279,7 +277,10 @@ export function EditGroupDialog({
                             {isDayEnabled && (
                               <div className="ml-6 flex items-center gap-4 py-2 px-2">
                                 <div className="flex items-center gap-2.5">
-                                  <label htmlFor={`start-${day.key}`} className="text-xs text-muted-foreground whitespace-nowrap">
+                                  <label
+                                    htmlFor={`start-${day.key}`}
+                                    className="text-xs text-muted-foreground whitespace-nowrap"
+                                  >
                                     Start:
                                   </label>
                                   <Select
@@ -287,7 +288,8 @@ export function EditGroupDialog({
                                     onValueChange={(value) => {
                                       const newStart = parseInt(value, 10);
                                       const currentEnd =
-                                        autoScheduleHours[day.key as keyof GroupScheduleHours]?.end ?? 17;
+                                        autoScheduleHours[day.key as keyof GroupScheduleHours]
+                                          ?.end ?? 17;
                                       setAutoScheduleHours((prev) => ({
                                         ...prev,
                                         [day.key]: {
@@ -297,7 +299,10 @@ export function EditGroupDialog({
                                       }));
                                     }}
                                   >
-                                    <SelectTrigger id={`start-${day.key}`} className="h-8 min-w-[5rem] px-3">
+                                    <SelectTrigger
+                                      id={`start-${day.key}`}
+                                      className="h-8 min-w-[5rem] px-3"
+                                    >
                                       <SelectValue />
                                     </SelectTrigger>
                                     <SelectContent>
@@ -311,7 +316,10 @@ export function EditGroupDialog({
                                 </div>
                                 <span className="text-xs text-muted-foreground px-1">to</span>
                                 <div className="flex items-center gap-2.5">
-                                  <label htmlFor={`end-${day.key}`} className="text-xs text-muted-foreground whitespace-nowrap">
+                                  <label
+                                    htmlFor={`end-${day.key}`}
+                                    className="text-xs text-muted-foreground whitespace-nowrap"
+                                  >
                                     End:
                                   </label>
                                   <Select
@@ -319,20 +327,25 @@ export function EditGroupDialog({
                                     onValueChange={(value) => {
                                       const newEnd = parseInt(value, 10);
                                       const currentStart =
-                                        autoScheduleHours[day.key as keyof GroupScheduleHours]?.start ?? 9;
+                                        autoScheduleHours[day.key as keyof GroupScheduleHours]
+                                          ?.start ?? 9;
                                       setAutoScheduleHours((prev) => ({
                                         ...prev,
                                         [day.key]: { start: currentStart, end: newEnd },
                                       }));
                                     }}
                                   >
-                                    <SelectTrigger id={`end-${day.key}`} className="h-8 min-w-[5rem] px-3">
+                                    <SelectTrigger
+                                      id={`end-${day.key}`}
+                                      className="h-8 min-w-[5rem] px-3"
+                                    >
                                       <SelectValue />
                                     </SelectTrigger>
                                     <SelectContent>
                                       {Array.from({ length: 24 }, (_, i) => {
                                         const currentStart =
-                                          autoScheduleHours[day.key as keyof GroupScheduleHours]?.start ?? 9;
+                                          autoScheduleHours[day.key as keyof GroupScheduleHours]
+                                            ?.start ?? 9;
                                         if (i <= currentStart) return null;
                                         return (
                                           <SelectItem key={i} value={i.toString()}>

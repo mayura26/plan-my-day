@@ -1,10 +1,10 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { generateTaskId } from "@/lib/task-utils";
 import { findNearestAvailableSlot } from "@/lib/scheduler-utils";
+import { generateTaskId } from "@/lib/task-utils";
 import { getUserTimezone } from "@/lib/timezone-utils";
 import { db } from "@/lib/turso";
-import type { CreateCarryoverTaskRequest, GroupScheduleHours, Task, TaskStatus, TaskType } from "@/lib/types";
+import type { CreateCarryoverTaskRequest, Task, TaskStatus, TaskType } from "@/lib/types";
 
 // Helper to map database row to Task object
 function mapRowToTask(row: any): Task {
@@ -177,14 +177,15 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     // Auto-schedule the carryover task if requested
     if (body.auto_schedule) {
       // Get user's timezone and working hours
-      const userResult = await db.execute("SELECT timezone, working_hours FROM users WHERE id = ?", [
-        session.user.id,
-      ]);
+      const userResult = await db.execute(
+        "SELECT timezone, working_hours FROM users WHERE id = ?",
+        [session.user.id]
+      );
       const userTimezone =
         userResult.rows.length > 0
           ? getUserTimezone(userResult.rows[0].timezone as string | null)
           : "UTC";
-      
+
       let workingHours = null;
       if (userResult.rows.length > 0 && userResult.rows[0].working_hours) {
         try {

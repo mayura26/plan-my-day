@@ -92,7 +92,15 @@ export async function POST(request: NextRequest) {
 
     // Validate auto_schedule_hours structure if provided
     if (body.auto_schedule_hours !== undefined && body.auto_schedule_hours !== null) {
-      const validDays = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"];
+      const validDays = [
+        "monday",
+        "tuesday",
+        "wednesday",
+        "thursday",
+        "friday",
+        "saturday",
+        "sunday",
+      ];
       const scheduleHours = body.auto_schedule_hours;
 
       for (const day of validDays) {

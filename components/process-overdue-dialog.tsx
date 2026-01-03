@@ -4,6 +4,7 @@ import { AlertTriangle, Calendar, CalendarClock, Clock, RotateCcw, X, XCircle } 
 import { useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -15,7 +16,6 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Checkbox } from "@/components/ui/checkbox";
 import { useUserTimezone } from "@/hooks/use-user-timezone";
 import { getOverdueTasks } from "@/lib/task-utils";
 import { formatDateTimeLocalForTimezone, parseDateTimeLocalToUTC } from "@/lib/timezone-utils";
@@ -421,7 +421,8 @@ export function ProcessOverdueDialog({
 
                                 // Show success message
                                 toast.success(`Carryover created for "${task.title}"`, {
-                                  description: "The dialog will stay open so you can process more tasks.",
+                                  description:
+                                    "The dialog will stay open so you can process more tasks.",
                                 });
 
                                 // Refresh tasks to update the list (this will filter out rescheduled tasks)

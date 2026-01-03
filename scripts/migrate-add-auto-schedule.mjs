@@ -55,14 +55,18 @@ async function backupDatabase() {
 async function migrateAutoSchedule() {
   let backupFile = null;
   try {
-    console.log("Adding auto_schedule_enabled and auto_schedule_hours columns to task_groups table...");
+    console.log(
+      "Adding auto_schedule_enabled and auto_schedule_hours columns to task_groups table..."
+    );
 
     // Create backup first
     backupFile = await backupDatabase();
 
     // Check if columns already exist
     const tableInfo = await turso.execute("PRAGMA table_info(task_groups)");
-    const hasAutoScheduleEnabled = tableInfo.rows.some((row) => row.name === "auto_schedule_enabled");
+    const hasAutoScheduleEnabled = tableInfo.rows.some(
+      (row) => row.name === "auto_schedule_enabled"
+    );
     const hasAutoScheduleHours = tableInfo.rows.some((row) => row.name === "auto_schedule_hours");
 
     if (hasAutoScheduleEnabled && hasAutoScheduleHours) {
@@ -132,4 +136,3 @@ async function migrateAutoSchedule() {
 }
 
 migrateAutoSchedule();
-

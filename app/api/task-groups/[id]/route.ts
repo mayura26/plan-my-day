@@ -101,7 +101,15 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 
     // Validate auto_schedule_hours structure if provided
     if (body.auto_schedule_hours !== undefined && body.auto_schedule_hours !== null) {
-      const validDays = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"];
+      const validDays = [
+        "monday",
+        "tuesday",
+        "wednesday",
+        "thursday",
+        "friday",
+        "saturday",
+        "sunday",
+      ];
       const scheduleHours = body.auto_schedule_hours;
 
       for (const day of validDays) {
@@ -220,7 +228,9 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     }
     if (body.auto_schedule_hours !== undefined) {
       updateFields.push("auto_schedule_hours = ?");
-      values.push(body.auto_schedule_hours === null ? null : JSON.stringify(body.auto_schedule_hours));
+      values.push(
+        body.auto_schedule_hours === null ? null : JSON.stringify(body.auto_schedule_hours)
+      );
     }
 
     updateFields.push("updated_at = ?");

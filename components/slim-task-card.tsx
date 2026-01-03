@@ -15,7 +15,12 @@ interface SlimTaskCardProps {
   isSubtask?: boolean;
 }
 
-export function SlimTaskCard({ task, onTaskClick, subtasks, isSubtask = false }: SlimTaskCardProps) {
+export function SlimTaskCard({
+  task,
+  onTaskClick,
+  subtasks,
+  isSubtask = false,
+}: SlimTaskCardProps) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: task.id,
     disabled: task.locked,
@@ -129,9 +134,7 @@ export function SlimTaskCard({ task, onTaskClick, subtasks, isSubtask = false }:
     return (
       <div className="space-y-1 border rounded-md border-border bg-card/50 p-1">
         {/* Parent task card */}
-        <div className="pb-1 border-b border-border/50">
-          {taskCardContent}
-        </div>
+        <div className="pb-1 border-b border-border/50">{taskCardContent}</div>
         {/* Nested subtasks */}
         <div className="space-y-1 pl-2">
           {subtasks.map((subtask) => (

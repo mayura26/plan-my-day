@@ -17,7 +17,7 @@ async function migrate() {
       await turso.execute("SELECT working_hours FROM users LIMIT 1");
       console.log("✅ Column working_hours already exists");
       return;
-    } catch (error) {
+    } catch (_error) {
       // Column doesn't exist, continue with migration
     }
 
@@ -35,4 +35,3 @@ async function migrate() {
 }
 
 migrate();
-

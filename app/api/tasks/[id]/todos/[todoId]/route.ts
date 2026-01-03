@@ -40,10 +40,10 @@ export async function PUT(
     }
 
     // Verify todo exists and belongs to this task
-    const todoResult = await db.execute(
-      "SELECT * FROM task_todos WHERE id = ? AND task_id = ?",
-      [todoId, taskId]
-    );
+    const todoResult = await db.execute("SELECT * FROM task_todos WHERE id = ? AND task_id = ?", [
+      todoId,
+      taskId,
+    ]);
 
     if (todoResult.rows.length === 0) {
       return NextResponse.json({ error: "Todo not found" }, { status: 404 });
@@ -79,10 +79,7 @@ export async function PUT(
     updateFields.push("updated_at = ?");
     values.push(now, todoId);
 
-    await db.execute(
-      `UPDATE task_todos SET ${updateFields.join(", ")} WHERE id = ?`,
-      values
-    );
+    await db.execute(`UPDATE task_todos SET ${updateFields.join(", ")} WHERE id = ?`, values);
 
     // Fetch updated todo
     const updatedResult = await db.execute("SELECT * FROM task_todos WHERE id = ?", [todoId]);
@@ -119,10 +116,10 @@ export async function DELETE(
     }
 
     // Verify todo exists and belongs to this task
-    const todoResult = await db.execute(
-      "SELECT * FROM task_todos WHERE id = ? AND task_id = ?",
-      [todoId, taskId]
-    );
+    const todoResult = await db.execute("SELECT * FROM task_todos WHERE id = ? AND task_id = ?", [
+      todoId,
+      taskId,
+    ]);
 
     if (todoResult.rows.length === 0) {
       return NextResponse.json({ error: "Todo not found" }, { status: 404 });

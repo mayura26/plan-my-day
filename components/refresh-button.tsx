@@ -26,7 +26,7 @@ export function RefreshButton({
     e.preventDefault(); // Prevent form submission
     e.stopPropagation(); // Prevent event bubbling to parent elements
     if (isRefreshing) return;
-    
+
     setIsRefreshing(true);
     try {
       await onRefresh();
@@ -49,12 +49,8 @@ export function RefreshButton({
       aria-label={ariaLabel}
     >
       <RotateCw
-        className={cn(
-          "h-4 w-4 transition-transform duration-300",
-          isRefreshing && "animate-spin"
-        )}
+        className={cn("h-4 w-4 transition-transform duration-300", isRefreshing && "animate-spin")}
       />
     </Button>
   );
 }
-

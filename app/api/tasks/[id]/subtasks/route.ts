@@ -128,7 +128,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       if (totalDurationWithNew > parentTask.duration) {
         // Check if extend_parent_duration flag is set
         const extendParentDuration = (body as any).extend_parent_duration === true;
-        
+
         if (extendParentDuration) {
           // Update parent task duration
           const newParentDuration = totalDurationWithNew;

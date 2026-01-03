@@ -88,7 +88,7 @@ export function SubtaskManager({
   // Calculate duration metrics
   const calculateDurationMetrics = (includeNewSubtask: boolean = false) => {
     const totalUsed = subtasks.reduce((sum, st) => sum + (st.duration || 0), 0);
-    const newSubtaskDuration = includeNewSubtask ? (formData.duration || 0) : 0;
+    const newSubtaskDuration = includeNewSubtask ? formData.duration || 0 : 0;
     const totalUsedWithNew = totalUsed + newSubtaskDuration;
     const remaining = parentTaskDuration !== null ? parentTaskDuration - totalUsedWithNew : null;
     return {
@@ -121,7 +121,9 @@ export function SubtaskManager({
         });
 
         if (!confirmed) {
-          toast.error("Subtask not added. Please reduce the subtask duration or extend the parent task duration.");
+          toast.error(
+            "Subtask not added. Please reduce the subtask duration or extend the parent task duration."
+          );
           return;
         }
 
@@ -248,7 +250,8 @@ export function SubtaskManager({
             <Clock className="h-3 w-3" />
             <span>
               Used: {formatDuration(durationMetrics.used)}
-              {durationMetrics.total !== null && ` / Total: ${formatDuration(durationMetrics.total)}`}
+              {durationMetrics.total !== null &&
+                ` / Total: ${formatDuration(durationMetrics.total)}`}
             </span>
           </div>
           {durationMetrics.remaining !== null && (
@@ -256,7 +259,8 @@ export function SubtaskManager({
               className={
                 durationMetrics.remaining < 0
                   ? "text-destructive font-medium"
-                  : durationMetrics.remaining < durationMetrics.total! * 0.1
+                  : durationMetrics.total !== null &&
+                      durationMetrics.remaining < durationMetrics.total * 0.1
                     ? "text-yellow-600 font-medium"
                     : "text-muted-foreground"
               }

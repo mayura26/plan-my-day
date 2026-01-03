@@ -112,7 +112,13 @@ function MetricSection({
   );
 }
 
-export function TaskMetrics({ tasks, onTaskClick, onProcessOverdue, onRefresh, className }: TaskMetricsProps) {
+export function TaskMetrics({
+  tasks,
+  onTaskClick,
+  onProcessOverdue,
+  onRefresh,
+  className,
+}: TaskMetricsProps) {
   const [expandedSections, setExpandedSections] = useState<Set<MetricType>>(new Set());
 
   const overdueTasks = getOverdueTasks(tasks);

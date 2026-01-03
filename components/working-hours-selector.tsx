@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronDown, ChevronRight, Clock } from "lucide-react";
+import { ChevronDown, ChevronRight } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -134,9 +134,7 @@ export function WorkingHoursSelector() {
                         onCheckedChange={(checked) => {
                           setWorkingHours((prev) => ({
                             ...prev,
-                            [day.key]: checked
-                              ? { start: startHour, end: endHour }
-                              : null,
+                            [day.key]: checked ? { start: startHour, end: endHour } : null,
                           }));
                         }}
                       />
@@ -206,10 +204,7 @@ export function WorkingHoursSelector() {
                               }));
                             }}
                           >
-                            <SelectTrigger
-                              id={`end-${day.key}`}
-                              className="h-8 min-w-[5rem] px-3"
-                            >
+                            <SelectTrigger id={`end-${day.key}`} className="h-8 min-w-[5rem] px-3">
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
@@ -244,4 +239,3 @@ export function WorkingHoursSelector() {
     </div>
   );
 }
-

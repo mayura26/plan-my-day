@@ -1,6 +1,6 @@
 "use client";
 
-import { Bell, Clock, Key, RefreshCw, Briefcase } from "lucide-react";
+import { Bell, Briefcase, Clock, Key, RefreshCw } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { useEffect } from "react";
@@ -9,9 +9,9 @@ import { ForceUpdateButton } from "@/components/force-update-button";
 import { PushNotificationManager } from "@/components/push-notification-manager";
 import { PushSubscriptionList } from "@/components/push-subscription-list";
 import { TimezoneSelector } from "@/components/timezone-selector";
-import { WorkingHoursSelector } from "@/components/working-hours-selector";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
+import { WorkingHoursSelector } from "@/components/working-hours-selector";
 
 export default function SettingsPage() {
   const { data: session, status } = useSession();
