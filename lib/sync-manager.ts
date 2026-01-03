@@ -56,6 +56,7 @@ export class SyncManager {
         headers: {
           "Content-Type": "application/json",
         },
+        credentials: 'include', // Include cookies for NextAuth session
         body: item.body ? JSON.stringify(item.body) : undefined,
       });
 
