@@ -2,6 +2,7 @@
 
 import { parseISO } from "date-fns";
 import {
+  ArrowLeft,
   Calendar,
   CalendarX,
   CheckCircle2,
@@ -69,6 +70,7 @@ export function TaskDetailDialog({
   const [isMarkingIncomplete, setIsMarkingIncomplete] = useState(false);
   const [isStartingTask, setIsStartingTask] = useState(false);
   const [isMarkingComplete, setIsMarkingComplete] = useState(false);
+  const [isLoadingParent, setIsLoadingParent] = useState(false);
   const [dependencies, setDependencies] = useState<DependencyInfo[]>([]);
   const [blockedBy, setBlockedBy] = useState<Task[]>([]);
   const [isBlocked, setIsBlocked] = useState(false);
@@ -288,6 +290,33 @@ export function TaskDetailDialog({
     }
   };
 
+  const handleNavigateToParent = async () => {
+    if (!task?.parent_task_id) return;
+
+    setIsLoadingParent(true);
+    try {
+      const response = await fetch(`/api/tasks/${task.parent_task_id}`);
+      if (response.ok) {
+        const data = await response.json();
+        const parentTask = data.task;
+        if (parentTask) {
+          // Update the dialog to show the parent task
+          onTaskRefresh?.(parentTask);
+          toast.success(`Navigated to parent task: ${parentTask.title}`);
+        } else {
+          toast.error("Parent task not found");
+        }
+      } else {
+        toast.error("Failed to load parent task");
+      }
+    } catch (error) {
+      console.error("Error fetching parent task:", error);
+      toast.error("Failed to load parent task");
+    } finally {
+      setIsLoadingParent(false);
+    }
+  };
+
   const getStatusColor = (status: Task["status"]) => {
     switch (status) {
       case "completed":
@@ -342,7 +371,22 @@ export function TaskDetailDialog({
     <Dialog open={open} onOpenChange={handleDialogClose}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto w-[95vw] md:w-full mx-2 md:mx-auto">
         <DialogHeader>
-          <DialogTitle className="text-xl sm:text-2xl">{task.title}</DialogTitle>
+          <div className="flex items-center justify-between gap-2 pr-8">
+            <DialogTitle className="text-xl sm:text-2xl flex-1">{task.title}</DialogTitle>
+            {isSubtask && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleNavigateToParent}
+                loading={isLoadingParent}
+                className="flex-shrink-0"
+                title="Go to parent task"
+              >
+                <ArrowLeft className="h-4 w-4 mr-1" />
+                <span className="hidden sm:inline">Parent Task</span>
+              </Button>
+            )}
+          </div>
         </DialogHeader>
 
         <div className="space-y-3 sm:space-y-4">
