@@ -11,9 +11,11 @@ import { cn } from "@/lib/utils";
 interface SlimTaskCardProps {
   task: Task;
   onTaskClick?: (taskId: string) => void;
+  subtasks?: Task[];
+  isSubtask?: boolean;
 }
 
-export function SlimTaskCard({ task, onTaskClick }: SlimTaskCardProps) {
+export function SlimTaskCard({ task, onTaskClick, subtasks, isSubtask = false }: SlimTaskCardProps) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: task.id,
     disabled: task.locked,
@@ -69,8 +71,7 @@ export function SlimTaskCard({ task, onTaskClick }: SlimTaskCardProps) {
     }
   };
 
-  return (
-    // biome-ignore lint/a11y/useSemanticElements: Draggable task requires div for drag-and-drop functionality
+  const taskCardContent = (
     <div
       ref={setNodeRef}
       style={style}
@@ -80,7 +81,8 @@ export function SlimTaskCard({ task, onTaskClick }: SlimTaskCardProps) {
       tabIndex={0}
       className={cn(
         "py-1.5 px-2 rounded border bg-card hover:bg-accent/50 transition-colors cursor-grab active:cursor-grabbing text-xs overflow-hidden",
-        task.locked && "cursor-not-allowed opacity-75"
+        task.locked && "cursor-not-allowed opacity-75",
+        isSubtask && "ml-4 border-l-2 border-l-primary/30 bg-muted/30"
       )}
       onClick={handleClick}
       onKeyDown={(e) => {
@@ -121,4 +123,30 @@ export function SlimTaskCard({ task, onTaskClick }: SlimTaskCardProps) {
       </div>
     </div>
   );
+
+  // If this is a parent task with subtasks, wrap it in a container with nested subtasks
+  if (subtasks && subtasks.length > 0) {
+    return (
+      <div className="space-y-1 border rounded-md border-border bg-card/50 p-1">
+        {/* Parent task card */}
+        <div className="pb-1 border-b border-border/50">
+          {taskCardContent}
+        </div>
+        {/* Nested subtasks */}
+        <div className="space-y-1 pl-2">
+          {subtasks.map((subtask) => (
+            <SlimTaskCard
+              key={subtask.id}
+              task={subtask}
+              onTaskClick={onTaskClick}
+              isSubtask={true}
+            />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  // Regular task card (no subtasks)
+  return taskCardContent;
 }

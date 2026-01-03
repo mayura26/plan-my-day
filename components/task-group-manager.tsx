@@ -200,6 +200,7 @@ interface GroupCardProps {
   indentLevel?: number;
   children?: React.ReactNode;
   isDeleting?: boolean;
+  subtasksMap?: Map<string, Task[]>;
 }
 
 function GroupCard({
@@ -223,6 +224,7 @@ function GroupCard({
   indentLevel = 0,
   children,
   isDeleting = false,
+  subtasksMap = new Map(),
 }: GroupCardProps) {
   const textColor = getContrastColor(groupColor);
 
@@ -397,9 +399,29 @@ function GroupCard({
               <ChevronDown className="h-3.5 w-3.5" />
             </Button>
           </div>
-          {tasks.map((task) => (
-            <SlimTaskCard key={task.id} task={task} onTaskClick={onTaskClick} />
-          ))}
+          {tasks.map((task) => {
+            // Only show parent tasks (not subtasks themselves)
+            if (task.parent_task_id) {
+              return null;
+            }
+            const allSubtasks = subtasksMap.get(task.id) || [];
+            // Filter subtasks based on showAllTasks setting
+            const filteredSubtasks = showAllTasks
+              ? allSubtasks.filter((st) => st.status !== "completed")
+              : allSubtasks.filter(
+                  (st) =>
+                    st.status !== "completed" &&
+                    (!st.scheduled_start || !st.scheduled_end)
+                );
+            return (
+              <SlimTaskCard
+                key={task.id}
+                task={task}
+                onTaskClick={onTaskClick}
+                subtasks={filteredSubtasks.length > 0 ? filteredSubtasks : undefined}
+              />
+            );
+          })}
           {tasks.length === 0 && (
             <p className="text-xs text-muted-foreground py-2 text-center">
               No {showAllTasks ? "tasks" : "unscheduled tasks"}
@@ -434,6 +456,7 @@ export function TaskGroupManager({
   const [deletingGroupId, setDeletingGroupId] = useState<string | null>(null);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const [hiddenGroups, setHiddenGroups] = useState<Set<string>>(new Set());
+  const [subtasksMap, setSubtasksMap] = useState<Map<string, Task[]>>(new Map());
 
   const isFetchingRef = useRef<boolean>(false);
   const hasFetchedRef = useRef<boolean>(false);
@@ -463,6 +486,23 @@ export function TaskGroupManager({
     }
   }, []);
 
+  const fetchSubtasks = useCallback(async (parentTaskId: string) => {
+    try {
+      const response = await fetch(`/api/tasks/${parentTaskId}/subtasks`);
+      if (response.ok) {
+        const data = await response.json();
+        const subtasks = data.subtasks || [];
+        setSubtasksMap((prev) => {
+          const newMap = new Map(prev);
+          newMap.set(parentTaskId, subtasks);
+          return newMap;
+        });
+      }
+    } catch (error) {
+      console.error("Error fetching subtasks:", error);
+    }
+  }, []);
+
   useEffect(() => {
     // Only fetch once on mount
     if (!hasFetchedRef.current) {
@@ -471,6 +511,23 @@ export function TaskGroupManager({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fetchGroups]); // Empty deps - only run once on mount
+
+  // Clear and refetch subtasks when tasks change (e.g., after refresh)
+  // This ensures we get updated subtask data including scheduling status
+  useEffect(() => {
+    // Clear the subtasks map to force refetch with fresh data
+    setSubtasksMap(new Map());
+    
+    // Filter tasks to get parent tasks with subtasks
+    const parentTasksWithSubtasks = tasks.filter(
+      (task) => !task.parent_task_id && (task.subtask_count || 0) > 0
+    );
+    // Fetch subtasks for all parent tasks (will use fresh data)
+    parentTasksWithSubtasks.forEach((task) => {
+      fetchSubtasks(task.id);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tasks.length, tasks.map((t) => t.id).join(',')]);
 
   // Auto-rotate color when create dialog opens
   useEffect(() => {
@@ -709,10 +766,12 @@ export function TaskGroupManager({
       const isUnscheduled = !task.scheduled_start || !task.scheduled_end;
       if (!isUnscheduled) return false;
 
-      // Exclude parent tasks that have subtasks (only show subtasks in unscheduled view)
-      if (!task.parent_task_id && (task.subtask_count || 0) > 0) {
+      // Exclude subtasks themselves (they will be shown nested under their parent)
+      if (task.parent_task_id) {
         return false;
       }
+
+      // Include parent tasks with subtasks (they will be shown with nested subtasks)
 
       if (groupId === null) {
         return !task.group_id;
@@ -725,6 +784,11 @@ export function TaskGroupManager({
     return tasks.filter((task) => {
       // Exclude completed tasks
       if (task.status === "completed") return false;
+
+      // Exclude subtasks themselves (they will be shown nested under their parent)
+      if (task.parent_task_id) {
+        return false;
+      }
 
       if (groupId === null) {
         return !task.group_id;
@@ -799,32 +863,33 @@ export function TaskGroupManager({
     // Regular groups
     return (
       <div key={group.id}>
-        <GroupCard
-          groupName={group.name}
-          groupColor={group.color}
-          taskCount={getTaskCountForGroup(group.id)}
-          childGroupCount={childGroupCount}
-          tasks={getTasksForGroup(group.id)}
-          isExpanded={isExpanded}
-          isHidden={hiddenGroups.has(group.id)}
-          isOtherSelected={selectedGroupId !== null && selectedGroupId !== group.id}
-          showAllTasks={showAllTasks}
-          onToggleExpand={() => toggleGroupExpansion(group.id)}
-          onToggleVisibility={() => toggleGroupVisibility(group.id)}
-          onSelect={() => {
-            if (selectedGroupId === group.id) {
-              onGroupSelect?.(null);
-            } else {
-              onGroupSelect?.(group.id);
-            }
-          }}
-          onTaskClick={onTaskClick}
-          onEdit={() => handleEditGroup(group)}
-          onDelete={() => deleteGroup(group.id)}
-          isParent={isParentGroup}
-          indentLevel={level}
-          isDeleting={deletingGroupId === group.id}
-        />
+          <GroupCard
+            groupName={group.name}
+            groupColor={group.color}
+            taskCount={getTaskCountForGroup(group.id)}
+            childGroupCount={childGroupCount}
+            tasks={getTasksForGroup(group.id)}
+            isExpanded={isExpanded}
+            isHidden={hiddenGroups.has(group.id)}
+            isOtherSelected={selectedGroupId !== null && selectedGroupId !== group.id}
+            showAllTasks={showAllTasks}
+            onToggleExpand={() => toggleGroupExpansion(group.id)}
+            onToggleVisibility={() => toggleGroupVisibility(group.id)}
+            onSelect={() => {
+              if (selectedGroupId === group.id) {
+                onGroupSelect?.(null);
+              } else {
+                onGroupSelect?.(group.id);
+              }
+            }}
+            onTaskClick={onTaskClick}
+            onEdit={() => handleEditGroup(group)}
+            onDelete={() => deleteGroup(group.id)}
+            isParent={isParentGroup}
+            indentLevel={level}
+            isDeleting={deletingGroupId === group.id}
+            subtasksMap={subtasksMap}
+          />
       </div>
     );
   };
@@ -1020,6 +1085,7 @@ export function TaskGroupManager({
             onTaskClick={onTaskClick}
             isUngrouped
             isDeleting={false}
+            subtasksMap={subtasksMap}
           />
         )}
       </div>

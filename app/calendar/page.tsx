@@ -89,6 +89,7 @@ export default function CalendarPage() {
     return 380;
   });
   const [isResizing, setIsResizing] = useState(false);
+  const [subtasksMap, setSubtasksMap] = useState<Map<string, Task[]>>(new Map());
   const fetchedGroupsUserIdRef = useRef<string | null>(null);
   const isFetchingGroupsRef = useRef<boolean>(false);
   const hasFetchedInitialDataRef = useRef<boolean>(false);
@@ -111,6 +112,8 @@ export default function CalendarPage() {
       if (response.ok) {
         const data = await response.json();
         setTasks(data.tasks || []);
+        // Clear subtasks map when tasks are refreshed to ensure fresh data
+        setSubtasksMap(new Map());
       } else {
         console.error("Failed to fetch tasks");
       }
@@ -141,6 +144,27 @@ export default function CalendarPage() {
       console.error("Error fetching task groups:", error);
     } finally {
       isFetchingGroupsRef.current = false;
+    }
+  }, []);
+
+  const fetchSubtasks = useCallback(async (parentTaskId: string) => {
+    try {
+      const response = await fetch(`/api/tasks/${parentTaskId}/subtasks`);
+      if (response.ok) {
+        const data = await response.json();
+        const subtasks = data.subtasks || [];
+        setSubtasksMap((prev) => {
+          // Only update if we don't already have this data
+          if (prev.has(parentTaskId)) {
+            return prev;
+          }
+          const newMap = new Map(prev);
+          newMap.set(parentTaskId, subtasks);
+          return newMap;
+        });
+      }
+    } catch (error) {
+      console.error("Error fetching subtasks:", error);
     }
   }, []);
 
@@ -540,13 +564,28 @@ export default function CalendarPage() {
     // Only show pending tasks
     if (task.status !== "pending") return false;
 
-    // Exclude parent tasks that have subtasks (only show subtasks in unscheduled view)
-    if (!task.parent_task_id && (task.subtask_count || 0) > 0) {
+    // Include parent tasks with subtasks (they will be shown with nested subtasks)
+    // Exclude subtasks themselves (they will be shown nested under their parent)
+    if (task.parent_task_id) {
       return false;
     }
 
     return true;
   });
+
+  // Fetch subtasks for parent tasks that have them
+  useEffect(() => {
+    const parentTasksWithSubtasks = unscheduledTasks.filter(
+      (task) => (task.subtask_count || 0) > 0
+    );
+    parentTasksWithSubtasks.forEach((task) => {
+      // Only fetch if we don't already have subtasks for this task
+      if (!subtasksMap.has(task.id)) {
+        fetchSubtasks(task.id);
+      }
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [unscheduledTasks]);
 
   // For display in calendar - only show scheduled tasks
   const calendarTasks = scheduledTasks;
@@ -1138,9 +1177,23 @@ export default function CalendarPage() {
                 {expandedSections.has("unscheduled-tasks") && (
                   <CardContent className="px-2 pb-2 pt-0">
                     <div className="max-h-[400px] overflow-y-auto space-y-1 pr-1">
-                      {sortTasksByCreatedTimeDesc(unscheduledTasks).map((task) => (
-                        <SlimTaskCard key={task.id} task={task} onTaskClick={handleTaskClick} />
-                      ))}
+                      {sortTasksByCreatedTimeDesc(unscheduledTasks).map((task) => {
+                        const allSubtasks = subtasksMap.get(task.id) || [];
+                        // Filter to only show unscheduled subtasks (matching the unscheduled filter)
+                        const filteredSubtasks = allSubtasks.filter(
+                          (st) =>
+                            st.status === "pending" &&
+                            (!st.scheduled_start || !st.scheduled_end)
+                        );
+                        return (
+                          <SlimTaskCard
+                            key={task.id}
+                            task={task}
+                            onTaskClick={handleTaskClick}
+                            subtasks={filteredSubtasks.length > 0 ? filteredSubtasks : undefined}
+                          />
+                        );
+                      })}
                     </div>
                   </CardContent>
                 )}
