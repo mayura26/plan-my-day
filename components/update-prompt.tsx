@@ -237,7 +237,11 @@ export function UpdatePrompt() {
     setIsUpdating(true);
     try {
       const registration = await navigator.serviceWorker.getRegistration();
-      if (!registration) return;
+      if (!registration) {
+        // No service worker registered, just reload to get new version
+        window.location.reload();
+        return;
+      }
 
       const waitingWorker = registration.waiting;
       if (waitingWorker) {
@@ -246,10 +250,47 @@ export function UpdatePrompt() {
         // Tell the waiting service worker to skip waiting
         waitingWorker.postMessage({ type: "SKIP_WAITING" });
         setShowPrompt(false);
+      } else {
+        // No waiting worker, but update is available (detected via version check)
+        // Trigger a service worker update check
+        await registration.update();
+
+        // Wait for the update to be detected (check every 200ms for up to 2 seconds)
+        let attempts = 0;
+        const maxAttempts = 10; // 10 attempts * 200ms = 2 seconds
+        const checkInterval = 200;
+
+        const waitForWaitingWorker = async (): Promise<ServiceWorker | null> => {
+          while (attempts < maxAttempts) {
+            await new Promise((resolve) => setTimeout(resolve, checkInterval));
+            attempts++;
+
+            const updatedRegistration = await navigator.serviceWorker.getRegistration();
+            if (updatedRegistration?.waiting) {
+              return updatedRegistration.waiting;
+            }
+          }
+          return null;
+        };
+
+        const newWaitingWorker = await waitForWaitingWorker();
+
+        if (newWaitingWorker) {
+          // A waiting worker appeared, send SKIP_WAITING
+          userRequestedReload = true;
+          newWaitingWorker.postMessage({ type: "SKIP_WAITING" });
+          setShowPrompt(false);
+        } else {
+          // No waiting worker appeared after update check, reload to get new version
+          userRequestedReload = true;
+          window.location.reload();
+        }
       }
     } catch (error) {
       console.error("Error updating:", error);
       userRequestedReload = false;
+      // On error, try to reload anyway to get the new version
+      window.location.reload();
     } finally {
       setIsUpdating(false);
     }
