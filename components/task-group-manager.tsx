@@ -1,6 +1,8 @@
 "use client";
 
 import {
+  AlertCircle,
+  AlertTriangle,
   ChevronDown,
   ChevronRight,
   ChevronsDown,
@@ -227,6 +229,12 @@ function GroupCard({
   subtasksMap = new Map(),
 }: GroupCardProps) {
   const textColor = getContrastColor(groupColor);
+  
+  // Calculate critical task counts
+  const p1Count = tasks.filter((task) => task.priority === 1).length;
+  const p2Count = tasks.filter((task) => task.priority === 2).length;
+  const criticalCount = p1Count + p2Count;
+  const hasP1Tasks = p1Count > 0;
 
   // For parent groups, render as wireframe container
   if (isParent) {
@@ -313,13 +321,39 @@ function GroupCard({
               {groupName}
             </span>
           </div>
-          <Badge
-            variant="secondary"
-            className="text-[10px] px-1.5 py-0 h-4 min-w-[1.25rem] bg-white/20 text-inherit border-0"
-            style={{ color: textColor }}
-          >
-            {taskCount}
-          </Badge>
+          <div className="flex items-center gap-1">
+            {criticalCount > 0 && (
+              <span
+                title={
+                  hasP1Tasks
+                    ? `Contains ${p1Count} critical task${p1Count !== 1 ? "s" : ""} (Priority 1)`
+                    : `Contains ${p2Count} high priority task${p2Count !== 1 ? "s" : ""} (Priority 2)`
+                }
+              >
+                {hasP1Tasks ? (
+                  <AlertCircle 
+                    className="h-3.5 w-3.5 stroke-[2.5]" 
+                    style={{ color: textColor }}
+                  />
+                ) : (
+                  <AlertTriangle 
+                    className="h-3.5 w-3.5 stroke-[2.5]" 
+                    style={{ color: textColor }}
+                  />
+                )}
+              </span>
+            )}
+            <Badge
+              variant="secondary"
+              className="text-[10px] px-1.5 py-0 h-4 min-w-[1.25rem] bg-white/20 text-inherit border"
+              style={{ 
+                color: textColor,
+                borderColor: textColor === "#ffffff" ? "rgba(255, 255, 255, 0.3)" : "rgba(0, 0, 0, 0.3)"
+              }}
+            >
+              {taskCount}
+            </Badge>
+          </div>
         </div>
       </button>
 
