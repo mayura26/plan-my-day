@@ -2,6 +2,8 @@
 
 import { useDraggable } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
+import { parseISO } from "date-fns";
+import { useEffect, useState } from "react";
 import { Flag, GripVertical, Zap } from "lucide-react";
 import { getEnergyLevelColor, isTaskOverdue, isTaskTimeExpired } from "@/lib/task-utils";
 import { formatDateShort } from "@/lib/timezone-utils";
@@ -26,6 +28,29 @@ export const getPriorityBarColor = (priority: number) => {
   }
 };
 
+// Helper function to calculate task duration in minutes
+function calculateTaskDuration(task: Task): number | null {
+  // First check if task.duration exists
+  if (task.duration !== null && task.duration !== undefined) {
+    return task.duration;
+  }
+  
+  // Otherwise, calculate from scheduled times
+  if (task.scheduled_start && task.scheduled_end) {
+    try {
+      const start = parseISO(task.scheduled_start);
+      const end = parseISO(task.scheduled_end);
+      const diffMs = end.getTime() - start.getTime();
+      return Math.round(diffMs / 60000); // Convert to minutes
+    } catch (error) {
+      console.error("Error calculating task duration:", error);
+      return null;
+    }
+  }
+  
+  return null;
+}
+
 interface ResizableTaskProps {
   task: Task;
   position: { top: string; height: string };
@@ -47,6 +72,8 @@ export function ResizableTask({
   groups = [],
   timezone = "UTC",
 }: ResizableTaskProps) {
+  const [parentTaskName, setParentTaskName] = useState<string | null>(null);
+  
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: task.id,
     disabled: task.locked,
@@ -119,6 +146,36 @@ export function ResizableTask({
 
   // Check if task is very short (15 minutes or less)
   const isShortTask = task.duration && task.duration <= 15;
+  
+  // Calculate task duration
+  const taskDuration = calculateTaskDuration(task);
+  
+  // Fetch parent task name if this is a scheduled subtask
+  useEffect(() => {
+    if (task.parent_task_id && task.scheduled_start && task.scheduled_end) {
+      // Only fetch if duration > 30 minutes
+      if (taskDuration !== null && taskDuration > 30) {
+        fetch(`/api/tasks/${task.parent_task_id}`)
+          .then((response) => {
+            if (response.ok) {
+              return response.json();
+            }
+            throw new Error("Failed to fetch parent task");
+          })
+          .then((data) => {
+            setParentTaskName(data.task?.title || null);
+          })
+          .catch((error) => {
+            console.error("Error fetching parent task:", error);
+            setParentTaskName(null);
+          });
+      } else {
+        setParentTaskName(null);
+      }
+    } else {
+      setParentTaskName(null);
+    }
+  }, [task.parent_task_id, task.scheduled_start, task.scheduled_end, taskDuration]);
 
   // Convert hex color to rgba for background
   const hexToRgba = (hex: string, alpha: number) => {
@@ -250,6 +307,17 @@ export function ResizableTask({
             </div>
           );
         })()}
+      {/* Parent task name - only show if duration > 30 minutes */}
+      {parentTaskName && taskDuration !== null && taskDuration > 30 && (
+        <div
+          className={cn(
+            "text-white/80 truncate pointer-events-none",
+            isShortTask ? "text-[8px] md:text-[9px] mb-0.5" : "text-[9px] md:text-[10px] mb-0.5"
+          )}
+        >
+          {parentTaskName}
+        </div>
+      )}
       <div
         className={cn(
           "font-medium text-white truncate pointer-events-none",

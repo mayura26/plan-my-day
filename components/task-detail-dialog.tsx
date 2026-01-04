@@ -86,6 +86,7 @@ export function TaskDetailDialog({
     completed: 0,
     total: 0,
   });
+  const [parentTaskName, setParentTaskName] = useState<string | null>(null);
   const { timezone } = useUserTimezone();
 
   const fetchDependencies = useCallback(async (taskId: string) => {
@@ -132,6 +133,19 @@ export function TaskDetailDialog({
     }
   }, []);
 
+  const fetchParentTaskName = useCallback(async (parentTaskId: string) => {
+    try {
+      const response = await fetch(`/api/tasks/${parentTaskId}`);
+      if (response.ok) {
+        const data = await response.json();
+        setParentTaskName(data.task?.title || null);
+      }
+    } catch (error) {
+      console.error("Error fetching parent task:", error);
+      setParentTaskName(null);
+    }
+  }, []);
+
   // Track when dialog opens to fetch dependencies only once
   const openedTaskIdRef = useRef<string | null>(null);
   useEffect(() => {
@@ -146,6 +160,12 @@ export function TaskDetailDialog({
         }
         // Fetch notes count for all tasks
         fetchNotesCount(task.id);
+        // Fetch parent task name if this is a subtask
+        if (task.parent_task_id) {
+          fetchParentTaskName(task.parent_task_id);
+        } else {
+          setParentTaskName(null);
+        }
         // Reset change tracking when dialog opens
         setHasChanges(false);
       }
@@ -153,6 +173,7 @@ export function TaskDetailDialog({
     // Reset ref when dialog closes
     if (!open) {
       openedTaskIdRef.current = null;
+      setParentTaskName(null);
     }
   }, [
     open,
@@ -160,6 +181,7 @@ export function TaskDetailDialog({
     fetchDependencies,
     fetchSubtasksCount,
     fetchNotesCount,
+    fetchParentTaskName,
     task?.task_type,
     task?.parent_task_id,
   ]);
@@ -402,7 +424,12 @@ export function TaskDetailDialog({
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto w-[95vw] md:w-full mx-2 md:mx-auto">
         <DialogHeader>
           <div className="flex items-center justify-between gap-2 pr-8">
-            <DialogTitle className="text-xl sm:text-2xl flex-1">{task.title}</DialogTitle>
+            <div className="flex-1">
+              <DialogTitle className="text-xl sm:text-2xl">{task.title}</DialogTitle>
+              {isSubtask && parentTaskName && (
+                <p className="text-sm text-muted-foreground mt-1">{parentTaskName}</p>
+              )}
+            </div>
             {isSubtask && (
               <Button
                 size="sm"
