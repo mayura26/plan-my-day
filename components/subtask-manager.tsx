@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/select";
 import { ENERGY_LABELS, formatDuration, PRIORITY_LABELS } from "@/lib/task-utils";
 import type { Task } from "@/lib/types";
+import { cn } from "@/lib/utils";
 
 interface SubtaskManagerProps {
   parentTaskId: string;
@@ -47,6 +48,9 @@ export function SubtaskManager({
   const [showAddForm, setShowAddForm] = useState(false);
   const [togglingSubtaskId, setTogglingSubtaskId] = useState<string | null>(null);
   const [deletingSubtaskId, setDeletingSubtaskId] = useState<string | null>(null);
+  const [editingDurationId, setEditingDurationId] = useState<string | null>(null);
+  const [editingDurationValue, setEditingDurationValue] = useState<string>("");
+  const [isUpdatingDuration, setIsUpdatingDuration] = useState(false);
   const [formData, setFormData] = useState<SubtaskFormData>({
     title: "",
     duration: undefined,
@@ -236,6 +240,128 @@ export function SubtaskManager({
     }
   };
 
+  const handleStartEditingDuration = (subtask: Task) => {
+    if (readOnly) return;
+    setEditingDurationId(subtask.id);
+    setEditingDurationValue(subtask.duration?.toString() || "");
+  };
+
+  const handleCancelEditingDuration = () => {
+    setEditingDurationId(null);
+    setEditingDurationValue("");
+  };
+
+  const handleSaveDuration = async (subtaskId: string) => {
+    // Guard: Only save if we're still editing this subtask
+    if (editingDurationId !== subtaskId) {
+      return;
+    }
+
+    if (!editingDurationValue.trim()) {
+      // If empty, set to undefined/null to remove duration
+      const newDuration = undefined;
+      return handleUpdateDuration(subtaskId, newDuration);
+    }
+
+    const newDuration = parseInt(editingDurationValue, 10);
+    if (isNaN(newDuration) || newDuration < 0) {
+      toast.error("Please enter a valid duration");
+      return;
+    }
+
+    return handleUpdateDuration(subtaskId, newDuration);
+  };
+
+  const handleUpdateDuration = async (subtaskId: string, newDuration: number | undefined) => {
+    // Find the subtask being edited
+    const subtask = subtasks.find((st) => st.id === subtaskId);
+    if (!subtask) return;
+
+    const oldDuration = subtask.duration || 0;
+    const durationDiff = (newDuration || 0) - oldDuration;
+
+    // Check if changing this subtask's duration would exceed parent duration
+    if (parentTaskDuration !== null && newDuration !== undefined) {
+      const totalUsed = subtasks.reduce((sum, st) => {
+        if (st.id === subtaskId) {
+          return sum; // Exclude current subtask from calculation
+        }
+        return sum + (st.duration || 0);
+      }, 0);
+      const totalWithNew = totalUsed + newDuration;
+
+      if (totalWithNew > parentTaskDuration) {
+        // Calculate new parent duration needed
+        const newParentDuration = totalWithNew;
+        const confirmed = await confirm({
+          title: "Extend Parent Task Duration?",
+          description: `Changing this subtask duration would exceed the parent task duration by ${formatDuration(
+            totalWithNew - parentTaskDuration
+          )}. Would you like to extend the parent task duration from ${formatDuration(
+            parentTaskDuration
+          )} to ${formatDuration(newParentDuration)}?`,
+          variant: "default",
+          confirmText: "Extend & Update",
+          cancelText: "Cancel",
+        });
+
+        if (!confirmed) {
+          handleCancelEditingDuration();
+          return;
+        }
+
+        // Update parent task duration
+        try {
+          const updateResponse = await fetch(`/api/tasks/${parentTaskId}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ duration: newParentDuration }),
+          });
+
+          if (!updateResponse.ok) {
+            toast.error("Failed to update parent task duration");
+            handleCancelEditingDuration();
+            return;
+          }
+
+          // Update local state
+          setParentTaskDuration(newParentDuration);
+        } catch (error) {
+          console.error("Error updating parent task duration:", error);
+          toast.error("Failed to update parent task duration");
+          handleCancelEditingDuration();
+          return;
+        }
+      }
+    }
+
+    setIsUpdatingDuration(true);
+    try {
+      const response = await fetch(`/api/tasks/${subtaskId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ duration: newDuration }),
+      });
+
+      if (response.ok) {
+        await fetchSubtasks();
+        await fetchParentTask(); // Refresh parent task duration
+        onSubtaskChange?.();
+        setEditingDurationId(null);
+        setEditingDurationValue("");
+        toast.success("Subtask duration updated successfully");
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        toast.error(errorData.error || "Failed to update subtask duration");
+      }
+    } catch (error) {
+      console.error("Error updating subtask duration:", error);
+      toast.error("Failed to update subtask duration");
+    } finally {
+      setIsUpdatingDuration(false);
+    }
+  };
+
   const completedCount = subtasks.filter((st) => st.status === "completed").length;
   const totalCount = subtasks.length;
   const progressPercentage = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
@@ -341,11 +467,52 @@ export function SubtaskManager({
                 >
                   {subtask.title}
                 </span>
-                {subtask.duration && (
-                  <span className="text-xs text-muted-foreground flex items-center gap-1">
+                {editingDurationId === subtask.id ? (
+                  <div className="flex items-center gap-1">
+                    <Input
+                      type="number"
+                      value={editingDurationValue}
+                      onChange={(e) => setEditingDurationValue(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          handleSaveDuration(subtask.id);
+                        } else if (e.key === "Escape") {
+                          handleCancelEditingDuration();
+                        }
+                      }}
+                      onBlur={() => handleSaveDuration(subtask.id)}
+                      placeholder="mins"
+                      min="0"
+                      className="h-7 w-16 text-xs px-2"
+                      autoFocus
+                      disabled={isUpdatingDuration}
+                    />
+                    {isUpdatingDuration && (
+                      <LoadingSpinner size="sm" className="h-3 w-3" />
+                    )}
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => !readOnly && handleStartEditingDuration(subtask)}
+                    disabled={readOnly}
+                    className={cn(
+                      "text-xs flex items-center gap-1 transition-colors",
+                      subtask.duration
+                        ? "text-muted-foreground hover:text-foreground"
+                        : "text-muted-foreground/60 hover:text-muted-foreground",
+                      readOnly && "cursor-default hover:text-muted-foreground"
+                    )}
+                    title={readOnly ? undefined : "Click to edit duration"}
+                  >
                     <Clock className="h-3 w-3" />
-                    {formatDuration(subtask.duration)}
-                  </span>
+                    {subtask.duration ? (
+                      formatDuration(subtask.duration)
+                    ) : (
+                      <span className="italic">—</span>
+                    )}
+                  </button>
                 )}
                 {!readOnly && (
                   <button
@@ -370,19 +537,20 @@ export function SubtaskManager({
         {!readOnly &&
           (showAddForm ? (
             <form onSubmit={handleAddSubtask} className="space-y-3 pt-2 border-t">
-              <div>
+              <div className="space-y-1.5">
                 <Input
                   placeholder="Subtask title..."
                   value={formData.title}
                   onChange={(e) => setFormData({ ...formData, title: e.target.value })}
                   autoFocus
+                  className="h-10"
                 />
               </div>
               <div className="grid grid-cols-3 gap-2">
-                <div>
-                  <Label className="text-xs text-muted-foreground flex items-center gap-1">
-                    <Clock className="h-3 w-3" />
-                    Time
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground h-4 flex items-center gap-1 leading-none">
+                    <Clock className="h-3 w-3 shrink-0" />
+                    <span>Time</span>
                   </Label>
                   <Input
                     type="number"
@@ -395,16 +563,18 @@ export function SubtaskManager({
                         duration: e.target.value ? parseInt(e.target.value, 10) : undefined,
                       })
                     }
-                    className="h-8 text-sm"
+                    className="h-10 text-sm"
                   />
                 </div>
-                <div>
-                  <Label className="text-xs text-muted-foreground">Priority</Label>
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground h-4 flex items-center leading-none">
+                    <span>Priority</span>
+                  </Label>
                   <Select
                     value={formData.priority.toString()}
                     onValueChange={(v) => setFormData({ ...formData, priority: parseInt(v, 10) })}
                   >
-                    <SelectTrigger className="h-8 text-sm">
+                    <SelectTrigger className="h-10 text-sm">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -416,10 +586,10 @@ export function SubtaskManager({
                     </SelectContent>
                   </Select>
                 </div>
-                <div>
-                  <Label className="text-xs text-muted-foreground flex items-center gap-1">
-                    <Zap className="h-3 w-3" />
-                    Energy
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground h-4 flex items-center gap-1 leading-none">
+                    <Zap className="h-3 w-3 shrink-0" />
+                    <span>Energy</span>
                   </Label>
                   <Select
                     value={formData.energy_level_required.toString()}
@@ -427,7 +597,7 @@ export function SubtaskManager({
                       setFormData({ ...formData, energy_level_required: parseInt(v, 10) })
                     }
                   >
-                    <SelectTrigger className="h-8 text-sm">
+                    <SelectTrigger className="h-10 text-sm">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
