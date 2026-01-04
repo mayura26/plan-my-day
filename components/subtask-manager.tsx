@@ -264,7 +264,7 @@ export function SubtaskManager({
     }
 
     const newDuration = parseInt(editingDurationValue, 10);
-    if (isNaN(newDuration) || newDuration < 0) {
+    if (Number.isNaN(newDuration) || newDuration < 0) {
       toast.error("Please enter a valid duration");
       return;
     }
@@ -276,9 +276,6 @@ export function SubtaskManager({
     // Find the subtask being edited
     const subtask = subtasks.find((st) => st.id === subtaskId);
     if (!subtask) return;
-
-    const oldDuration = subtask.duration || 0;
-    const durationDiff = (newDuration || 0) - oldDuration;
 
     // Check if changing this subtask's duration would exceed parent duration
     if (parentTaskDuration !== null && newDuration !== undefined) {
@@ -488,9 +485,7 @@ export function SubtaskManager({
                       autoFocus
                       disabled={isUpdatingDuration}
                     />
-                    {isUpdatingDuration && (
-                      <LoadingSpinner size="sm" className="h-3 w-3" />
-                    )}
+                    {isUpdatingDuration && <LoadingSpinner size="sm" className="h-3 w-3" />}
                   </div>
                 ) : (
                   <button

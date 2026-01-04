@@ -59,7 +59,9 @@ export function findNearestAvailableSlot(
     .sort((a, b) => a.start.getTime() - b.start.getTime()); // Sort by start time for easier debugging
 
   // Helper: Get what day/time a UTC timestamp represents in the user's timezone
-  const getTimeInTimezone = (utcDate: Date): {
+  const getTimeInTimezone = (
+    utcDate: Date
+  ): {
     year: number;
     month: number;
     day: number;
@@ -110,27 +112,10 @@ export function findNearestAvailableSlot(
     return null;
   };
 
-  // Helper: Check if a UTC time falls within working hours in the user's timezone
-  const isWithinWorkingHours = (utcDate: Date): boolean => {
-    const tzTime = getTimeInTimezone(utcDate);
-    const dayHours = getWorkingHoursForDay(tzTime.dayOfWeek);
-    if (!dayHours) {
-      return false;
-    }
-    const hour = tzTime.hour;
-    const minute = tzTime.minute;
-    const timeInMinutes = hour * 60 + minute;
-    const startInMinutes = dayHours.start * 60;
-    const endInMinutes = dayHours.end * 60;
-    return timeInMinutes >= startInMinutes && timeInMinutes < endInMinutes;
-  };
-
   // Start searching from startFrom (UTC), but not before now
   // Round to next 15-minute interval in UTC
   let currentTimeUTC = new Date(Math.max(startFrom.getTime(), nowUTC.getTime()));
   const currentMinutes = currentTimeUTC.getUTCMinutes();
-  const currentSeconds = currentTimeUTC.getUTCSeconds();
-  const currentMs = currentTimeUTC.getUTCMilliseconds();
   // Round up to next 15-minute mark
   const roundedMinutes = Math.ceil(currentMinutes / 15) * 15;
   if (roundedMinutes >= 60) {
@@ -140,10 +125,8 @@ export function findNearestAvailableSlot(
   }
 
   // Search slot by slot (in 15-minute intervals in UTC)
-  const intervalMs = 15 * 60 * 1000; // 15 minutes in milliseconds
-
   while (currentTimeUTC < maxSearchTime) {
-    let slotStartUTC = new Date(currentTimeUTC);
+    const slotStartUTC = new Date(currentTimeUTC);
     const slotEndUTC = new Date(slotStartUTC.getTime() + durationMs);
 
     // Get what day/time this slot represents in user's timezone
@@ -154,7 +137,7 @@ export function findNearestAvailableSlot(
     if (!dayHours) {
       // Move to start of next day - find when the next day starts in user's timezone
       // Add 24 hours and search for the next midnight in timezone
-      let nextDay = new Date(slotStartUTC);
+      const nextDay = new Date(slotStartUTC);
       nextDay.setUTCDate(nextDay.getUTCDate() + 1);
       // Search around this time for midnight in the timezone
       for (let offsetHours = -12; offsetHours <= 12; offsetHours++) {
@@ -183,13 +166,14 @@ export function findNearestAvailableSlot(
     const slotTimeInMinutes = slotTzTime.hour * 60 + slotTzTime.minute;
     const startInMinutes = dayHours.start * 60;
     const endInMinutes = dayHours.end * 60;
-    const isInWorkingHours = slotTimeInMinutes >= startInMinutes && slotTimeInMinutes < endInMinutes;
+    const isInWorkingHours =
+      slotTimeInMinutes >= startInMinutes && slotTimeInMinutes < endInMinutes;
 
     if (!isInWorkingHours) {
       // Not in working hours - only allow if it's today and before 11 PM
       if (!isToday || slotTimeInMinutes >= 23 * 60) {
         // Move to next day
-        let nextDay = new Date(slotStartUTC);
+        const nextDay = new Date(slotStartUTC);
         nextDay.setUTCDate(nextDay.getUTCDate() + 1);
         // Find start of next day in timezone
         for (let offsetHours = -12; offsetHours <= 12; offsetHours++) {
@@ -197,7 +181,11 @@ export function findNearestAvailableSlot(
           const candidateTz = getTimeInTimezone(candidate);
           if (candidateTz.hour === dayHours.start && candidateTz.minute === 0) {
             currentTimeUTC = candidate;
-            currentTimeUTC.setUTCMinutes(Math.floor(currentTimeUTC.getUTCMinutes() / 15) * 15, 0, 0);
+            currentTimeUTC.setUTCMinutes(
+              Math.floor(currentTimeUTC.getUTCMinutes() / 15) * 15,
+              0,
+              0
+            );
             break;
           }
         }
@@ -213,7 +201,8 @@ export function findNearestAvailableSlot(
     // Check if slot end is within working hours (or same day if after hours today)
     const slotEndTzTime = getTimeInTimezone(slotEndUTC);
     const slotEndTimeInMinutes = slotEndTzTime.hour * 60 + slotEndTzTime.minute;
-    const endIsInWorkingHours = slotEndTimeInMinutes >= startInMinutes && slotEndTimeInMinutes <= endInMinutes;
+    const endIsInWorkingHours =
+      slotEndTimeInMinutes >= startInMinutes && slotEndTimeInMinutes <= endInMinutes;
     const endIsToday =
       slotEndTzTime.year === nowTzTime.year &&
       slotEndTzTime.month === nowTzTime.month &&
@@ -221,7 +210,7 @@ export function findNearestAvailableSlot(
 
     if (!endIsInWorkingHours && (!endIsToday || slotEndTzTime.hour >= 23)) {
       // Can't fit, move to next day
-      let nextDay = new Date(slotStartUTC);
+      const nextDay = new Date(slotStartUTC);
       nextDay.setUTCDate(nextDay.getUTCDate() + 1);
       // Find start of next day in timezone
       for (let offsetHours = -12; offsetHours <= 12; offsetHours++) {
@@ -246,7 +235,7 @@ export function findNearestAvailableSlot(
     // We need to check if our proposed slot overlaps with any existing scheduled task
     let hasConflict = false;
     let latestConflictEnd: Date | null = null;
-    
+
     for (const scheduledSlot of scheduledSlots) {
       // Check if there's any overlap (all times are UTC)
       // Overlap occurs if:
@@ -258,11 +247,10 @@ export function findNearestAvailableSlot(
       const ourEnd = slotEndUTC.getTime();
       const theirStart = scheduledSlot.start.getTime();
       const theirEnd = scheduledSlot.end.getTime();
-      
+
       // Check for any overlap - using <= and >= to handle edge cases
-      const hasOverlap = 
-        (ourStart < theirEnd && ourEnd > theirStart); // Standard overlap check
-      
+      const hasOverlap = ourStart < theirEnd && ourEnd > theirStart; // Standard overlap check
+
       if (hasOverlap) {
         hasConflict = true;
         // Track the latest conflict end time (to jump past all overlapping conflicts)
@@ -347,7 +335,7 @@ export function scheduleTask(
   } else {
     // Optimal scheduling: respect due date, find best slot within due date window
     startFrom = now;
-    
+
     if (options.maxDaysAhead !== undefined) {
       maxDaysAhead = options.maxDaysAhead;
     } else if (task.due_date) {

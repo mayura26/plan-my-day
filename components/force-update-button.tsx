@@ -37,7 +37,7 @@ async function getCachedVersion(): Promise<string | null> {
     if (versionCache) {
       // Extract version from cache name like "planmyday-v16"
       const match = versionCache.match(/planmyday-v(\d+)/);
-      if (match && match[1]) {
+      if (match?.[1]) {
         return match[1];
       }
     }
@@ -102,13 +102,13 @@ export function ForceUpdateButton() {
       // Get versions for comparison
       const serverVersion = await getServerVersion();
       const cachedVersion = await getCachedVersion();
-      
+
       // Determine if update is available
       // Update is available if:
       // 1. There's a waiting service worker, OR
       // 2. Server version is newer than cached version
       let updateAvailable = !!waitingWorker;
-      
+
       if (!updateAvailable && cachedVersion) {
         // Compare server version with cached version
         if (compareVersions(serverVersion, cachedVersion) > 0) {
@@ -271,7 +271,9 @@ export function ForceUpdateButton() {
       // Get current state to provide feedback
       const serverVersion = await getServerVersion();
       const cachedVersion = await getCachedVersion();
-      const hasUpdate = registration.waiting || (cachedVersion && compareVersions(serverVersion, cachedVersion) > 0);
+      const hasUpdate =
+        registration.waiting ||
+        (cachedVersion && compareVersions(serverVersion, cachedVersion) > 0);
 
       if (hasUpdate) {
         toast.success("Update available! Click 'Force Update' to install.");
@@ -436,7 +438,12 @@ export function ForceUpdateButton() {
               <RefreshCw className={`h-4 w-4 mr-2 ${isUpdating ? "animate-spin" : ""}`} />
               {isUpdating ? "Updating..." : "Force Update"}
             </Button>
-            <Button onClick={checkForUpdates} variant="outline" disabled={isChecking || isUpdating} className="w-full sm:w-auto">
+            <Button
+              onClick={checkForUpdates}
+              variant="outline"
+              disabled={isChecking || isUpdating}
+              className="w-full sm:w-auto"
+            >
               <RefreshCw className={`h-4 w-4 mr-2 ${isChecking ? "animate-spin" : ""}`} />
               {isChecking ? "Checking..." : "Check for Updates"}
             </Button>

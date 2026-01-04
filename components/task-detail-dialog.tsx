@@ -361,9 +361,7 @@ export function TaskDetailDialog({
       toast.success("Task scheduled successfully");
     } catch (error) {
       console.error("Error scheduling task:", error);
-      toast.error(
-        error instanceof Error ? error.message : "Failed to schedule task"
-      );
+      toast.error(error instanceof Error ? error.message : "Failed to schedule task");
     } finally {
       setIsScheduling(false);
     }
@@ -632,7 +630,9 @@ export function TaskDetailDialog({
           </div>
 
           {/* Schedule Information */}
-          {(task.scheduled_start || task.scheduled_end || (task.task_type === "task" && task.duration)) && (
+          {(task.scheduled_start ||
+            task.scheduled_end ||
+            (task.task_type === "task" && task.duration)) && (
             <Card className="py-2">
               <CardContent className="pt-0 pb-0 px-3 sm:px-6">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-0 mb-2 sm:mb-3">
@@ -697,11 +697,16 @@ export function TaskDetailDialog({
                       </span>
                     </div>
                   )}
-                  {!task.scheduled_start && !task.scheduled_end && task.task_type === "task" && task.duration && task.duration > 0 && (
-                    <div className="text-sm text-muted-foreground pt-2">
-                      This task is not yet scheduled. Click "Schedule Now" to automatically schedule it to the next available slot today.
-                    </div>
-                  )}
+                  {!task.scheduled_start &&
+                    !task.scheduled_end &&
+                    task.task_type === "task" &&
+                    task.duration &&
+                    task.duration > 0 && (
+                      <div className="text-sm text-muted-foreground pt-2">
+                        This task is not yet scheduled. Click "Schedule Now" to automatically
+                        schedule it to the next available slot today.
+                      </div>
+                    )}
                 </div>
               </CardContent>
             </Card>

@@ -32,7 +32,7 @@ async function getCachedVersion(): Promise<string | null> {
     if (versionCache) {
       // Extract version from cache name like "planmyday-v16"
       const match = versionCache.match(/planmyday-v(\d+)/);
-      if (match && match[1]) {
+      if (match?.[1]) {
         return match[1];
       }
     }
@@ -78,18 +78,18 @@ export function UpdatePrompt() {
       try {
         const serverVersion = await getServerVersion();
         const cachedVersion = await getCachedVersion();
-        
+
         // If we have a cached version and server version is newer, update is available
         if (cachedVersion && compareVersions(serverVersion, cachedVersion) > 0) {
           return true;
         }
-        
+
         // Also check for waiting service worker
         const registration = await navigator.serviceWorker.getRegistration();
-        if (registration && registration.waiting) {
+        if (registration?.waiting) {
           return true;
         }
-        
+
         return false;
       } catch (error) {
         console.error("Error checking version update:", error);
@@ -218,15 +218,18 @@ export function UpdatePrompt() {
         clearInterval(checkInterval);
       }
       navigator.serviceWorker.removeEventListener("controllerchange", handleControllerChange);
-      
+
       // Clean up updatefound listener
-      navigator.serviceWorker.getRegistration().then((registration) => {
-        if (registration) {
-          registration.removeEventListener("updatefound", handleUpdateFound);
-        }
-      }).catch(() => {
-        // Ignore errors during cleanup
-      });
+      navigator.serviceWorker
+        .getRegistration()
+        .then((registration) => {
+          if (registration) {
+            registration.removeEventListener("updatefound", handleUpdateFound);
+          }
+        })
+        .catch(() => {
+          // Ignore errors during cleanup
+        });
     };
   }, []);
 

@@ -229,7 +229,7 @@ function GroupCard({
   subtasksMap = new Map(),
 }: GroupCardProps) {
   const textColor = getContrastColor(groupColor);
-  
+
   // Calculate critical task counts
   const p1Count = tasks.filter((task) => task.priority === 1).length;
   const p2Count = tasks.filter((task) => task.priority === 2).length;
@@ -331,13 +331,10 @@ function GroupCard({
                 }
               >
                 {hasP1Tasks ? (
-                  <AlertCircle 
-                    className="h-3.5 w-3.5 stroke-[2.5]" 
-                    style={{ color: textColor }}
-                  />
+                  <AlertCircle className="h-3.5 w-3.5 stroke-[2.5]" style={{ color: textColor }} />
                 ) : (
-                  <AlertTriangle 
-                    className="h-3.5 w-3.5 stroke-[2.5]" 
+                  <AlertTriangle
+                    className="h-3.5 w-3.5 stroke-[2.5]"
                     style={{ color: textColor }}
                   />
                 )}
@@ -346,9 +343,10 @@ function GroupCard({
             <Badge
               variant="secondary"
               className="text-[10px] px-1.5 py-0 h-4 min-w-[1.25rem] bg-white/20 text-inherit border"
-              style={{ 
+              style={{
                 color: textColor,
-                borderColor: textColor === "#ffffff" ? "rgba(255, 255, 255, 0.3)" : "rgba(0, 0, 0, 0.3)"
+                borderColor:
+                  textColor === "#ffffff" ? "rgba(255, 255, 255, 0.3)" : "rgba(0, 0, 0, 0.3)",
               }}
             >
               {taskCount}

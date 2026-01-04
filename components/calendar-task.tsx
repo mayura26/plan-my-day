@@ -3,8 +3,8 @@
 import { useDraggable } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
 import { parseISO } from "date-fns";
-import { useEffect, useState } from "react";
 import { Flag, GripVertical, Zap } from "lucide-react";
+import { useEffect, useState } from "react";
 import { getEnergyLevelColor, isTaskOverdue, isTaskTimeExpired } from "@/lib/task-utils";
 import { formatDateShort } from "@/lib/timezone-utils";
 import type { Task, TaskGroup } from "@/lib/types";
@@ -34,7 +34,7 @@ function calculateTaskDuration(task: Task): number | null {
   if (task.duration !== null && task.duration !== undefined) {
     return task.duration;
   }
-  
+
   // Otherwise, calculate from scheduled times
   if (task.scheduled_start && task.scheduled_end) {
     try {
@@ -47,7 +47,7 @@ function calculateTaskDuration(task: Task): number | null {
       return null;
     }
   }
-  
+
   return null;
 }
 
@@ -73,7 +73,7 @@ export function ResizableTask({
   timezone = "UTC",
 }: ResizableTaskProps) {
   const [parentTaskName, setParentTaskName] = useState<string | null>(null);
-  
+
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: task.id,
     disabled: task.locked,
@@ -146,10 +146,10 @@ export function ResizableTask({
 
   // Check if task is very short (15 minutes or less)
   const isShortTask = task.duration && task.duration <= 15;
-  
+
   // Calculate task duration
   const taskDuration = calculateTaskDuration(task);
-  
+
   // Fetch parent task name if this is a scheduled subtask
   useEffect(() => {
     if (task.parent_task_id && task.scheduled_start && task.scheduled_end) {

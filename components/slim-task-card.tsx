@@ -77,27 +77,18 @@ export function SlimTaskCard({
   };
 
   const taskCardContent = (
-    <div
+    <button
+      type="button"
       ref={setNodeRef}
       style={style}
       {...listeners}
       {...attributes}
-      role="button"
-      tabIndex={0}
       className={cn(
-        "py-1.5 px-2 rounded border bg-card hover:bg-accent/50 transition-colors cursor-grab active:cursor-grabbing text-xs overflow-hidden",
+        "w-full text-left py-1.5 px-2 rounded border bg-card hover:bg-accent/50 transition-colors cursor-grab active:cursor-grabbing text-xs overflow-hidden",
         task.locked && "cursor-not-allowed opacity-75",
         isSubtask && "ml-4 border-l-2 border-l-primary/30 bg-muted/30"
       )}
       onClick={handleClick}
-      onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-          if (!isDragging) {
-            onTaskClick?.(task.id);
-          }
-        }
-      }}
     >
       {/* Line 1: Title */}
       <div className="font-medium truncate text-xs leading-tight flex items-center gap-1">
@@ -126,7 +117,7 @@ export function SlimTaskCard({
           </span>
         )}
       </div>
-    </div>
+    </button>
   );
 
   // If this is a parent task with subtasks, wrap it in a container with nested subtasks

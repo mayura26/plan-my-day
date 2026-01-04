@@ -28,7 +28,7 @@ async function getCachedVersion(): Promise<string | null> {
     if (versionCache) {
       // Extract version from cache name like "planmyday-v16"
       const match = versionCache.match(/planmyday-v(\d+)/);
-      if (match && match[1]) {
+      if (match?.[1]) {
         return match[1];
       }
     }
@@ -53,10 +53,7 @@ export function VersionIndicator() {
   useEffect(() => {
     const fetchVersions = async () => {
       try {
-        const [server, cached] = await Promise.all([
-          getServerVersion(),
-          getCachedVersion(),
-        ]);
+        const [server, cached] = await Promise.all([getServerVersion(), getCachedVersion()]);
 
         setServerVersion(server);
         setCachedVersion(cached);

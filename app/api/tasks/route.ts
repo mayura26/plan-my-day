@@ -371,12 +371,6 @@ export async function POST(request: NextRequest) {
             [slot.start.toISOString(), slot.end.toISOString(), updatedAt, task.id, session.user.id]
           );
 
-          // Fetch updated task
-          const updatedResult = await db.execute("SELECT * FROM tasks WHERE id = ? AND user_id = ?", [
-            task.id,
-            session.user.id,
-          ]);
-
           task.scheduled_start = slot.start.toISOString();
           task.scheduled_end = slot.end.toISOString();
           task.updated_at = updatedAt;

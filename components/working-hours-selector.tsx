@@ -85,17 +85,10 @@ export function WorkingHoursSelector() {
       </div>
 
       <div className="border rounded-lg overflow-hidden">
-        <div
-          role="button"
-          tabIndex={0}
-          className="px-4 py-3 border-b cursor-pointer hover:bg-accent/50 transition-colors flex items-center justify-between bg-card"
+        <button
+          type="button"
+          className="w-full px-4 py-3 border-b cursor-pointer hover:bg-accent/50 transition-colors flex items-center justify-between bg-card"
           onClick={() => setIsExpanded(!isExpanded)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" || e.key === " ") {
-              e.preventDefault();
-              setIsExpanded(!isExpanded);
-            }
-          }}
         >
           <div className="flex items-center gap-2">
             {isExpanded ? (
@@ -105,7 +98,7 @@ export function WorkingHoursSelector() {
             )}
             <h3 className="text-sm font-semibold">Working Hours</h3>
           </div>
-        </div>
+        </button>
         {isExpanded && (
           <div className="p-4 space-y-4">
             <div className="space-y-3">
@@ -176,11 +169,14 @@ export function WorkingHoursSelector() {
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
-                              {Array.from({ length: 24 }, (_, i) => (
-                                <SelectItem key={i} value={i.toString()}>
-                                  {i.toString().padStart(2, "0")}:00
-                                </SelectItem>
-                              ))}
+                              {Array.from({ length: 24 }, (_, i) => {
+                                const hourValue = i.toString();
+                                return (
+                                  <SelectItem key={hourValue} value={hourValue}>
+                                    {hourValue.padStart(2, "0")}:00
+                                  </SelectItem>
+                                );
+                              })}
                             </SelectContent>
                           </Select>
                         </div>
@@ -212,9 +208,10 @@ export function WorkingHoursSelector() {
                                 const currentStart =
                                   workingHours[day.key as keyof GroupScheduleHours]?.start ?? 9;
                                 if (i <= currentStart) return null;
+                                const hourValue = i.toString();
                                 return (
-                                  <SelectItem key={i} value={i.toString()}>
-                                    {i.toString().padStart(2, "0")}:00
+                                  <SelectItem key={hourValue} value={hourValue}>
+                                    {hourValue.padStart(2, "0")}:00
                                   </SelectItem>
                                 );
                               })}
