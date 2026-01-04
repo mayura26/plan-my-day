@@ -7,6 +7,7 @@ import { CalendarSlot } from "@/components/calendar-slot";
 import { ResizableTask } from "@/components/calendar-task";
 import { RefreshButton } from "@/components/refresh-button";
 import { Button } from "@/components/ui/button";
+import { doTasksOverlap } from "@/lib/overlap-utils";
 import {
   formatDateInTimezone,
   getDateInTimezone,
@@ -29,6 +30,7 @@ interface WeeklyCalendarProps {
   onNoteClick?: (date: Date) => void;
   onSlotDoubleClick?: (day: Date, hour: number, minute: number) => void;
   onRefresh?: () => void | Promise<void>;
+  onOverlapClick?: (taskId: string) => void;
 }
 
 const HOURS = Array.from({ length: 24 }, (_, i) => i); // 0-23 hours
@@ -55,6 +57,7 @@ export function WeeklyCalendar({
   onNoteClick,
   onSlotDoubleClick,
   onRefresh,
+  onOverlapClick,
 }: WeeklyCalendarProps) {
   const [currentWeek, setCurrentWeek] = useState(new Date());
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -447,19 +450,45 @@ export function WeeklyCalendar({
                       className="absolute top-0 left-0 right-0 pointer-events-none"
                       style={{ height: "1536px" }}
                     >
-                      {tasks
-                        .filter((task) => {
+                      {(() => {
+                        // Filter tasks for the current day
+                        const dayTasks = tasks.filter((task) => {
                           if (!task.scheduled_start) return false;
                           const taskStartUTC = parseISO(task.scheduled_start);
                           const taskStartDate = getDateInTimezone(taskStartUTC, timezone);
                           const dayDate = getDateInTimezone(day, timezone);
-                          const matches = isSameDay(taskStartDate, dayDate);
+                          return isSameDay(taskStartDate, dayDate);
+                        });
 
-                          return matches;
-                        })
-                        .map((task) => {
+                        // Separate active and completed tasks
+                        const activeTasks = dayTasks.filter((t) => t.status !== "completed");
+                        const completedTasks = dayTasks.filter((t) => t.status === "completed");
+
+                        // Filter completed tasks: hide if they overlap with any active task
+                        const visibleCompletedTasks = completedTasks.filter((completed) => {
+                          return !activeTasks.some((active) => doTasksOverlap(active, completed));
+                        });
+
+                        // Combine active tasks with visible completed tasks
+                        const tasksToRender = [...activeTasks, ...visibleCompletedTasks];
+
+                        // Build overlap map for active tasks
+                        const overlapMap = new Map<string, Task[]>();
+                        for (const activeTask of activeTasks) {
+                          const overlappingCompleted = completedTasks.filter((completed) =>
+                            doTasksOverlap(activeTask, completed)
+                          );
+                          if (overlappingCompleted.length > 0) {
+                            overlapMap.set(activeTask.id, overlappingCompleted);
+                          }
+                        }
+
+                        return tasksToRender.map((task) => {
                           const position = getTaskPosition(task);
                           if (!position) return null;
+
+                          // Get overlapping completed tasks for this task (if it's an active task)
+                          const overlappingCompletedTasks = overlapMap.get(task.id) || [];
 
                           return (
                             <ResizableTask
@@ -472,9 +501,12 @@ export function WeeklyCalendar({
                               selectedGroupId={selectedGroupId}
                               groups={groups}
                               timezone={timezone}
+                              overlappingCompletedTasks={overlappingCompletedTasks}
+                              onOverlapClick={onOverlapClick}
                             />
                           );
-                        })}
+                        });
+                      })()}
                     </div>
                   </div>
                 );

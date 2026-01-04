@@ -7,6 +7,7 @@ import { CalendarSlot } from "@/components/calendar-slot";
 import { ResizableTask } from "@/components/calendar-task";
 import { RefreshButton } from "@/components/refresh-button";
 import { Button } from "@/components/ui/button";
+import { doTasksOverlap } from "@/lib/overlap-utils";
 import { sortTasksByScheduledTime } from "@/lib/task-utils";
 import {
   formatDateInTimezone,
@@ -31,6 +32,7 @@ interface DayCalendarProps {
   onNoteClick?: (date: Date) => void;
   onSlotDoubleClick?: (day: Date, hour: number, minute: number) => void;
   onRefresh?: () => void | Promise<void>;
+  onOverlapClick?: (taskId: string) => void;
 }
 
 const HOURS = Array.from({ length: 24 }, (_, i) => i); // 0-23 hours
@@ -58,6 +60,7 @@ export function DayCalendar({
   onNoteClick,
   onSlotDoubleClick,
   onRefresh,
+  onOverlapClick,
 }: DayCalendarProps) {
   const [currentDate, setCurrentDate] = useState(externalCurrentDate || new Date());
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -332,8 +335,31 @@ export function DayCalendar({
                     return isSameDay(taskStartDate, dayDate);
                   });
 
+                  // Separate active and completed tasks
+                  const activeTasks = dayTasks.filter((t) => t.status !== "completed");
+                  const completedTasks = dayTasks.filter((t) => t.status === "completed");
+
+                  // Filter completed tasks: hide if they overlap with any active task
+                  const visibleCompletedTasks = completedTasks.filter((completed) => {
+                    return !activeTasks.some((active) => doTasksOverlap(active, completed));
+                  });
+
+                  // Combine active tasks with visible completed tasks
+                  const tasksToRender = [...activeTasks, ...visibleCompletedTasks];
+
+                  // Build overlap map for active tasks
+                  const overlapMap = new Map<string, Task[]>();
+                  for (const activeTask of activeTasks) {
+                    const overlappingCompleted = completedTasks.filter((completed) =>
+                      doTasksOverlap(activeTask, completed)
+                    );
+                    if (overlappingCompleted.length > 0) {
+                      overlapMap.set(activeTask.id, overlappingCompleted);
+                    }
+                  }
+
                   // Sort tasks by scheduled time to ensure consistent rendering order
-                  const sortedTasks = sortTasksByScheduledTime(dayTasks);
+                  const sortedTasks = sortTasksByScheduledTime(tasksToRender);
 
                   // Render each task with its own position calculation
                   return sortedTasks.map((task) => {
@@ -341,6 +367,9 @@ export function DayCalendar({
                     // Create a fresh position object for each task to avoid any object reuse issues
                     const position = getTaskPosition(task);
                     if (!position) return null;
+
+                    // Get overlapping completed tasks for this task (if it's an active task)
+                    const overlappingCompletedTasks = overlapMap.get(task.id) || [];
 
                     return (
                       <ResizableTask
@@ -353,6 +382,8 @@ export function DayCalendar({
                         selectedGroupId={selectedGroupId}
                         groups={groups}
                         timezone={timezone}
+                        overlappingCompletedTasks={overlappingCompletedTasks}
+                        onOverlapClick={onOverlapClick}
                       />
                     );
                   });

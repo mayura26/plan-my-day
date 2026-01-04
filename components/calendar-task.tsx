@@ -3,7 +3,7 @@
 import { useDraggable } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
 import { parseISO } from "date-fns";
-import { Flag, GripVertical, Zap } from "lucide-react";
+import { Archive, Flag, GripVertical, Zap } from "lucide-react";
 import { useEffect, useState } from "react";
 import { getEnergyLevelColor, isTaskOverdue, isTaskTimeExpired } from "@/lib/task-utils";
 import { formatDateShort } from "@/lib/timezone-utils";
@@ -60,6 +60,8 @@ interface ResizableTaskProps {
   selectedGroupId?: string | null;
   groups?: TaskGroup[];
   timezone?: string;
+  overlappingCompletedTasks?: Task[];
+  onOverlapClick?: (taskId: string) => void;
 }
 
 export function ResizableTask({
@@ -71,6 +73,8 @@ export function ResizableTask({
   selectedGroupId,
   groups = [],
   timezone = "UTC",
+  overlappingCompletedTasks = [],
+  onOverlapClick,
 }: ResizableTaskProps) {
   const [parentTaskName, setParentTaskName] = useState<string | null>(null);
 
@@ -284,6 +288,48 @@ export function ResizableTask({
               {task.energy_level_required}
             </span>
           </span>
+        </div>
+      )}
+      {/* Overlap indicator - shows when active task overlaps with completed tasks */}
+      {overlappingCompletedTasks.length > 0 && !isCompleted && (
+        <div
+          className={cn(
+            "absolute pointer-events-auto cursor-pointer z-20",
+            // Position below energy badge if it exists, otherwise at top-right
+            task.energy_level_required
+              ? isShortTask
+                ? "top-3 right-0.5 md:top-4 md:right-0.5"
+                : "top-6 right-1"
+              : isShortTask
+                ? "top-0.5 right-0.5 md:top-1 md:right-0.5"
+                : "top-2 right-1"
+          )}
+          onClick={(e) => {
+            e.stopPropagation();
+            if (overlappingCompletedTasks.length > 0 && onOverlapClick) {
+              // Open the first overlapping completed task
+              onOverlapClick(overlappingCompletedTasks[0].id);
+            }
+          }}
+          title={
+            overlappingCompletedTasks.length === 1
+              ? "View completed task"
+              : `${overlappingCompletedTasks.length} completed tasks hidden`
+          }
+        >
+          <div
+            className={cn(
+              "flex items-center justify-center rounded-full bg-white/20 hover:bg-white/30 transition-colors",
+              isShortTask ? "w-3 h-3 md:w-3.5 md:h-3.5" : "w-4 h-4"
+            )}
+          >
+            <Archive
+              className={cn(
+                "text-white/90",
+                isShortTask ? "w-2 h-2 md:w-2.5 md:h-2.5" : "w-3 h-3"
+              )}
+            />
+          </div>
         </div>
       )}
       {/* Due date badge at bottom left - only show on screens >= 1200px, and hide for tasks 30m or less */}

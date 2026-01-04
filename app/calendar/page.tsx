@@ -58,6 +58,8 @@ export default function CalendarPage() {
   const [isCreating, setIsCreating] = useState(false);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [showTaskDetail, setShowTaskDetail] = useState(false);
+  const [completedTaskDialog, setCompletedTaskDialog] = useState<Task | null>(null);
+  const [showCompletedTaskDetail, setShowCompletedTaskDetail] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
@@ -355,6 +357,15 @@ export default function CalendarPage() {
     if (task) {
       setSelectedTask(task);
       setShowTaskDetail(true);
+      setSidebarOpen(false); // Close sidebar on mobile when viewing task details
+    }
+  };
+
+  const handleOverlapClick = (taskId: string) => {
+    const task = tasks.find((t) => t.id === taskId);
+    if (task) {
+      setCompletedTaskDialog(task);
+      setShowCompletedTaskDetail(true);
       setSidebarOpen(false); // Close sidebar on mobile when viewing task details
     }
   };
@@ -1251,6 +1262,7 @@ export default function CalendarPage() {
               onNoteClick={handleNoteClick}
               onSlotDoubleClick={handleSlotDoubleClick}
               onRefresh={() => fetchTasks(false)}
+              onOverlapClick={handleOverlapClick}
             />
           )}
           {viewMode === "week" && (
@@ -1268,6 +1280,7 @@ export default function CalendarPage() {
               onNoteClick={handleNoteClick}
               onSlotDoubleClick={handleSlotDoubleClick}
               onRefresh={() => fetchTasks(false)}
+              onOverlapClick={handleOverlapClick}
             />
           )}
           {viewMode === "month" && (
@@ -1307,6 +1320,32 @@ export default function CalendarPage() {
         onTaskRefresh={(updatedTask) => {
           // Update the selected task with fresh data
           setSelectedTask(updatedTask);
+          // Also update the task in the tasks array
+          setTasks((prev) => prev.map((task) => (task.id === updatedTask.id ? updatedTask : task)));
+        }}
+      />
+
+      {/* Completed Task Detail Dialog (for overlap indicator clicks) */}
+      <TaskDetailDialog
+        task={completedTaskDialog}
+        open={showCompletedTaskDetail}
+        onOpenChange={(open) => {
+          setShowCompletedTaskDetail(open);
+          if (!open) {
+            setCompletedTaskDialog(null);
+          }
+        }}
+        onEdit={handleEditTask}
+        onDelete={handleDeleteTask}
+        onStatusChange={handleStatusChange}
+        onUnschedule={handleUnscheduleTask}
+        onTaskUpdate={async () => {
+          // Task updates are handled via onTaskRefresh callback
+          // No need to refresh the entire list
+        }}
+        onTaskRefresh={(updatedTask) => {
+          // Update the completed task dialog with fresh data
+          setCompletedTaskDialog(updatedTask);
           // Also update the task in the tasks array
           setTasks((prev) => prev.map((task) => (task.id === updatedTask.id ? updatedTask : task)));
         }}
