@@ -1,6 +1,3 @@
-## Phase 2: AI Scheduling & Notifications (Weeks 5-8)
-- [ ] Build fast scheudle for task
-
 ### ⏳ Pending
 - [ ] AI-powered task scheduling engine
 - [ ] Task locking mechanism

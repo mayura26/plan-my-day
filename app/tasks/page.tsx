@@ -432,6 +432,7 @@ export default function TasksPage() {
             onSubmit={handleCreateTask}
             onCancel={() => setShowCreateForm(false)}
             isLoading={isCreating}
+            taskGroups={groups}
           />
         </DialogContent>
       </Dialog>
@@ -467,6 +468,7 @@ export default function TasksPage() {
                 due_date: editingTask.due_date || undefined,
               }}
               isLoading={isUpdating}
+              taskGroups={groups}
             />
           )}
         </DialogContent>

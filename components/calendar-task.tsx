@@ -4,7 +4,7 @@ import { useDraggable } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
 import { parseISO } from "date-fns";
 import { Archive, Flag, GripVertical, Zap } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { getEnergyLevelColor, isTaskOverdue, isTaskTimeExpired } from "@/lib/task-utils";
 import { formatDateShort } from "@/lib/timezone-utils";
 import type { Task, TaskGroup } from "@/lib/types";
@@ -62,6 +62,7 @@ interface ResizableTaskProps {
   timezone?: string;
   overlappingCompletedTasks?: Task[];
   onOverlapClick?: (taskId: string) => void;
+  parentTaskName?: string | null;
 }
 
 export function ResizableTask({
@@ -75,8 +76,8 @@ export function ResizableTask({
   timezone = "UTC",
   overlappingCompletedTasks = [],
   onOverlapClick,
+  parentTaskName,
 }: ResizableTaskProps) {
-  const [parentTaskName, setParentTaskName] = useState<string | null>(null);
 
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: task.id,
@@ -153,33 +154,6 @@ export function ResizableTask({
 
   // Calculate task duration
   const taskDuration = calculateTaskDuration(task);
-
-  // Fetch parent task name if this is a scheduled subtask
-  useEffect(() => {
-    if (task.parent_task_id && task.scheduled_start && task.scheduled_end) {
-      // Only fetch if duration > 30 minutes
-      if (taskDuration !== null && taskDuration > 30) {
-        fetch(`/api/tasks/${task.parent_task_id}`)
-          .then((response) => {
-            if (response.ok) {
-              return response.json();
-            }
-            throw new Error("Failed to fetch parent task");
-          })
-          .then((data) => {
-            setParentTaskName(data.task?.title || null);
-          })
-          .catch((error) => {
-            console.error("Error fetching parent task:", error);
-            setParentTaskName(null);
-          });
-      } else {
-        setParentTaskName(null);
-      }
-    } else {
-      setParentTaskName(null);
-    }
-  }, [task.parent_task_id, task.scheduled_start, task.scheduled_end, taskDuration]);
 
   // Convert hex color to rgba for background
   const hexToRgba = (hex: string, alpha: number) => {

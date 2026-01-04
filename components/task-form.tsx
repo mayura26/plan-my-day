@@ -30,10 +30,14 @@ interface TaskFormProps {
   onCancel?: () => void;
   initialData?: Partial<CreateTaskRequest> & { id?: string };
   isLoading?: boolean;
+  taskGroups?: TaskGroup[];
 }
 
-export function TaskForm({ onSubmit, onCancel, initialData, isLoading = false }: TaskFormProps) {
+export function TaskForm({ onSubmit, onCancel, initialData, isLoading = false, taskGroups: propTaskGroups }: TaskFormProps) {
   const { timezone } = useUserTimezone();
+  
+  // Use prop groups if provided, otherwise fall back to empty array for backward compatibility
+  const taskGroups = propTaskGroups ?? [];
 
   const [formData, setFormData] = useState<CreateTaskRequest>({
     title: initialData?.title || "",
@@ -53,27 +57,10 @@ export function TaskForm({ onSubmit, onCancel, initialData, isLoading = false }:
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [taskGroups, setTaskGroups] = useState<TaskGroup[]>([]);
   const [showDescription, setShowDescription] = useState(!!initialData?.description);
   const [showDependencies, setShowDependencies] = useState(
     (initialData?.dependency_ids?.length ?? 0) > 0
   );
-
-  // Fetch task groups
-  useEffect(() => {
-    const fetchTaskGroups = async () => {
-      try {
-        const response = await fetch("/api/task-groups");
-        if (response.ok) {
-          const data = await response.json();
-          setTaskGroups(data.groups || []);
-        }
-      } catch (error) {
-        console.error("Error fetching task groups:", error);
-      }
-    };
-    fetchTaskGroups();
-  }, []);
 
   // Fetch existing dependencies when editing a task
   useEffect(() => {

@@ -92,6 +92,7 @@ export default function CalendarPage() {
   });
   const [isResizing, setIsResizing] = useState(false);
   const [subtasksMap, setSubtasksMap] = useState<Map<string, Task[]>>(new Map());
+  const [parentTasksMap, setParentTasksMap] = useState<Map<string, string>>(new Map());
   const fetchedGroupsUserIdRef = useRef<string | null>(null);
   const isFetchingGroupsRef = useRef<boolean>(false);
   const hasFetchedInitialDataRef = useRef<boolean>(false);
@@ -105,6 +106,64 @@ export default function CalendarPage() {
     })
   );
 
+  const fetchParentTaskNames = useCallback(async (tasksToProcess: Task[]) => {
+    // Get unique parent task IDs from tasks that have parent_task_id and are scheduled
+    const uniqueParentIds = new Set<string>();
+    for (const task of tasksToProcess) {
+      if (task.parent_task_id && task.scheduled_start && task.scheduled_end) {
+        // Calculate duration to check if > 30 minutes (matching the condition in ResizableTask)
+        const duration = task.duration ?? (() => {
+          if (task.scheduled_start && task.scheduled_end) {
+            try {
+              const start = new Date(task.scheduled_start);
+              const end = new Date(task.scheduled_end);
+              return Math.round((end.getTime() - start.getTime()) / 60000);
+            } catch {
+              return null;
+            }
+          }
+          return null;
+        })();
+        
+        if (duration !== null && duration > 30) {
+          uniqueParentIds.add(task.parent_task_id);
+        }
+      }
+    }
+
+    // Fetch parent task names in parallel
+    if (uniqueParentIds.size > 0) {
+      try {
+        const parentTaskPromises = Array.from(uniqueParentIds).map(async (parentId) => {
+          try {
+            const response = await fetch(`/api/tasks/${parentId}`);
+            if (response.ok) {
+              const data = await response.json();
+              return { id: parentId, title: data.task?.title || null };
+            }
+            return { id: parentId, title: null };
+          } catch (error) {
+            console.error(`Error fetching parent task ${parentId}:`, error);
+            return { id: parentId, title: null };
+          }
+        });
+
+        const parentTasks = await Promise.all(parentTaskPromises);
+        const newParentTasksMap = new Map<string, string>();
+        for (const { id, title } of parentTasks) {
+          if (title) {
+            newParentTasksMap.set(id, title);
+          }
+        }
+        setParentTasksMap(newParentTasksMap);
+      } catch (error) {
+        console.error("Error fetching parent task names:", error);
+      }
+    } else {
+      setParentTasksMap(new Map());
+    }
+  }, []);
+
   const fetchTasks = useCallback(async (setLoading = true) => {
     try {
       if (setLoading) {
@@ -113,9 +172,12 @@ export default function CalendarPage() {
       const response = await fetch("/api/tasks");
       if (response.ok) {
         const data = await response.json();
-        setTasks(data.tasks || []);
+        const fetchedTasks = data.tasks || [];
+        setTasks(fetchedTasks);
         // Clear subtasks map when tasks are refreshed to ensure fresh data
         setSubtasksMap(new Map());
+        // Fetch parent task names for subtasks
+        await fetchParentTaskNames(fetchedTasks);
       } else {
         console.error("Failed to fetch tasks");
       }
@@ -126,7 +188,7 @@ export default function CalendarPage() {
         setIsLoading(false);
       }
     }
-  }, []);
+  }, [fetchParentTaskNames]);
 
   const fetchGroups = useCallback(async () => {
     // Prevent concurrent fetches
@@ -1263,6 +1325,7 @@ export default function CalendarPage() {
               onSlotDoubleClick={handleSlotDoubleClick}
               onRefresh={() => fetchTasks(false)}
               onOverlapClick={handleOverlapClick}
+              parentTasksMap={parentTasksMap}
             />
           )}
           {viewMode === "week" && (
@@ -1281,6 +1344,7 @@ export default function CalendarPage() {
               onSlotDoubleClick={handleSlotDoubleClick}
               onRefresh={() => fetchTasks(false)}
               onOverlapClick={handleOverlapClick}
+              parentTasksMap={parentTasksMap}
             />
           )}
           {viewMode === "month" && (
@@ -1391,6 +1455,7 @@ export default function CalendarPage() {
             }}
             isLoading={isCreating}
             initialData={quickAddInitialData || undefined}
+            taskGroups={groups}
           />
         </DialogContent>
       </Dialog>
@@ -1431,6 +1496,7 @@ export default function CalendarPage() {
                 due_date: editingTask.due_date || undefined,
               }}
               isLoading={isUpdating}
+              taskGroups={groups}
             />
           )}
         </DialogContent>

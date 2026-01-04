@@ -33,6 +33,7 @@ interface DayCalendarProps {
   onSlotDoubleClick?: (day: Date, hour: number, minute: number) => void;
   onRefresh?: () => void | Promise<void>;
   onOverlapClick?: (taskId: string) => void;
+  parentTasksMap?: Map<string, string>;
 }
 
 const HOURS = Array.from({ length: 24 }, (_, i) => i); // 0-23 hours
@@ -61,6 +62,7 @@ export function DayCalendar({
   onSlotDoubleClick,
   onRefresh,
   onOverlapClick,
+  parentTasksMap,
 }: DayCalendarProps) {
   const [currentDate, setCurrentDate] = useState(externalCurrentDate || new Date());
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -384,6 +386,7 @@ export function DayCalendar({
                         timezone={timezone}
                         overlappingCompletedTasks={overlappingCompletedTasks}
                         onOverlapClick={onOverlapClick}
+                        parentTaskName={task.parent_task_id ? parentTasksMap?.get(task.parent_task_id) : null}
                       />
                     );
                   });

@@ -31,6 +31,7 @@ interface WeeklyCalendarProps {
   onSlotDoubleClick?: (day: Date, hour: number, minute: number) => void;
   onRefresh?: () => void | Promise<void>;
   onOverlapClick?: (taskId: string) => void;
+  parentTasksMap?: Map<string, string>;
 }
 
 const HOURS = Array.from({ length: 24 }, (_, i) => i); // 0-23 hours
@@ -58,6 +59,7 @@ export function WeeklyCalendar({
   onSlotDoubleClick,
   onRefresh,
   onOverlapClick,
+  parentTasksMap,
 }: WeeklyCalendarProps) {
   const [currentWeek, setCurrentWeek] = useState(new Date());
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -503,6 +505,7 @@ export function WeeklyCalendar({
                               timezone={timezone}
                               overlappingCompletedTasks={overlappingCompletedTasks}
                               onOverlapClick={onOverlapClick}
+                              parentTaskName={task.parent_task_id ? parentTasksMap?.get(task.parent_task_id) : null}
                             />
                           );
                         });
