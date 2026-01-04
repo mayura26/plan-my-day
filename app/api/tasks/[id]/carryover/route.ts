@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { findNearestAvailableSlot } from "@/lib/scheduler-utils";
+import { scheduleTask } from "@/lib/scheduler-utils";
 import { generateTaskId } from "@/lib/task-utils";
 import { getUserTimezone } from "@/lib/timezone-utils";
 import { db } from "@/lib/turso";
@@ -202,22 +202,10 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       ]);
       const allTasks = allTasksResult.rows.map(mapRowToTask);
 
-      // Determine start time - use due_date if it's in the future, otherwise use now
-      const nowDate = new Date();
-      const startFrom =
-        carryoverTask.due_date && new Date(carryoverTask.due_date) > nowDate
-          ? new Date(carryoverTask.due_date)
-          : nowDate;
-
-      // Find nearest available slot
-      const slot = findNearestAvailableSlot(
-        carryoverTask,
-        allTasks,
-        startFrom,
-        workingHours,
-        7,
-        userTimezone
-      );
+      // Auto-schedule: Use optimal scheduling strategy (respects due date)
+      const slot = scheduleTask(carryoverTask, allTasks, workingHours, userTimezone, {
+        strategy: "optimal",
+      });
 
       if (slot) {
         // Update the carryover task with scheduled times

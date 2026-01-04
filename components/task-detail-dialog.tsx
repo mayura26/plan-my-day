@@ -70,6 +70,7 @@ export function TaskDetailDialog({
   const [isMarkingIncomplete, setIsMarkingIncomplete] = useState(false);
   const [isStartingTask, setIsStartingTask] = useState(false);
   const [isMarkingComplete, setIsMarkingComplete] = useState(false);
+  const [isScheduling, setIsScheduling] = useState(false);
   const [isLoadingParent, setIsLoadingParent] = useState(false);
   const [dependencies, setDependencies] = useState<DependencyInfo[]>([]);
   const [blockedBy, setBlockedBy] = useState<Task[]>([]);
@@ -314,6 +315,35 @@ export function TaskDetailDialog({
       toast.error("Failed to load parent task");
     } finally {
       setIsLoadingParent(false);
+    }
+  };
+
+  const handleScheduleNow = async () => {
+    if (!task) return;
+
+    setIsScheduling(true);
+    try {
+      const response = await fetch(`/api/tasks/${task.id}/schedule-now`, {
+        method: "POST",
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to schedule task");
+      }
+
+      const data = await response.json();
+      const updatedTask = data.task;
+      onTaskRefresh?.(updatedTask);
+      setHasChanges(true);
+      toast.success("Task scheduled successfully");
+    } catch (error) {
+      console.error("Error scheduling task:", error);
+      toast.error(
+        error instanceof Error ? error.message : "Failed to schedule task"
+      );
+    } finally {
+      setIsScheduling(false);
     }
   };
 
@@ -575,7 +605,7 @@ export function TaskDetailDialog({
           </div>
 
           {/* Schedule Information */}
-          {(task.scheduled_start || task.scheduled_end) && (
+          {(task.scheduled_start || task.scheduled_end || (task.task_type === "task" && task.duration)) && (
             <Card className="py-2">
               <CardContent className="pt-0 pb-0 px-3 sm:px-6">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-0 mb-2 sm:mb-3">
@@ -583,18 +613,32 @@ export function TaskDetailDialog({
                     <Calendar className="h-4 w-4" />
                     Schedule
                   </h3>
-                  {onUnschedule && (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={handleUnschedule}
-                      loading={isUnscheduling}
-                      className="text-xs sm:text-sm w-full sm:w-auto"
-                    >
-                      <CalendarX className="h-4 w-4 mr-2" />
-                      {isUnscheduling ? "Unscheduling..." : "Unschedule"}
-                    </Button>
-                  )}
+                  <div className="flex gap-2">
+                    {task.task_type === "task" && task.duration && task.duration > 0 && (
+                      <Button
+                        size="sm"
+                        variant="default"
+                        onClick={handleScheduleNow}
+                        loading={isScheduling}
+                        className="text-xs sm:text-sm w-full sm:w-auto"
+                      >
+                        <Clock className="h-4 w-4 mr-2" />
+                        {isScheduling ? "Scheduling..." : "Schedule Now"}
+                      </Button>
+                    )}
+                    {onUnschedule && (task.scheduled_start || task.scheduled_end) && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={handleUnschedule}
+                        loading={isUnscheduling}
+                        className="text-xs sm:text-sm w-full sm:w-auto"
+                      >
+                        <CalendarX className="h-4 w-4 mr-2" />
+                        {isUnscheduling ? "Unscheduling..." : "Unschedule"}
+                      </Button>
+                    )}
+                  </div>
                 </div>
                 <div className="space-y-2">
                   {task.scheduled_start && (
@@ -624,6 +668,11 @@ export function TaskDetailDialog({
                         )}{" "}
                         minutes
                       </span>
+                    </div>
+                  )}
+                  {!task.scheduled_start && !task.scheduled_end && task.task_type === "task" && task.duration && task.duration > 0 && (
+                    <div className="text-sm text-muted-foreground pt-2">
+                      This task is not yet scheduled. Click "Schedule Now" to automatically schedule it to the next available slot today.
                     </div>
                   )}
                 </div>

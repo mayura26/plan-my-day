@@ -1,8 +1,10 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
+import { scheduleTask } from "@/lib/scheduler-utils";
 import { generateDependencyId, generateTaskId, validateTaskData } from "@/lib/task-utils";
+import { getUserTimezone } from "@/lib/timezone-utils";
 import { db } from "@/lib/turso";
-import type { CreateTaskRequest, Task } from "@/lib/types";
+import type { CreateTaskRequest, Task, TaskStatus, TaskType } from "@/lib/types";
 
 // Helper to map database row to Task object
 function mapRowToTask(row: any): Task {
@@ -290,6 +292,98 @@ export async function POST(request: NextRequest) {
             [generateDependencyId(), task.id, depId]
           );
         }
+      }
+    }
+
+    // Handle auto-schedule if enabled
+    if (
+      body.auto_schedule &&
+      task.task_type === "task" &&
+      task.duration &&
+      task.duration > 0 &&
+      !task.scheduled_start &&
+      !task.scheduled_end
+    ) {
+      try {
+        // Get user's timezone and working hours
+        const userResult = await db.execute(
+          "SELECT timezone, working_hours FROM users WHERE id = ?",
+          [session.user.id]
+        );
+        const userTimezone =
+          userResult.rows.length > 0
+            ? getUserTimezone(userResult.rows[0].timezone as string | null)
+            : "UTC";
+
+        let workingHours = null;
+        if (userResult.rows.length > 0 && userResult.rows[0].working_hours) {
+          try {
+            workingHours = JSON.parse(userResult.rows[0].working_hours as string);
+          } catch (e) {
+            console.error("Error parsing working_hours JSON:", e);
+            workingHours = null;
+          }
+        }
+
+        // Get all tasks for the user to check for conflicts (including the newly created task)
+        const allTasksResult = await db.execute("SELECT * FROM tasks WHERE user_id = ?", [
+          session.user.id,
+        ]);
+        const allTasks = allTasksResult.rows.map((row: any) => {
+          // Map row to Task format
+          return {
+            id: row.id as string,
+            user_id: row.user_id as string,
+            title: row.title as string,
+            description: row.description as string | null,
+            priority: row.priority as number,
+            status: row.status as TaskStatus,
+            duration: row.duration as number | null,
+            scheduled_start: row.scheduled_start as string | null,
+            scheduled_end: row.scheduled_end as string | null,
+            due_date: row.due_date as string | null,
+            locked: Boolean(row.locked),
+            group_id: row.group_id as string | null,
+            template_id: row.template_id as string | null,
+            task_type: row.task_type as TaskType,
+            google_calendar_event_id: row.google_calendar_event_id as string | null,
+            notification_sent: Boolean(row.notification_sent),
+            depends_on_task_id: row.depends_on_task_id as string | null,
+            energy_level_required: row.energy_level_required as number,
+            parent_task_id: row.parent_task_id as string | null,
+            continued_from_task_id: row.continued_from_task_id as string | null,
+            ignored: Boolean(row.ignored ?? false),
+            created_at: row.created_at as string,
+            updated_at: row.updated_at as string,
+          } as Task;
+        });
+
+        // Auto-schedule: Use ASAP strategy to schedule immediately (same as "Schedule Now")
+        const slot = scheduleTask(task, allTasks, workingHours, userTimezone, {
+          strategy: "asap",
+        });
+
+        if (slot) {
+          // Update task with the scheduled times
+          const updatedAt = new Date().toISOString();
+          await db.execute(
+            `UPDATE tasks SET scheduled_start = ?, scheduled_end = ?, updated_at = ? WHERE id = ? AND user_id = ?`,
+            [slot.start.toISOString(), slot.end.toISOString(), updatedAt, task.id, session.user.id]
+          );
+
+          // Fetch updated task
+          const updatedResult = await db.execute("SELECT * FROM tasks WHERE id = ? AND user_id = ?", [
+            task.id,
+            session.user.id,
+          ]);
+
+          task.scheduled_start = slot.start.toISOString();
+          task.scheduled_end = slot.end.toISOString();
+          task.updated_at = updatedAt;
+        }
+      } catch (error) {
+        console.error("Error auto-scheduling task:", error);
+        // Continue with task creation even if auto-schedule fails
       }
     }
 

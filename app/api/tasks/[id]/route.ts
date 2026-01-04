@@ -1,5 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
+import { scheduleTask } from "@/lib/scheduler-utils";
+import { getUserTimezone } from "@/lib/timezone-utils";
 import { db } from "@/lib/turso";
 import type { Task, TaskStatus, TaskType, UpdateTaskRequest } from "@/lib/types";
 
@@ -376,6 +378,75 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     ]);
 
     const task = mapRowToTask(result.rows[0]);
+
+    // Handle auto-schedule if enabled (only for regular tasks with duration)
+    // Only auto-schedule if explicitly requested via auto_schedule field
+    // Don't auto-schedule if scheduled times are being set in this update
+    if (
+      body.auto_schedule === true &&
+      task.task_type === "task" &&
+      task.duration &&
+      task.duration > 0 &&
+      !task.scheduled_start &&
+      !task.scheduled_end &&
+      body.scheduled_start === undefined &&
+      body.scheduled_end === undefined
+    ) {
+      try {
+        // Get user's timezone and working hours
+        const userResult = await db.execute(
+          "SELECT timezone, working_hours FROM users WHERE id = ?",
+          [session.user.id]
+        );
+        const userTimezone =
+          userResult.rows.length > 0
+            ? getUserTimezone(userResult.rows[0].timezone as string | null)
+            : "UTC";
+
+        let workingHours = null;
+        if (userResult.rows.length > 0 && userResult.rows[0].working_hours) {
+          try {
+            workingHours = JSON.parse(userResult.rows[0].working_hours as string);
+          } catch (e) {
+            console.error("Error parsing working_hours JSON:", e);
+            workingHours = null;
+          }
+        }
+
+        // Get all tasks for the user to check for conflicts
+        const allTasksResult = await db.execute("SELECT * FROM tasks WHERE user_id = ?", [
+          session.user.id,
+        ]);
+        const allTasks = allTasksResult.rows.map(mapRowToTask);
+
+        // Auto-schedule: Use optimal scheduling strategy (respects due date)
+        const slot = scheduleTask(task, allTasks, workingHours, userTimezone, {
+          strategy: "optimal",
+        });
+
+        if (slot) {
+          // Update task with the scheduled times
+          const updatedAt = new Date().toISOString();
+          await db.execute(
+            `UPDATE tasks SET scheduled_start = ?, scheduled_end = ?, updated_at = ? WHERE id = ? AND user_id = ?`,
+            [slot.start.toISOString(), slot.end.toISOString(), updatedAt, task.id, session.user.id]
+          );
+
+          // Fetch updated task
+          const updatedResult = await db.execute("SELECT * FROM tasks WHERE id = ? AND user_id = ?", [
+            task.id,
+            session.user.id,
+          ]);
+
+          task.scheduled_start = slot.start.toISOString();
+          task.scheduled_end = slot.end.toISOString();
+          task.updated_at = updatedAt;
+        }
+      } catch (error) {
+        console.error("Error auto-scheduling task during update:", error);
+        // Continue with task update even if auto-schedule fails
+      }
+    }
 
     return NextResponse.json({ task });
   } catch (error) {

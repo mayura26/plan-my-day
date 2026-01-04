@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { findNearestAvailableSlot } from "@/lib/scheduler-utils";
+import { scheduleTask } from "@/lib/scheduler-utils";
 import { getUserTimezone } from "@/lib/timezone-utils";
 import { db } from "@/lib/turso";
 import type { Task, TaskStatus, TaskType } from "@/lib/types";
@@ -89,13 +89,10 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
     ]);
     const allTasks = allTasksResult.rows.map(mapRowToTask);
 
-    // Determine start time - use due_date if it's in the future, otherwise use now
-    const now = new Date();
-    const startFrom =
-      task.due_date && new Date(task.due_date) > now ? new Date(task.due_date) : now;
-
-    // Find nearest available slot (pass working hours and timezone)
-    const slot = findNearestAvailableSlot(task, allTasks, startFrom, workingHours, 7, userTimezone);
+    // "Schedule Now" uses ASAP strategy (ignores due date)
+    const slot = scheduleTask(task, allTasks, workingHours, userTimezone, {
+      strategy: "asap",
+    });
 
     if (!slot) {
       return NextResponse.json(

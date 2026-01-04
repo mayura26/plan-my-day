@@ -13,6 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { useUserTimezone } from "@/hooks/use-user-timezone";
 import { ENERGY_LABELS, PRIORITY_LABELS, TASK_TYPE_LABELS } from "@/lib/task-utils";
@@ -48,6 +49,7 @@ export function TaskForm({ onSubmit, onCancel, initialData, isLoading = false }:
     scheduled_start: formatDateTimeLocalForTimezone(initialData?.scheduled_start, timezone),
     scheduled_end: formatDateTimeLocalForTimezone(initialData?.scheduled_end, timezone),
     due_date: formatDateTimeLocalForTimezone(initialData?.due_date, timezone),
+    auto_schedule: initialData?.auto_schedule || false,
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -112,6 +114,7 @@ export function TaskForm({ onSubmit, onCancel, initialData, isLoading = false }:
         scheduled_start: formatDateTimeLocalForTimezone(initialData.scheduled_start, timezone),
         scheduled_end: formatDateTimeLocalForTimezone(initialData.scheduled_end, timezone),
         due_date: formatDateTimeLocalForTimezone(initialData.due_date, timezone),
+        auto_schedule: initialData.auto_schedule || false,
       }));
       setShowDescription(!!initialData.description);
     }
@@ -229,6 +232,21 @@ export function TaskForm({ onSubmit, onCancel, initialData, isLoading = false }:
           const newEndTime = calculateEndTime(startTime, duration);
           if (newEndTime) updated.scheduled_end = newEndTime;
         }
+        // If manual times are set, disable auto-schedule
+        if (field === "scheduled_start" && value) {
+          updated.auto_schedule = false;
+        }
+      }
+
+      if (field === "scheduled_end" && value) {
+        // If manual end time is set, disable auto-schedule
+        updated.auto_schedule = false;
+      }
+
+      if (field === "auto_schedule" && value) {
+        // If auto-schedule is enabled, clear manual scheduled times
+        updated.scheduled_start = undefined;
+        updated.scheduled_end = undefined;
       }
 
       if (field === "due_date") {
@@ -501,6 +519,38 @@ export function TaskForm({ onSubmit, onCancel, initialData, isLoading = false }:
         <Label className="text-xs text-muted-foreground">
           {isEvent ? "Event Time *" : "Schedule"}
         </Label>
+        {isTask && (
+          <div className="flex items-center gap-2 pb-2">
+            <Switch
+              id="auto_schedule"
+              checked={formData.auto_schedule || false}
+              onCheckedChange={(checked) => handleInputChange("auto_schedule", checked)}
+              disabled={
+                !!(formData.scheduled_start || formData.scheduled_end) ||
+                formData.task_type !== "task"
+              }
+            />
+            <Label
+              htmlFor="auto_schedule"
+              className="text-sm font-normal cursor-pointer flex items-center gap-1.5"
+            >
+              <Calendar className="w-3.5 h-3.5" />
+              <span>Auto-schedule to next available slot today</span>
+            </Label>
+          </div>
+        )}
+        {isTask && formData.auto_schedule && !formData.duration && (
+          <p className="text-xs text-amber-600 dark:text-amber-500">
+            Note: Auto-schedule requires a duration to be set.
+          </p>
+        )}
+        {isTask &&
+          (formData.scheduled_start || formData.scheduled_end) &&
+          formData.auto_schedule && (
+            <p className="text-xs text-muted-foreground">
+              Manual times are set. Auto-schedule is disabled.
+            </p>
+          )}
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1">
             <span className="text-xs text-muted-foreground">Start</span>

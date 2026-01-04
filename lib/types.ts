@@ -175,6 +175,7 @@ export interface CreateTaskRequest {
   scheduled_start?: string;
   scheduled_end?: string;
   due_date?: string; // when task must be completed by
+  auto_schedule?: boolean; // If true, automatically schedule to next available slot for today
 }
 
 export interface UpdateTaskRequest extends Partial<CreateTaskRequest> {
