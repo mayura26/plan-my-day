@@ -33,9 +33,15 @@ interface TaskFormProps {
   taskGroups?: TaskGroup[];
 }
 
-export function TaskForm({ onSubmit, onCancel, initialData, isLoading = false, taskGroups: propTaskGroups }: TaskFormProps) {
+export function TaskForm({
+  onSubmit,
+  onCancel,
+  initialData,
+  isLoading = false,
+  taskGroups: propTaskGroups,
+}: TaskFormProps) {
   const { timezone } = useUserTimezone();
-  
+
   // Use prop groups if provided, otherwise fall back to empty array for backward compatibility
   const taskGroups = propTaskGroups ?? [];
 

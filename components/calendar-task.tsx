@@ -4,7 +4,6 @@ import { useDraggable } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
 import { parseISO } from "date-fns";
 import { Archive, Flag, GripVertical, Zap } from "lucide-react";
-import { useState } from "react";
 import { getEnergyLevelColor, isTaskOverdue, isTaskTimeExpired } from "@/lib/task-utils";
 import { formatDateShort } from "@/lib/timezone-utils";
 import type { Task, TaskGroup } from "@/lib/types";
@@ -78,7 +77,6 @@ export function ResizableTask({
   onOverlapClick,
   parentTaskName,
 }: ResizableTaskProps) {
-
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: task.id,
     disabled: task.locked,
@@ -266,7 +264,10 @@ export function ResizableTask({
       )}
       {/* Overlap indicator - shows when active task overlaps with completed tasks */}
       {overlappingCompletedTasks.length > 0 && !isCompleted && (
+        // biome-ignore lint/a11y/useSemanticElements: Absolutely positioned element requires div for layout
         <div
+          role="button"
+          tabIndex={0}
           className={cn(
             "absolute pointer-events-auto cursor-pointer z-20",
             // Position below energy badge if it exists, otherwise at top-right
@@ -285,6 +286,16 @@ export function ResizableTask({
               onOverlapClick(overlappingCompletedTasks[0].id);
             }
           }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              e.stopPropagation();
+              if (overlappingCompletedTasks.length > 0 && onOverlapClick) {
+                // Open the first overlapping completed task
+                onOverlapClick(overlappingCompletedTasks[0].id);
+              }
+            }
+          }}
           title={
             overlappingCompletedTasks.length === 1
               ? "View completed task"
@@ -298,10 +309,7 @@ export function ResizableTask({
             )}
           >
             <Archive
-              className={cn(
-                "text-white/90",
-                isShortTask ? "w-2 h-2 md:w-2.5 md:h-2.5" : "w-3 h-3"
-              )}
+              className={cn("text-white/90", isShortTask ? "w-2 h-2 md:w-2.5 md:h-2.5" : "w-3 h-3")}
             />
           </div>
         </div>

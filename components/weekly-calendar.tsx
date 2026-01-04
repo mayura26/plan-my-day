@@ -505,7 +505,11 @@ export function WeeklyCalendar({
                               timezone={timezone}
                               overlappingCompletedTasks={overlappingCompletedTasks}
                               onOverlapClick={onOverlapClick}
-                              parentTaskName={task.parent_task_id ? parentTasksMap?.get(task.parent_task_id) : null}
+                              parentTaskName={
+                                task.parent_task_id
+                                  ? parentTasksMap?.get(task.parent_task_id)
+                                  : null
+                              }
                             />
                           );
                         });

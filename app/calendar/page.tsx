@@ -112,19 +112,21 @@ export default function CalendarPage() {
     for (const task of tasksToProcess) {
       if (task.parent_task_id && task.scheduled_start && task.scheduled_end) {
         // Calculate duration to check if > 30 minutes (matching the condition in ResizableTask)
-        const duration = task.duration ?? (() => {
-          if (task.scheduled_start && task.scheduled_end) {
-            try {
-              const start = new Date(task.scheduled_start);
-              const end = new Date(task.scheduled_end);
-              return Math.round((end.getTime() - start.getTime()) / 60000);
-            } catch {
-              return null;
+        const duration =
+          task.duration ??
+          (() => {
+            if (task.scheduled_start && task.scheduled_end) {
+              try {
+                const start = new Date(task.scheduled_start);
+                const end = new Date(task.scheduled_end);
+                return Math.round((end.getTime() - start.getTime()) / 60000);
+              } catch {
+                return null;
+              }
             }
-          }
-          return null;
-        })();
-        
+            return null;
+          })();
+
         if (duration !== null && duration > 30) {
           uniqueParentIds.add(task.parent_task_id);
         }
@@ -164,31 +166,34 @@ export default function CalendarPage() {
     }
   }, []);
 
-  const fetchTasks = useCallback(async (setLoading = true) => {
-    try {
-      if (setLoading) {
-        setIsLoading(true);
+  const fetchTasks = useCallback(
+    async (setLoading = true) => {
+      try {
+        if (setLoading) {
+          setIsLoading(true);
+        }
+        const response = await fetch("/api/tasks");
+        if (response.ok) {
+          const data = await response.json();
+          const fetchedTasks = data.tasks || [];
+          setTasks(fetchedTasks);
+          // Clear subtasks map when tasks are refreshed to ensure fresh data
+          setSubtasksMap(new Map());
+          // Fetch parent task names for subtasks
+          await fetchParentTaskNames(fetchedTasks);
+        } else {
+          console.error("Failed to fetch tasks");
+        }
+      } catch (error) {
+        console.error("Error fetching tasks:", error);
+      } finally {
+        if (setLoading) {
+          setIsLoading(false);
+        }
       }
-      const response = await fetch("/api/tasks");
-      if (response.ok) {
-        const data = await response.json();
-        const fetchedTasks = data.tasks || [];
-        setTasks(fetchedTasks);
-        // Clear subtasks map when tasks are refreshed to ensure fresh data
-        setSubtasksMap(new Map());
-        // Fetch parent task names for subtasks
-        await fetchParentTaskNames(fetchedTasks);
-      } else {
-        console.error("Failed to fetch tasks");
-      }
-    } catch (error) {
-      console.error("Error fetching tasks:", error);
-    } finally {
-      if (setLoading) {
-        setIsLoading(false);
-      }
-    }
-  }, [fetchParentTaskNames]);
+    },
+    [fetchParentTaskNames]
+  );
 
   const fetchGroups = useCallback(async () => {
     // Prevent concurrent fetches
