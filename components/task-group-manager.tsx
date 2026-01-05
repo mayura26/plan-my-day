@@ -899,34 +899,34 @@ export function TaskGroupManager({
     if (isParentGroup) {
       return (
         <div key={group.id}>
-        <GroupCard
-          groupName={group.name}
-          groupColor={group.color}
-          taskCount={getTaskCountForGroup(group.id)}
-          childGroupCount={childGroupCount}
-          tasks={getTasksForGroup(group.id)}
-          isExpanded={isExpanded}
-          isHidden={hiddenGroups.has(group.id)}
-          isOtherSelected={selectedGroupId !== null && selectedGroupId !== group.id}
-          showAllTasks={showAllTasks}
-          onToggleExpand={() => toggleGroupExpansion(group.id)}
-          onToggleVisibility={() => toggleGroupVisibility(group.id)}
-          onSelect={() => {
-            if (selectedGroupId === group.id) {
-              onGroupSelect?.(null);
-            } else {
-              onGroupSelect?.(group.id);
-            }
-          }}
-          onTaskClick={onTaskClick}
-          onEdit={() => handleEditGroup(group)}
-          onDelete={() => deleteGroup(group.id)}
-          onQuickAddTask={onQuickAddTask}
-          groupId={group.id}
-          isParent={isParentGroup}
-          indentLevel={level}
-          isDeleting={deletingGroupId === group.id}
-        >
+          <GroupCard
+            groupName={group.name}
+            groupColor={group.color}
+            taskCount={getTaskCountForGroup(group.id)}
+            childGroupCount={childGroupCount}
+            tasks={getTasksForGroup(group.id)}
+            isExpanded={isExpanded}
+            isHidden={hiddenGroups.has(group.id)}
+            isOtherSelected={selectedGroupId !== null && selectedGroupId !== group.id}
+            showAllTasks={showAllTasks}
+            onToggleExpand={() => toggleGroupExpansion(group.id)}
+            onToggleVisibility={() => toggleGroupVisibility(group.id)}
+            onSelect={() => {
+              if (selectedGroupId === group.id) {
+                onGroupSelect?.(null);
+              } else {
+                onGroupSelect?.(group.id);
+              }
+            }}
+            onTaskClick={onTaskClick}
+            onEdit={() => handleEditGroup(group)}
+            onDelete={() => deleteGroup(group.id)}
+            onQuickAddTask={onQuickAddTask}
+            groupId={group.id}
+            isParent={isParentGroup}
+            indentLevel={level}
+            isDeleting={deletingGroupId === group.id}
+          >
             {/* Render children inside parent wireframe when expanded */}
             {isExpanded && group.children.length > 0 && (
               <div className="mt-2 space-y-2">

@@ -106,13 +106,14 @@ export function TaskCard({
   const statusColor = getTaskStatusColor(task.status);
   const energyColor = getEnergyLevelColor(task.energy_level_required);
   const taskIsUnscheduled = !task.scheduled_start || !task.scheduled_end;
-  
+
   // If task has subtasks, check if all subtasks are scheduled
   // If all subtasks are scheduled, don't show unscheduled badge on parent
-  const allSubtasksScheduled = subtasks && subtasks.length > 0
-    ? subtasks.every((st) => st.scheduled_start && st.scheduled_end)
-    : false;
-  
+  const allSubtasksScheduled =
+    subtasks && subtasks.length > 0
+      ? subtasks.every((st) => st.scheduled_start && st.scheduled_end)
+      : false;
+
   const isUnscheduled = taskIsUnscheduled && !allSubtasksScheduled;
 
   // Get group color for the task
@@ -186,7 +187,10 @@ export function TaskCard({
                 {STATUS_LABELS[task.status]}
               </Badge>
               {showAllTasks && isUnscheduled && (
-                <Badge variant="outline" className="text-xs text-orange-600 dark:text-orange-400 border-orange-300 dark:border-orange-700">
+                <Badge
+                  variant="outline"
+                  className="text-xs text-orange-600 dark:text-orange-400 border-orange-300 dark:border-orange-700"
+                >
                   <Calendar className="w-3 h-3 flex-shrink-0" />
                   Unscheduled
                 </Badge>
@@ -226,12 +230,13 @@ export function TaskCard({
   };
 
   // Calculate subtask progress
-  const subtaskProgress = subtasks && subtasks.length > 0
-    ? {
-        completed: subtasks.filter((st) => st.status === "completed").length,
-        total: subtasks.length,
-      }
-    : null;
+  const subtaskProgress =
+    subtasks && subtasks.length > 0
+      ? {
+          completed: subtasks.filter((st) => st.status === "completed").length,
+          total: subtasks.length,
+        }
+      : null;
 
   // Render a subtask item
   const renderSubtask = (subtask: Task, index: number) => {
@@ -288,9 +293,18 @@ export function TaskCard({
     };
 
     return (
+      // biome-ignore lint/a11y/useSemanticElements: Div structure needed for complex nested layout with buttons inside
       <div
         key={subtask.id}
         onClick={handleSubtaskClick}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            handleSubtaskClick(e as unknown as React.MouseEvent);
+          }
+        }}
         className={cn(
           "flex items-center gap-1.5 pl-6 pr-2 py-1 border-l-2 border-l-primary/30 bg-muted/30 rounded-r-md overflow-hidden cursor-pointer transition-colors",
           isCompleted && "opacity-75",
@@ -354,17 +368,18 @@ export function TaskCard({
 
           {/* Energy level */}
           {subtask.energy_level_required && (
-            <span className={`text-[9px] flex items-center gap-0.5 flex-shrink-0 ${getEnergyLevelColor(subtask.energy_level_required)}`}>
+            <span
+              className={`text-[9px] flex items-center gap-0.5 flex-shrink-0 ${getEnergyLevelColor(subtask.energy_level_required)}`}
+            >
               <Zap className="h-2 w-2 flex-shrink-0" />
               {subtask.energy_level_required}
             </span>
           )}
         </div>
         {/* Action buttons for subtasks */}
-        <div
-          className="flex items-center gap-1 flex-shrink-0"
-          onClick={(e) => e.stopPropagation()}
-        >
+        {/* biome-ignore lint/a11y/noStaticElementInteractions: Container div for button group */}
+        {/* biome-ignore lint/a11y/useKeyWithClickEvents: Container div doesn't need keyboard interaction */}
+        <div className="flex items-center gap-1 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
           {subtask.status === "pending" && (
             <Button
               variant="ghost"
@@ -465,18 +480,27 @@ export function TaskCard({
             {/* Key info badges - inline */}
             <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap flex-shrink-0">
               {/* Priority badge */}
-              <Badge variant="outline" className={`text-xs h-5 px-1.5 flex-shrink-0 ${priorityColor}`}>
+              <Badge
+                variant="outline"
+                className={`text-xs h-5 px-1.5 flex-shrink-0 ${priorityColor}`}
+              >
                 P{task.priority}
               </Badge>
 
               {/* Status badge */}
-              <Badge variant="outline" className={`text-xs h-5 px-1.5 flex-shrink-0 ${statusColor}`}>
+              <Badge
+                variant="outline"
+                className={`text-xs h-5 px-1.5 flex-shrink-0 ${statusColor}`}
+              >
                 {STATUS_LABELS[task.status]}
               </Badge>
 
               {/* Unscheduled badge - only show when showAllTasks is true */}
               {showAllTasks && isUnscheduled && (
-                <Badge variant="outline" className="text-xs h-5 px-1.5 flex-shrink-0 text-orange-600 dark:text-orange-400 border-orange-300 dark:border-orange-700">
+                <Badge
+                  variant="outline"
+                  className="text-xs h-5 px-1.5 flex-shrink-0 text-orange-600 dark:text-orange-400 border-orange-300 dark:border-orange-700"
+                >
                   <Calendar className="w-3 h-3 flex-shrink-0" />
                   Unscheduled
                 </Badge>

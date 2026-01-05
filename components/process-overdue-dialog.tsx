@@ -1,6 +1,15 @@
 "use client";
 
-import { AlertTriangle, Calendar, CalendarClock, CheckCircle2, Clock, RotateCcw, X, XCircle } from "lucide-react";
+import {
+  AlertTriangle,
+  Calendar,
+  CalendarClock,
+  CheckCircle2,
+  Clock,
+  RotateCcw,
+  X,
+  XCircle,
+} from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -30,7 +39,13 @@ interface ProcessOverdueDialogProps {
   onTaskUpdate?: (taskId: string, updatedTask: Task) => void;
 }
 
-type TaskAction = "carryover" | "schedule-now" | "update-due-date" | "ignore" | "mark-complete" | null;
+type TaskAction =
+  | "carryover"
+  | "schedule-now"
+  | "update-due-date"
+  | "ignore"
+  | "mark-complete"
+  | null;
 
 interface TaskActionState {
   action: TaskAction;
@@ -339,10 +354,10 @@ export function ProcessOverdueDialog({
                         onClick={async (e) => {
                           e.preventDefault();
                           e.stopPropagation();
-                          
+
                           setProcessingTaskId(task.id);
                           setError(null);
-                          
+
                           try {
                             const response = await fetch(`/api/tasks/${task.id}`, {
                               method: "PUT",
@@ -351,30 +366,29 @@ export function ProcessOverdueDialog({
                                 status: "completed",
                               }),
                             });
-                            
+
                             if (!response.ok) {
                               const data = await response.json();
                               throw new Error(data.error || `Failed to complete ${task.title}`);
                             }
-                            
+
                             const responseData = await response.json();
                             const updatedTask = responseData.task;
-                            
+
                             // Update task locally if callback provided, otherwise refresh all
                             if (onTaskUpdate && updatedTask) {
                               onTaskUpdate(task.id, updatedTask);
                             } else {
                               onTasksUpdated();
                             }
-                            
+
                             toast.success(`Task "${task.title}" marked as complete`, {
-                              description: "The dialog will stay open so you can process more tasks.",
+                              description:
+                                "The dialog will stay open so you can process more tasks.",
                             });
                           } catch (err) {
                             setError(
-                              err instanceof Error
-                                ? err.message
-                                : "Failed to mark task as complete"
+                              err instanceof Error ? err.message : "Failed to mark task as complete"
                             );
                           } finally {
                             setProcessingTaskId(null);
@@ -557,10 +571,10 @@ export function ProcessOverdueDialog({
                         onClick={async (e) => {
                           e.preventDefault();
                           e.stopPropagation();
-                          
+
                           setProcessingTaskId(task.id);
                           setError(null);
-                          
+
                           try {
                             const response = await fetch(`/api/tasks/${task.id}`, {
                               method: "PUT",
@@ -569,30 +583,29 @@ export function ProcessOverdueDialog({
                                 status: "completed",
                               }),
                             });
-                            
+
                             if (!response.ok) {
                               const data = await response.json();
                               throw new Error(data.error || `Failed to complete ${task.title}`);
                             }
-                            
+
                             const responseData = await response.json();
                             const updatedTask = responseData.task;
-                            
+
                             // Update task locally if callback provided, otherwise refresh all
                             if (onTaskUpdate && updatedTask) {
                               onTaskUpdate(task.id, updatedTask);
                             } else {
                               onTasksUpdated();
                             }
-                            
+
                             toast.success(`Task "${task.title}" marked as complete`, {
-                              description: "The dialog will stay open so you can process more tasks.",
+                              description:
+                                "The dialog will stay open so you can process more tasks.",
                             });
                           } catch (err) {
                             setError(
-                              err instanceof Error
-                                ? err.message
-                                : "Failed to mark task as complete"
+                              err instanceof Error ? err.message : "Failed to mark task as complete"
                             );
                           } finally {
                             setProcessingTaskId(null);

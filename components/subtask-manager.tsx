@@ -427,7 +427,9 @@ export function SubtaskManager({
           <div className="mt-2">{durationDisplay}</div>
         </CardHeader>
       )}
-      <CardContent className={noCard ? "p-0 space-y-3 overflow-x-hidden" : "space-y-3 overflow-x-hidden"}>
+      <CardContent
+        className={noCard ? "p-0 space-y-3 overflow-x-hidden" : "space-y-3 overflow-x-hidden"}
+      >
         {noCard && (parentTaskDuration !== null || subtasks.length > 0) && (
           <div className="pb-2 border-b overflow-x-hidden">{durationDisplay}</div>
         )}
@@ -439,9 +441,7 @@ export function SubtaskManager({
                 key={subtask.id}
                 className={cn(
                   "flex items-center gap-2 p-2.5 rounded-md border-l-2 border-l-primary/30 bg-muted/30 rounded-r-md",
-                  subtask.status === "completed"
-                    ? "opacity-75"
-                    : ""
+                  subtask.status === "completed" ? "opacity-75" : ""
                 )}
               >
                 <button

@@ -51,13 +51,14 @@ export function SlimTaskCard({
   };
 
   const taskIsUnscheduled = !task.scheduled_start || !task.scheduled_end;
-  
+
   // If task has subtasks, check if all subtasks are scheduled
   // If all subtasks are scheduled, don't show unscheduled badge on parent
-  const allSubtasksScheduled = subtasks && subtasks.length > 0
-    ? subtasks.every((st) => st.scheduled_start && st.scheduled_end)
-    : false;
-  
+  const allSubtasksScheduled =
+    subtasks && subtasks.length > 0
+      ? subtasks.every((st) => st.scheduled_start && st.scheduled_end)
+      : false;
+
   const isUnscheduled = taskIsUnscheduled && !allSubtasksScheduled;
 
   const getStatusBadgeColor = (status: string) => {
@@ -109,10 +110,12 @@ export function SlimTaskCard({
       onClick={handleClick}
     >
       {/* Line 1: Title */}
-      <div className={cn(
-        "font-medium truncate leading-tight flex items-center gap-1 overflow-x-hidden",
-        isSubtask ? "text-[11px]" : "text-xs"
-      )}>
+      <div
+        className={cn(
+          "font-medium truncate leading-tight flex items-center gap-1 overflow-x-hidden",
+          isSubtask ? "text-[11px]" : "text-xs"
+        )}
+      >
         {task.locked && <span className="text-[10px] flex-shrink-0">🔒</span>}
         {isSubtask && subtaskIndex !== undefined && subtaskTotal !== undefined && (
           <span className="text-[10px] text-muted-foreground font-medium flex-shrink-0">
@@ -123,10 +126,12 @@ export function SlimTaskCard({
       </div>
 
       {/* Line 2: Priority, Status, Duration */}
-      <div className={cn(
-        "flex items-center gap-1 flex-wrap overflow-x-hidden",
-        isSubtask ? "mt-0.5" : "mt-1"
-      )}>
+      <div
+        className={cn(
+          "flex items-center gap-1 flex-wrap overflow-x-hidden",
+          isSubtask ? "mt-0.5" : "mt-1"
+        )}
+      >
         <Badge
           variant="outline"
           className={cn(
@@ -160,10 +165,12 @@ export function SlimTaskCard({
           </Badge>
         )}
         {task.duration && (
-          <span className={cn(
-            "text-muted-foreground flex items-center gap-0.5 flex-shrink-0",
-            isSubtask ? "text-[9px]" : "text-[10px]"
-          )}>
+          <span
+            className={cn(
+              "text-muted-foreground flex items-center gap-0.5 flex-shrink-0",
+              isSubtask ? "text-[9px]" : "text-[10px]"
+            )}
+          >
             <Clock className={isSubtask ? "h-2 w-2" : "h-2.5 w-2.5"} />
             {formatDuration(task.duration)}
           </span>
@@ -176,7 +183,7 @@ export function SlimTaskCard({
   if (subtasks && subtasks.length > 0) {
     // Use allSubtasks for step numbering if provided, otherwise fall back to subtasks
     const subtasksForNumbering = allSubtasks || subtasks;
-    
+
     return (
       <div className="space-y-1 border rounded-md border-border bg-card/50 p-1 overflow-x-hidden">
         {/* Parent task card */}

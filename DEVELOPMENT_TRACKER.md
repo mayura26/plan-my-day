@@ -1,8 +1,4 @@
 - [ ] Create schedule ASAP which will shuffle stuff down
-- [ ] make sure page shown is timezone tocrect on today
-- [ ] On task view sub tasks aren't goruped properly
-- [ ] Lets also make subtasks look better on main page
-
 
 ### ⏳ Pending
 - [ ] AI-powered task scheduling engine
