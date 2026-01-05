@@ -943,15 +943,16 @@ export default function CalendarPage() {
   const handleViewModeChange = (mode: ViewMode) => {
     setViewMode(mode);
     // When switching views, update currentDate appropriately
+    const today = getDateInTimezone(new Date(), timezone);
     if (mode === "day") {
       // If switching to day view, use today or keep current date
-      setCurrentDate(new Date());
+      setCurrentDate(today);
     } else if (mode === "month") {
       // If switching to month view, use current month
-      setCurrentDate(startOfMonth(new Date()));
+      setCurrentDate(startOfMonth(today));
     } else {
       // Week view - use current week
-      setCurrentDate(new Date());
+      setCurrentDate(today);
     }
   };
 

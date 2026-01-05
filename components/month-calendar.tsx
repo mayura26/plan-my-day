@@ -87,7 +87,7 @@ export function MonthCalendar({
   };
 
   const goToToday = () => {
-    const today = new Date();
+    const today = getDateInTimezone(new Date(), timezone);
     setCurrentDate(today);
     onDateChange?.(today);
   };

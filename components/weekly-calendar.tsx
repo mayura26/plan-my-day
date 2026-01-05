@@ -252,7 +252,8 @@ export function WeeklyCalendar({
   };
 
   const goToToday = () => {
-    setCurrentWeek(new Date());
+    const today = getDateInTimezone(new Date(), timezone);
+    setCurrentWeek(today);
   };
 
   const getCurrentTimePosition = () => {
