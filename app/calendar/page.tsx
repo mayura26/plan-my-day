@@ -15,7 +15,7 @@ import { format, startOfMonth } from "date-fns";
 import { CheckSquare, ChevronDown, ChevronRight, Plus, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CalendarSkeleton } from "@/components/calendar-skeleton";
 import { DayCalendar } from "@/components/day-calendar";
 import { DayNoteDialog } from "@/components/day-note-dialog";
@@ -635,21 +635,34 @@ export default function CalendarPage() {
     ? filteredTasks.filter((task) => task.scheduled_start && task.scheduled_end)
     : filteredTasks.filter((task) => task.scheduled_start && task.scheduled_end);
 
-  const unscheduledTasks = filteredTasks.filter((task) => {
-    const isUnscheduled = !task.scheduled_start || !task.scheduled_end;
-    if (!isUnscheduled) return false;
+  const unscheduledTasks = useMemo(() => {
+    return filteredTasks.filter((task) => {
+      const isUnscheduled = !task.scheduled_start || !task.scheduled_end;
+      if (!isUnscheduled) return false;
 
-    // Only show pending tasks
-    if (task.status !== "pending") return false;
+      // Only show pending tasks
+      if (task.status !== "pending") return false;
 
-    // Include parent tasks with subtasks (they will be shown with nested subtasks)
-    // Exclude subtasks themselves (they will be shown nested under their parent)
-    if (task.parent_task_id) {
-      return false;
-    }
+      // Exclude subtasks themselves (they will be shown nested under their parent)
+      if (task.parent_task_id) {
+        return false;
+      }
 
-    return true;
-  });
+      // If task has subtasks, check if all subtasks are scheduled
+      // If all subtasks are scheduled, exclude the parent task (it's considered scheduled)
+      const taskSubtasks = subtasksMap.get(task.id) || [];
+      if (taskSubtasks.length > 0) {
+        const allSubtasksScheduled = taskSubtasks.every(
+          (st) => st.scheduled_start && st.scheduled_end
+        );
+        if (allSubtasksScheduled) {
+          return false; // Exclude parent task if all subtasks are scheduled
+        }
+      }
+
+      return true;
+    });
+  }, [filteredTasks, subtasksMap]);
 
   // Fetch subtasks for parent tasks that have them
   useEffect(() => {
@@ -1272,6 +1285,7 @@ export default function CalendarPage() {
                             task={task}
                             onTaskClick={handleTaskClick}
                             subtasks={filteredSubtasks.length > 0 ? filteredSubtasks : undefined}
+                            allSubtasks={allSubtasks.length > 0 ? allSubtasks : undefined}
                           />
                         );
                       })}

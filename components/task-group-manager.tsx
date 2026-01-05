@@ -483,6 +483,7 @@ function GroupCard({
                 task={task}
                 onTaskClick={onTaskClick}
                 subtasks={filteredSubtasks.length > 0 ? filteredSubtasks : undefined}
+                allSubtasks={allSubtasks.length > 0 ? allSubtasks : undefined}
                 showAllTasks={showAllTasks}
               />
             );
@@ -836,7 +837,17 @@ export function TaskGroupManager({
         return false;
       }
 
-      // Include parent tasks with subtasks (they will be shown with nested subtasks)
+      // If task has subtasks, check if all subtasks are scheduled
+      // If all subtasks are scheduled, exclude the parent task (it's considered scheduled)
+      const taskSubtasks = subtasksMap.get(task.id) || [];
+      if (taskSubtasks.length > 0) {
+        const allSubtasksScheduled = taskSubtasks.every(
+          (st) => st.scheduled_start && st.scheduled_end
+        );
+        if (allSubtasksScheduled) {
+          return false; // Exclude parent task if all subtasks are scheduled
+        }
+      }
 
       if (groupId === null) {
         return !task.group_id;

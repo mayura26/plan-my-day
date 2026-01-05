@@ -12,16 +12,22 @@ interface SlimTaskCardProps {
   task: Task;
   onTaskClick?: (taskId: string) => void;
   subtasks?: Task[];
+  allSubtasks?: Task[]; // All subtasks (unfiltered) for calculating step numbers
   isSubtask?: boolean;
   showAllTasks?: boolean;
+  subtaskIndex?: number;
+  subtaskTotal?: number;
 }
 
 export function SlimTaskCard({
   task,
   onTaskClick,
   subtasks,
+  allSubtasks,
   isSubtask = false,
   showAllTasks = false,
+  subtaskIndex,
+  subtaskTotal,
 }: SlimTaskCardProps) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: task.id,
@@ -98,7 +104,7 @@ export function SlimTaskCard({
       className={cn(
         "w-full text-left py-1.5 px-2 rounded border bg-card hover:bg-accent/50 transition-colors cursor-grab active:cursor-grabbing text-xs overflow-hidden overflow-x-hidden",
         task.locked && "cursor-not-allowed opacity-75",
-        isSubtask && "ml-4 border-l-2 border-l-primary/30 bg-muted/30 py-1"
+        isSubtask && "pl-6 pr-2 border-l-2 border-l-primary/30 bg-muted/30 rounded-r-md py-1"
       )}
       onClick={handleClick}
     >
@@ -108,6 +114,11 @@ export function SlimTaskCard({
         isSubtask ? "text-[11px]" : "text-xs"
       )}>
         {task.locked && <span className="text-[10px] flex-shrink-0">🔒</span>}
+        {isSubtask && subtaskIndex !== undefined && subtaskTotal !== undefined && (
+          <span className="text-[10px] text-muted-foreground font-medium flex-shrink-0">
+            Step {subtaskIndex + 1} of {subtaskTotal}
+          </span>
+        )}
         <span className="truncate min-w-0">{task.title}</span>
       </div>
 
@@ -118,28 +129,42 @@ export function SlimTaskCard({
       )}>
         <Badge
           variant="outline"
-          className={cn("text-[10px] px-1 py-0 h-4 border-0", getPriorityBadgeColor(task.priority))}
+          className={cn(
+            isSubtask ? "text-[9px] h-3.5 px-1" : "text-[10px] px-1 py-0 h-4",
+            "border-0 flex-shrink-0",
+            getPriorityBadgeColor(task.priority)
+          )}
         >
           P{task.priority}
         </Badge>
         <Badge
           variant="outline"
-          className={cn("text-[10px] px-1 py-0 h-4 border-0", getStatusBadgeColor(task.status))}
+          className={cn(
+            isSubtask ? "text-[9px] h-3.5 px-1" : "text-[10px] px-1 py-0 h-4",
+            "border-0 flex-shrink-0",
+            getStatusBadgeColor(task.status)
+          )}
         >
           {STATUS_LABELS[task.status]}
         </Badge>
         {showAllTasks && isUnscheduled && (
           <Badge
             variant="outline"
-            className="text-[10px] px-1 py-0 h-4 border-0 bg-orange-100 text-orange-700 dark:bg-orange-900/50 dark:text-orange-300"
+            className={cn(
+              isSubtask ? "text-[9px] h-3.5 px-1" : "text-[10px] px-1 py-0 h-4",
+              "border-0 bg-orange-100 text-orange-700 dark:bg-orange-900/50 dark:text-orange-300 flex-shrink-0"
+            )}
           >
-            <Calendar className="h-2.5 w-2.5 flex-shrink-0" />
+            <Calendar className={isSubtask ? "h-2 w-2" : "h-2.5 w-2.5"} />
             Unscheduled
           </Badge>
         )}
         {task.duration && (
-          <span className="text-[10px] text-muted-foreground flex items-center gap-0.5">
-            <Clock className="h-2.5 w-2.5" />
+          <span className={cn(
+            "text-muted-foreground flex items-center gap-0.5 flex-shrink-0",
+            isSubtask ? "text-[9px]" : "text-[10px]"
+          )}>
+            <Clock className={isSubtask ? "h-2 w-2" : "h-2.5 w-2.5"} />
             {formatDuration(task.duration)}
           </span>
         )}
@@ -149,21 +174,30 @@ export function SlimTaskCard({
 
   // If this is a parent task with subtasks, wrap it in a container with nested subtasks
   if (subtasks && subtasks.length > 0) {
+    // Use allSubtasks for step numbering if provided, otherwise fall back to subtasks
+    const subtasksForNumbering = allSubtasks || subtasks;
+    
     return (
       <div className="space-y-1 border rounded-md border-border bg-card/50 p-1 overflow-x-hidden">
         {/* Parent task card */}
         <div className="pb-1 border-b border-border/50 overflow-x-hidden">{taskCardContent}</div>
         {/* Nested subtasks */}
-        <div className="space-y-1 pl-2 overflow-x-hidden">
-          {subtasks.map((subtask) => (
-            <SlimTaskCard
-              key={subtask.id}
-              task={subtask}
-              onTaskClick={onTaskClick}
-              isSubtask={true}
-              showAllTasks={showAllTasks}
-            />
-          ))}
+        <div className="space-y-1 overflow-x-hidden">
+          {subtasks.map((subtask) => {
+            // Find the original index in allSubtasks (or subtasks if allSubtasks not provided)
+            const originalIndex = subtasksForNumbering.findIndex((st) => st.id === subtask.id);
+            return (
+              <SlimTaskCard
+                key={subtask.id}
+                task={subtask}
+                onTaskClick={onTaskClick}
+                isSubtask={true}
+                showAllTasks={showAllTasks}
+                subtaskIndex={originalIndex >= 0 ? originalIndex : undefined}
+                subtaskTotal={subtasksForNumbering.length}
+              />
+            );
+          })}
         </div>
       </div>
     );
