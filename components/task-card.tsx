@@ -1,6 +1,6 @@
 "use client";
 
-import { Clock, Flag, Lock, Trash2, Zap } from "lucide-react";
+import { Calendar, CheckCircle2, Circle, Clock, Flag, Lock, Trash2, Zap } from "lucide-react";
 import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -30,6 +30,8 @@ interface TaskCardProps {
   onUnschedule?: (taskId: string) => Promise<void>;
   compact?: boolean;
   groups?: TaskGroup[];
+  subtasks?: Task[];
+  showAllTasks?: boolean;
 }
 
 export function TaskCard({
@@ -40,6 +42,8 @@ export function TaskCard({
   onUnschedule,
   compact = false,
   groups = [],
+  subtasks,
+  showAllTasks = false,
 }: TaskCardProps) {
   const { confirm } = useConfirmDialog();
   const [isUpdating, setIsUpdating] = useState(false);
@@ -99,6 +103,7 @@ export function TaskCard({
   const priorityColor = getTaskPriorityColor(task.priority);
   const statusColor = getTaskStatusColor(task.status);
   const energyColor = getEnergyLevelColor(task.energy_level_required);
+  const isUnscheduled = !task.scheduled_start || !task.scheduled_end;
 
   // Get group color for the task
   const group = task.group_id ? groups.find((g) => g.id === task.group_id) : null;
@@ -170,6 +175,12 @@ export function TaskCard({
               <Badge variant="outline" className={`text-xs ${statusColor}`}>
                 {STATUS_LABELS[task.status]}
               </Badge>
+              {showAllTasks && isUnscheduled && (
+                <Badge variant="outline" className="text-xs text-orange-600 dark:text-orange-400 border-orange-300 dark:border-orange-700">
+                  <Calendar className="w-3 h-3 flex-shrink-0" />
+                  Unscheduled
+                </Badge>
+              )}
             </div>
           </div>
           {/* Group badge in bottom right corner */}
@@ -204,20 +215,85 @@ export function TaskCard({
     onEdit?.(task.id);
   };
 
-  return (
+  // Calculate subtask progress
+  const subtaskProgress = subtasks && subtasks.length > 0
+    ? {
+        completed: subtasks.filter((st) => st.status === "completed").length,
+        total: subtasks.length,
+      }
+    : null;
+
+  // Render a subtask item
+  const renderSubtask = (subtask: Task, index: number) => {
+    const isCompleted = subtask.status === "completed";
+    return (
+      <div
+        key={subtask.id}
+        className={cn(
+          "flex items-center gap-1.5 pl-6 pr-2 py-1 border-l-2 border-l-primary/30 bg-muted/30 rounded-r-md overflow-hidden",
+          isCompleted && "opacity-75"
+        )}
+      >
+        <div className="flex items-center gap-2 flex-1 min-w-0 overflow-hidden">
+          <div className="flex-shrink-0">
+            {isCompleted ? (
+              <CheckCircle2 className="h-4 w-4 text-green-500" />
+            ) : (
+              <Circle className="h-4 w-4 text-muted-foreground" />
+            )}
+          </div>
+          <div className="flex-1 min-w-0 overflow-hidden">
+            <div className="flex items-center gap-1.5 min-w-0">
+              <span className="text-[10px] text-muted-foreground font-medium flex-shrink-0">
+                Step {index + 1} of {subtasks?.length || 0}
+              </span>
+              <span
+                className={cn(
+                  "text-[11px] truncate min-w-0",
+                  isCompleted && "line-through text-muted-foreground"
+                )}
+              >
+                {subtask.title}
+              </span>
+            </div>
+          </div>
+        </div>
+        <div className="flex items-center gap-1 flex-shrink-0">
+          {subtask.duration && (
+            <span className="text-[9px] text-muted-foreground flex items-center gap-0.5">
+              <Clock className="h-2 w-2 flex-shrink-0" />
+              {formatDuration(subtask.duration)}
+            </span>
+          )}
+          <Badge
+            variant="outline"
+            className={cn(
+              "text-[9px] h-3.5 px-1 flex-shrink-0",
+              getTaskStatusColor(subtask.status)
+            )}
+          >
+            {STATUS_LABELS[subtask.status]}
+          </Badge>
+        </div>
+      </div>
+    );
+  };
+
+  const mainCard = (
     <Card
       className={cn(
         "transition-all hover:shadow-sm relative border-l-2 cursor-pointer",
         isOverdue && "border-red-500 bg-red-50/50 dark:bg-red-950/10",
         isDueSoon && !isOverdue && "border-yellow-500 bg-yellow-50/50 dark:bg-yellow-950/10",
         !groupColor && !isOverdue && !isDueSoon && "border-l-gray-300 dark:border-l-gray-700",
-        onEdit && "hover:bg-accent/50"
+        onEdit && "hover:bg-accent/50",
+        subtasks && subtasks.length > 0 && "rounded-b-none"
       )}
       style={borderStyle}
       onClick={handleCardClick}
     >
-      <CardContent className="px-3 pt-0.5 pb-1.5">
-        <div className="flex items-center gap-3">
+      <CardContent className="px-3 pt-0.5 pb-1.5 overflow-hidden">
+        <div className="flex items-center gap-3 min-w-0">
           {/* Checkbox */}
           <Checkbox
             checked={task.status === "completed"}
@@ -228,9 +304,9 @@ export function TaskCard({
           />
 
           {/* Main content - horizontal layout */}
-          <div className="flex-1 min-w-0 flex items-center gap-3 flex-wrap">
+          <div className="flex-1 min-w-0 flex items-center gap-2 sm:gap-3 flex-wrap overflow-hidden">
             {/* Title */}
-            <div className="flex-1 min-w-0">
+            <div className="flex-1 min-w-0 overflow-hidden">
               <h4
                 className={cn(
                   "text-sm font-medium truncate",
@@ -243,34 +319,60 @@ export function TaskCard({
               {task.description && (
                 <p className="text-xs text-muted-foreground truncate mt-0.5">{task.description}</p>
               )}
+              {/* Subtask progress indicator */}
+              {subtaskProgress && (
+                <div className="flex items-center gap-2 mt-1 overflow-hidden">
+                  <span className="text-[10px] text-muted-foreground flex-shrink-0">
+                    {subtaskProgress.completed}/{subtaskProgress.total} subtasks completed
+                  </span>
+                  <div className="flex-1 max-w-[100px] bg-secondary rounded-full h-1 min-w-0">
+                    <div
+                      className="bg-primary h-1 rounded-full transition-all"
+                      style={{
+                        width: `${(subtaskProgress.completed / subtaskProgress.total) * 100}%`,
+                      }}
+                    />
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Key info badges - inline */}
-            <div className="flex items-center gap-2 flex-wrap">
+            <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap flex-shrink-0">
               {/* Priority badge */}
-              <Badge variant="outline" className={`text-xs h-5 px-1.5 ${priorityColor}`}>
+              <Badge variant="outline" className={`text-xs h-5 px-1.5 flex-shrink-0 ${priorityColor}`}>
                 P{task.priority}
               </Badge>
 
               {/* Status badge */}
-              <Badge variant="outline" className={`text-xs h-5 px-1.5 ${statusColor}`}>
+              <Badge variant="outline" className={`text-xs h-5 px-1.5 flex-shrink-0 ${statusColor}`}>
                 {STATUS_LABELS[task.status]}
               </Badge>
 
+              {/* Unscheduled badge - only show when showAllTasks is true */}
+              {showAllTasks && isUnscheduled && (
+                <Badge variant="outline" className="text-xs h-5 px-1.5 flex-shrink-0 text-orange-600 dark:text-orange-400 border-orange-300 dark:border-orange-700">
+                  <Calendar className="w-3 h-3 flex-shrink-0" />
+                  Unscheduled
+                </Badge>
+              )}
+
               {/* Duration */}
               {task.duration && (
-                <span className="text-xs text-muted-foreground flex items-center gap-1">
-                  <Clock className="w-3 h-3" />
-                  {formatDuration(task.duration)}
+                <span className="text-xs text-muted-foreground flex items-center gap-1 flex-shrink-0">
+                  <Clock className="w-3 h-3 flex-shrink-0" />
+                  <span className="truncate">{formatDuration(task.duration)}</span>
                 </span>
               )}
 
               {/* Start time */}
               {task.scheduled_start && (
-                <span className="text-xs text-muted-foreground flex items-center gap-1">
-                  <Clock className="w-3 h-3" />
-                  {formatDateShort(task.scheduled_start, timezone)}{" "}
-                  {formatTimeShort(task.scheduled_start, timezone)}
+                <span className="text-xs text-muted-foreground flex items-center gap-1 flex-shrink-0">
+                  <Clock className="w-3 h-3 flex-shrink-0" />
+                  <span className="truncate">
+                    {formatDateShort(task.scheduled_start, timezone)}{" "}
+                    {formatTimeShort(task.scheduled_start, timezone)}
+                  </span>
                 </span>
               )}
 
@@ -278,25 +380,25 @@ export function TaskCard({
               {task.due_date && (
                 <Badge
                   variant="outline"
-                  className="text-xs h-5 px-1.5 bg-red-100 text-red-700 dark:bg-red-900/50 dark:text-red-300 border-red-200 dark:border-red-800"
+                  className="text-xs h-5 px-1.5 bg-red-100 text-red-700 dark:bg-red-900/50 dark:text-red-300 border-red-200 dark:border-red-800 flex-shrink-0"
                 >
-                  <Flag className="w-3 h-3" />
-                  {formatDateShort(task.due_date, timezone)}
+                  <Flag className="w-3 h-3 flex-shrink-0" />
+                  <span className="truncate">{formatDateShort(task.due_date, timezone)}</span>
                 </Badge>
               )}
 
               {/* Energy level */}
-              <span className={`text-xs flex items-center gap-1 ${energyColor}`}>
-                <Zap className="w-3 h-3" />
+              <span className={`text-xs flex items-center gap-1 flex-shrink-0 ${energyColor}`}>
+                <Zap className="w-3 h-3 flex-shrink-0" />
                 {task.energy_level_required}
               </span>
 
               {/* Lock indicator */}
-              {task.locked && <Lock className="w-3 h-3 text-muted-foreground" />}
+              {task.locked && <Lock className="w-3 h-3 text-muted-foreground flex-shrink-0" />}
 
               {/* Overdue indicator */}
               {isOverdue && (
-                <span className="text-xs text-red-600 dark:text-red-400 font-medium">
+                <span className="text-xs text-red-600 dark:text-red-400 font-medium flex-shrink-0">
                   ⚠ Overdue
                 </span>
               )}
@@ -360,4 +462,18 @@ export function TaskCard({
       </CardContent>
     </Card>
   );
+
+  // If subtasks exist, wrap in a container
+  if (subtasks && subtasks.length > 0) {
+    return (
+      <div className="space-y-1 overflow-hidden">
+        {mainCard}
+        <div className="space-y-1 pl-2 overflow-hidden">
+          {subtasks.map((subtask, index) => renderSubtask(subtask, index))}
+        </div>
+      </div>
+    );
+  }
+
+  return mainCard;
 }

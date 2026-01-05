@@ -419,7 +419,7 @@ export function TaskDetailDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleDialogClose}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto w-[95vw] md:w-full mx-2 md:mx-auto">
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto overflow-x-hidden w-[95vw] md:w-full mx-2 md:mx-auto">
         <DialogHeader>
           <div className="flex items-center justify-between gap-2 pr-8">
             <div className="flex-1">
@@ -444,7 +444,7 @@ export function TaskDetailDialog({
           </div>
         </DialogHeader>
 
-        <div className="space-y-3 sm:space-y-4">
+        <div className="space-y-3 sm:space-y-4 overflow-x-hidden">
           {/* Top Action Bar */}
           <div className="space-y-2 sm:space-y-3">
             {/* Compact Status Badges */}
@@ -633,8 +633,8 @@ export function TaskDetailDialog({
           {(task.scheduled_start ||
             task.scheduled_end ||
             (task.task_type === "task" && task.duration)) && (
-            <Card className="py-2">
-              <CardContent className="pt-0 pb-0 px-3 sm:px-6">
+            <Card className="py-2 overflow-x-hidden">
+              <CardContent className="pt-0 pb-0 px-3 sm:px-6 overflow-x-hidden">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-0 mb-2 sm:mb-3">
                   <h3 className="text-sm font-semibold flex items-center gap-2">
                     <Calendar className="h-4 w-4" />
@@ -714,8 +714,8 @@ export function TaskDetailDialog({
 
           {/* Subtasks - Only show for non-subtask tasks */}
           {!isSubtask && (
-            <Card className="py-0">
-              <CardContent className="p-0">
+            <Card className="py-0 overflow-x-hidden">
+              <CardContent className="p-0 overflow-x-hidden">
                 <button
                   type="button"
                   onClick={() => setSubtasksExpanded(!subtasksExpanded)}
@@ -739,7 +739,7 @@ export function TaskDetailDialog({
                   )}
                 </button>
                 {subtasksExpanded && (
-                  <div className="border-t py-2 px-3 sm:py-4 sm:px-6">
+                  <div className="border-t py-2 px-3 sm:py-4 sm:px-6 overflow-x-hidden">
                     <SubtaskManager
                       parentTaskId={task.id}
                       onSubtaskChange={handleSubtaskChange}
@@ -757,8 +757,8 @@ export function TaskDetailDialog({
           )}
 
           {/* Notes */}
-          <Card className="py-0">
-            <CardContent className="p-0">
+          <Card className="py-0 overflow-x-hidden">
+            <CardContent className="p-0 overflow-x-hidden">
               <button
                 type="button"
                 onClick={() => setNotesExpanded(!notesExpanded)}
@@ -782,7 +782,7 @@ export function TaskDetailDialog({
                 )}
               </button>
               {notesExpanded && (
-                <div className="border-t py-2 px-3 sm:py-4 sm:px-6">
+                <div className="border-t py-2 px-3 sm:py-4 sm:px-6 overflow-x-hidden">
                   <NotesManager
                     taskId={task.id}
                     onNotesChange={handleNotesChange}
@@ -800,8 +800,8 @@ export function TaskDetailDialog({
 
           {/* Description */}
           {task.description && (
-            <Card className="py-2">
-              <CardContent className="pt-0 pb-0 px-3 sm:px-6">
+            <Card className="py-2 overflow-x-hidden">
+              <CardContent className="pt-0 pb-0 px-3 sm:px-6 overflow-x-hidden">
                 <h3 className="text-sm font-semibold mb-1.5 sm:mb-2">Description</h3>
                 <p className="text-xs sm:text-sm text-muted-foreground whitespace-pre-wrap break-words">
                   {task.description}
@@ -812,8 +812,8 @@ export function TaskDetailDialog({
 
           {/* Blocked By Warning */}
           {isBlocked && blockedBy.length > 0 && (
-            <Card className="border-destructive bg-destructive/10 py-2">
-              <CardContent className="pt-0 pb-0 px-3 sm:px-6">
+            <Card className="border-destructive bg-destructive/10 py-2 overflow-x-hidden">
+              <CardContent className="pt-0 pb-0 px-3 sm:px-6 overflow-x-hidden">
                 <h3 className="text-sm font-semibold mb-1.5 sm:mb-2 text-destructive flex items-center gap-2">
                   <GitBranch className="h-4 w-4" />
                   Blocked by incomplete tasks
@@ -832,8 +832,8 @@ export function TaskDetailDialog({
 
           {/* Dependencies */}
           {dependencies.length > 0 && (
-            <Card className="py-2">
-              <CardContent className="pt-0 pb-0 px-3 sm:px-6">
+            <Card className="py-2 overflow-x-hidden">
+              <CardContent className="pt-0 pb-0 px-3 sm:px-6 overflow-x-hidden">
                 <h3 className="text-sm font-semibold mb-1.5 sm:mb-2 flex items-center gap-2">
                   <GitBranch className="h-4 w-4" />
                   Dependencies
@@ -863,8 +863,8 @@ export function TaskDetailDialog({
           )}
 
           {/* Task Properties */}
-          <Card className="py-2 sm:py-6">
-            <CardContent className="pt-0 pb-0 px-3 sm:px-6">
+          <Card className="py-2 sm:py-6 overflow-x-hidden">
+            <CardContent className="pt-0 pb-0 px-3 sm:px-6 overflow-x-hidden">
               <h3 className="text-sm font-semibold mb-2 sm:mb-3">Task Properties</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
                 {task.duration && (

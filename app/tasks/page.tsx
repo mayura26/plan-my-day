@@ -56,7 +56,7 @@ export default function TasksPage() {
   // Fetch tasks
   const fetchTasks = useCallback(async () => {
     try {
-      const response = await fetch("/api/tasks");
+      const response = await fetch("/api/tasks?include_subtasks=true");
       if (response.ok) {
         const data = await response.json();
         setTasks(data.tasks || []);

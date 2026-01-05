@@ -306,7 +306,7 @@ function GroupCard({
   return (
     <Card
       className={cn(
-        "transition-opacity duration-200 overflow-hidden",
+        "transition-opacity duration-200 overflow-hidden overflow-x-hidden",
         "pt-0 pb-[5px] gap-0",
         isOtherSelected && "opacity-40",
         indentLevel > 0 && `ml-${indentLevel * 4}`
@@ -316,12 +316,12 @@ function GroupCard({
       {/* Colored Header */}
       <button
         type="button"
-        className="px-3 pt-[5px] pb-0.5 cursor-pointer w-full text-left border-0 bg-transparent"
+        className="px-3 pt-[5px] pb-0.5 cursor-pointer w-full text-left border-0 bg-transparent overflow-x-hidden"
         style={{ backgroundColor: groupColor }}
         onClick={onSelect}
       >
-        <div className="flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2 flex-1 min-w-0">
+        <div className="flex items-center justify-between gap-2 overflow-x-hidden">
+          <div className="flex items-center gap-2 flex-1 min-w-0 overflow-x-hidden">
             <span className="truncate text-sm font-medium" style={{ color: textColor }}>
               {groupName}
             </span>
@@ -435,7 +435,7 @@ function GroupCard({
 
       {/* Tasks - Shown when expanded (only for non-parent groups) */}
       {isExpanded && (
-        <CardContent className="pt-0 pb-2 px-2 space-y-1 overflow-y-auto max-h-64">
+        <CardContent className="pt-0 pb-2 px-2 space-y-1 overflow-y-auto overflow-x-hidden max-h-64">
           {/* Minimal header when expanded */}
           <div className="flex items-center justify-between py-1">
             {onQuickAddTask && (
@@ -483,6 +483,7 @@ function GroupCard({
                 task={task}
                 onTaskClick={onTaskClick}
                 subtasks={filteredSubtasks.length > 0 ? filteredSubtasks : undefined}
+                showAllTasks={showAllTasks}
               />
             );
           })}

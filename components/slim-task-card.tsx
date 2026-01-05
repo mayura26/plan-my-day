@@ -2,7 +2,7 @@
 
 import { useDraggable } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
-import { Clock } from "lucide-react";
+import { Calendar, Clock } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { formatDuration, STATUS_LABELS } from "@/lib/task-utils";
 import type { Task } from "@/lib/types";
@@ -13,6 +13,7 @@ interface SlimTaskCardProps {
   onTaskClick?: (taskId: string) => void;
   subtasks?: Task[];
   isSubtask?: boolean;
+  showAllTasks?: boolean;
 }
 
 export function SlimTaskCard({
@@ -20,6 +21,7 @@ export function SlimTaskCard({
   onTaskClick,
   subtasks,
   isSubtask = false,
+  showAllTasks = false,
 }: SlimTaskCardProps) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: task.id,
@@ -41,6 +43,8 @@ export function SlimTaskCard({
       onTaskClick?.(task.id);
     }
   };
+
+  const isUnscheduled = !task.scheduled_start || !task.scheduled_end;
 
   const getStatusBadgeColor = (status: string) => {
     switch (status) {
@@ -84,20 +88,26 @@ export function SlimTaskCard({
       {...listeners}
       {...attributes}
       className={cn(
-        "w-full text-left py-1.5 px-2 rounded border bg-card hover:bg-accent/50 transition-colors cursor-grab active:cursor-grabbing text-xs overflow-hidden",
+        "w-full text-left py-1.5 px-2 rounded border bg-card hover:bg-accent/50 transition-colors cursor-grab active:cursor-grabbing text-xs overflow-hidden overflow-x-hidden",
         task.locked && "cursor-not-allowed opacity-75",
-        isSubtask && "ml-4 border-l-2 border-l-primary/30 bg-muted/30"
+        isSubtask && "ml-4 border-l-2 border-l-primary/30 bg-muted/30 py-1"
       )}
       onClick={handleClick}
     >
       {/* Line 1: Title */}
-      <div className="font-medium truncate text-xs leading-tight flex items-center gap-1">
-        {task.locked && <span className="text-[10px]">🔒</span>}
-        {task.title}
+      <div className={cn(
+        "font-medium truncate leading-tight flex items-center gap-1 overflow-x-hidden",
+        isSubtask ? "text-[11px]" : "text-xs"
+      )}>
+        {task.locked && <span className="text-[10px] flex-shrink-0">🔒</span>}
+        <span className="truncate min-w-0">{task.title}</span>
       </div>
 
       {/* Line 2: Priority, Status, Duration */}
-      <div className="flex items-center gap-1 mt-1 flex-wrap">
+      <div className={cn(
+        "flex items-center gap-1 flex-wrap overflow-x-hidden",
+        isSubtask ? "mt-0.5" : "mt-1"
+      )}>
         <Badge
           variant="outline"
           className={cn("text-[10px] px-1 py-0 h-4 border-0", getPriorityBadgeColor(task.priority))}
@@ -110,6 +120,15 @@ export function SlimTaskCard({
         >
           {STATUS_LABELS[task.status]}
         </Badge>
+        {showAllTasks && isUnscheduled && (
+          <Badge
+            variant="outline"
+            className="text-[10px] px-1 py-0 h-4 border-0 bg-orange-100 text-orange-700 dark:bg-orange-900/50 dark:text-orange-300"
+          >
+            <Calendar className="h-2.5 w-2.5 flex-shrink-0" />
+            Unscheduled
+          </Badge>
+        )}
         {task.duration && (
           <span className="text-[10px] text-muted-foreground flex items-center gap-0.5">
             <Clock className="h-2.5 w-2.5" />
@@ -123,17 +142,18 @@ export function SlimTaskCard({
   // If this is a parent task with subtasks, wrap it in a container with nested subtasks
   if (subtasks && subtasks.length > 0) {
     return (
-      <div className="space-y-1 border rounded-md border-border bg-card/50 p-1">
+      <div className="space-y-1 border rounded-md border-border bg-card/50 p-1 overflow-x-hidden">
         {/* Parent task card */}
-        <div className="pb-1 border-b border-border/50">{taskCardContent}</div>
+        <div className="pb-1 border-b border-border/50 overflow-x-hidden">{taskCardContent}</div>
         {/* Nested subtasks */}
-        <div className="space-y-1 pl-2">
+        <div className="space-y-1 pl-2 overflow-x-hidden">
           {subtasks.map((subtask) => (
             <SlimTaskCard
               key={subtask.id}
               task={subtask}
               onTaskClick={onTaskClick}
               isSubtask={true}
+              showAllTasks={showAllTasks}
             />
           ))}
         </div>

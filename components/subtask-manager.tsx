@@ -427,21 +427,22 @@ export function SubtaskManager({
           <div className="mt-2">{durationDisplay}</div>
         </CardHeader>
       )}
-      <CardContent className={noCard ? "p-0 space-y-3" : "space-y-3"}>
+      <CardContent className={noCard ? "p-0 space-y-3 overflow-x-hidden" : "space-y-3 overflow-x-hidden"}>
         {noCard && (parentTaskDuration !== null || subtasks.length > 0) && (
-          <div className="pb-2 border-b">{durationDisplay}</div>
+          <div className="pb-2 border-b overflow-x-hidden">{durationDisplay}</div>
         )}
         {/* Subtask List */}
         {subtasks.length > 0 && (
-          <div className="space-y-2">
-            {subtasks.map((subtask) => (
+          <div className="space-y-2 overflow-x-hidden">
+            {subtasks.map((subtask, index) => (
               <div
                 key={subtask.id}
-                className={`flex items-center gap-2 p-2 rounded-md border ${
+                className={cn(
+                  "flex items-center gap-2 p-2.5 rounded-md border-l-2 border-l-primary/30 bg-muted/30 rounded-r-md",
                   subtask.status === "completed"
-                    ? "bg-muted/50 border-muted"
-                    : "bg-background border-border"
-                }`}
+                    ? "opacity-75"
+                    : ""
+                )}
               >
                 <button
                   type="button"
@@ -457,13 +458,21 @@ export function SubtaskManager({
                     <Circle className="h-5 w-5 text-muted-foreground" />
                   )}
                 </button>
-                <span
-                  className={`flex-1 text-sm ${
-                    subtask.status === "completed" ? "line-through text-muted-foreground" : ""
-                  }`}
-                >
-                  {subtask.title}
-                </span>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-xs text-muted-foreground font-medium">
+                      Step {index + 1} of {subtasks.length}
+                    </span>
+                    <span
+                      className={cn(
+                        "text-sm",
+                        subtask.status === "completed" ? "line-through text-muted-foreground" : ""
+                      )}
+                    >
+                      {subtask.title}
+                    </span>
+                  </div>
+                </div>
                 {editingDurationId === subtask.id ? (
                   <div className="flex items-center gap-1">
                     <Input
@@ -493,7 +502,7 @@ export function SubtaskManager({
                     onClick={() => !readOnly && handleStartEditingDuration(subtask)}
                     disabled={readOnly}
                     className={cn(
-                      "text-xs flex items-center gap-1 transition-colors",
+                      "text-xs flex items-center gap-1 transition-colors flex-shrink-0",
                       subtask.duration
                         ? "text-muted-foreground hover:text-foreground"
                         : "text-muted-foreground/60 hover:text-muted-foreground",
@@ -501,7 +510,7 @@ export function SubtaskManager({
                     )}
                     title={readOnly ? undefined : "Click to edit duration"}
                   >
-                    <Clock className="h-3 w-3" />
+                    {!subtask.duration && <Clock className="h-3 w-3" />}
                     {subtask.duration ? (
                       formatDuration(subtask.duration)
                     ) : (
@@ -531,7 +540,7 @@ export function SubtaskManager({
         {/* Add Subtask Form */}
         {!readOnly &&
           (showAddForm ? (
-            <form onSubmit={handleAddSubtask} className="space-y-3 pt-2 border-t">
+            <form onSubmit={handleAddSubtask} className="space-y-3 pt-2 border-t overflow-x-hidden">
               <div className="space-y-1.5">
                 <Input
                   placeholder="Subtask title..."
@@ -665,7 +674,7 @@ export function SubtaskManager({
   }
 
   if (noCard) {
-    return <div className="space-y-3">{content}</div>;
+    return <div className="space-y-3 overflow-x-hidden">{content}</div>;
   }
 
   return <Card>{content}</Card>;

@@ -20,12 +20,12 @@ import {
   sortTasksByPriority,
   sortTasksByScheduledTime,
 } from "@/lib/task-utils";
-import type { Task, TaskGroup, TaskStatus } from "@/lib/types";
+import type { Task, TaskGroup, TaskStatus, TaskWithSubtasks } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { TaskCard } from "./task-card";
 
 interface GroupedTaskListProps {
-  tasks: Task[];
+  tasks: (Task | TaskWithSubtasks)[];
   groups: TaskGroup[];
   onUpdateTask: (taskId: string, updates: Partial<Task>) => Promise<void>;
   onDeleteTask: (taskId: string) => Promise<void>;
@@ -143,6 +143,11 @@ export function GroupedTaskList({
 
   // Filter tasks
   const filteredTasks = tasks.filter((task) => {
+    // Exclude subtasks from the main list (they'll be shown under their parent)
+    if (task.parent_task_id) {
+      return false;
+    }
+
     // Search filter
     if (
       searchQuery &&
@@ -294,6 +299,14 @@ export function GroupedTaskList({
       default:
         return "bg-gray-500";
     }
+  };
+
+  // Helper to extract subtasks from a task
+  const getSubtasks = (task: Task | TaskWithSubtasks): Task[] => {
+    if ("subtasks" in task && task.subtasks) {
+      return task.subtasks;
+    }
+    return [];
   };
 
   const taskCounts = {
@@ -522,24 +535,29 @@ export function GroupedTaskList({
                   </div>
                 </CardHeader>
                 {expandedSections.has(status) && (
-                  <CardContent className="pt-0">
-                    <div className="space-y-3">
+                  <CardContent className="pt-0 overflow-x-hidden">
+                    <div className="space-y-3 overflow-x-hidden">
                       {sectionTasks.length === 0 ? (
                         <p className="text-sm text-muted-foreground py-4 text-center">
                           No {getStatusLabel(status)?.toLowerCase() || status} tasks
                         </p>
                       ) : (
-                        sectionTasks.map((task) => (
-                          <TaskCard
-                            key={task.id}
-                            task={task}
-                            onUpdate={onUpdateTask}
-                            onDelete={onDeleteTask}
-                            onEdit={onEditTask}
-                            onUnschedule={onUnscheduleTask}
-                            groups={groups}
-                          />
-                        ))
+                        sectionTasks.map((task) => {
+                          const subtasks = getSubtasks(task);
+                          return (
+                            <TaskCard
+                              key={task.id}
+                              task={task}
+                              onUpdate={onUpdateTask}
+                              onDelete={onDeleteTask}
+                              onEdit={onEditTask}
+                              onUnschedule={onUnscheduleTask}
+                              groups={groups}
+                              subtasks={subtasks.length > 0 ? subtasks : undefined}
+                              showAllTasks={showAllTasks}
+                            />
+                          );
+                        })
                       )}
                     </div>
                   </CardContent>
@@ -573,19 +591,23 @@ export function GroupedTaskList({
                 </div>
               </CardHeader>
               {expandedSections.has("ungrouped") && (
-                <CardContent className="pt-0">
-                  <div className="space-y-3">
-                    {(groupedTasks.ungrouped || []).map((task) => (
-                      <TaskCard
-                        key={task.id}
-                        task={task}
-                        onUpdate={onUpdateTask}
-                        onDelete={onDeleteTask}
-                        onEdit={onEditTask}
-                        onUnschedule={onUnscheduleTask}
-                        groups={groups}
-                      />
-                    ))}
+                <CardContent className="pt-0 overflow-x-hidden">
+                  <div className="space-y-3 overflow-x-hidden">
+                    {(groupedTasks.ungrouped || []).map((task) => {
+                      const subtasks = getSubtasks(task);
+                      return (
+                        <TaskCard
+                          key={task.id}
+                          task={task}
+                          onUpdate={onUpdateTask}
+                          onDelete={onDeleteTask}
+                          onEdit={onEditTask}
+                          onUnschedule={onUnscheduleTask}
+                          groups={groups}
+                          subtasks={subtasks.length > 0 ? subtasks : undefined}
+                        />
+                      );
+                    })}
                   </div>
                 </CardContent>
               )}
@@ -718,19 +740,23 @@ export function GroupedTaskList({
                                 </div>
                               </CardHeader>
                               {expandedSections.has(childGroup.id) && (
-                                <CardContent className="pt-0">
-                                  <div className="space-y-3">
-                                    {sectionTasks.map((task) => (
-                                      <TaskCard
-                                        key={task.id}
-                                        task={task}
-                                        onUpdate={onUpdateTask}
-                                        onDelete={onDeleteTask}
-                                        onEdit={onEditTask}
-                                        onUnschedule={onUnscheduleTask}
-                                        groups={groups}
-                                      />
-                                    ))}
+                                <CardContent className="pt-0 overflow-x-hidden">
+                                  <div className="space-y-3 overflow-x-hidden">
+                                    {sectionTasks.map((task) => {
+                                      const subtasks = getSubtasks(task);
+                                      return (
+                                        <TaskCard
+                                          key={task.id}
+                                          task={task}
+                                          onUpdate={onUpdateTask}
+                                          onDelete={onDeleteTask}
+                                          onEdit={onEditTask}
+                                          onUnschedule={onUnscheduleTask}
+                                          groups={groups}
+                                          subtasks={subtasks.length > 0 ? subtasks : undefined}
+                                        />
+                                      );
+                                    })}
                                     {sectionTasks.length === 0 && (
                                       <p className="text-sm text-muted-foreground py-2 text-center">
                                         No tasks in this group
@@ -825,19 +851,24 @@ export function GroupedTaskList({
                     </div>
                   </CardHeader>
                   {expandedSections.has(hierarchyItem.id) && (
-                    <CardContent className="pt-0">
-                      <div className="space-y-3">
-                        {sectionTasks.map((task) => (
-                          <TaskCard
-                            key={task.id}
-                            task={task}
-                            onUpdate={onUpdateTask}
-                            onDelete={onDeleteTask}
-                            onEdit={onEditTask}
-                            onUnschedule={onUnscheduleTask}
-                            groups={groups}
-                          />
-                        ))}
+                    <CardContent className="pt-0 overflow-x-hidden">
+                      <div className="space-y-3 overflow-x-hidden">
+                        {sectionTasks.map((task) => {
+                          const subtasks = getSubtasks(task);
+                          return (
+                            <TaskCard
+                              key={task.id}
+                              task={task}
+                              onUpdate={onUpdateTask}
+                              onDelete={onDeleteTask}
+                              onEdit={onEditTask}
+                              onUnschedule={onUnscheduleTask}
+                              groups={groups}
+                              subtasks={subtasks.length > 0 ? subtasks : undefined}
+                              showAllTasks={showAllTasks}
+                            />
+                          );
+                        })}
                       </div>
                     </CardContent>
                   )}
@@ -857,17 +888,21 @@ export function GroupedTaskList({
               </CardContent>
             </Card>
           ) : (
-            sortedTasks.map((task) => (
-              <TaskCard
-                key={task.id}
-                task={task}
-                onUpdate={onUpdateTask}
-                onDelete={onDeleteTask}
-                onEdit={onEditTask}
-                onUnschedule={onUnscheduleTask}
-                groups={groups}
-              />
-            ))
+            sortedTasks.map((task) => {
+              const subtasks = getSubtasks(task);
+              return (
+                <TaskCard
+                  key={task.id}
+                  task={task}
+                  onUpdate={onUpdateTask}
+                  onDelete={onDeleteTask}
+                  onEdit={onEditTask}
+                  onUnschedule={onUnscheduleTask}
+                  groups={groups}
+                  subtasks={subtasks.length > 0 ? subtasks : undefined}
+                />
+              );
+            })
           )}
         </div>
       )}
