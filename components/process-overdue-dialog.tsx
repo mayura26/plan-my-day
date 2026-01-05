@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertTriangle, Calendar, CalendarClock, Clock, RotateCcw, X, XCircle } from "lucide-react";
+import { AlertTriangle, Calendar, CalendarClock, CheckCircle2, Clock, RotateCcw, X, XCircle } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -27,9 +27,10 @@ interface ProcessOverdueDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onTasksUpdated: () => void;
+  onTaskUpdate?: (taskId: string, updatedTask: Task) => void;
 }
 
-type TaskAction = "carryover" | "schedule-now" | "update-due-date" | "ignore" | null;
+type TaskAction = "carryover" | "schedule-now" | "update-due-date" | "ignore" | "mark-complete" | null;
 
 interface TaskActionState {
   action: TaskAction;
@@ -44,6 +45,7 @@ export function ProcessOverdueDialog({
   open,
   onOpenChange,
   onTasksUpdated,
+  onTaskUpdate,
 }: ProcessOverdueDialogProps) {
   const { timezone } = useUserTimezone();
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
@@ -186,6 +188,21 @@ export function ProcessOverdueDialog({
             }
           });
           promises.push(promise);
+        } else if (actionState.action === "mark-complete") {
+          // Mark task as completed
+          const promise = fetch(`/api/tasks/${taskId}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              status: "completed",
+            }),
+          }).then(async (res) => {
+            if (!res.ok) {
+              const data = await res.json();
+              throw new Error(data.error || `Failed to complete ${task.title}`);
+            }
+          });
+          promises.push(promise);
         }
       }
 
@@ -297,7 +314,7 @@ export function ProcessOverdueDialog({
 
                 {/* Action Selection */}
                 {taskType === "scheduled" ? (
-                  // Scheduled task: only carryover option
+                  // Scheduled task: carryover and mark complete options
                   <div className="space-y-2">
                     <Label>Action</Label>
                     <div className="flex items-center gap-2">
@@ -315,6 +332,61 @@ export function ProcessOverdueDialog({
                       >
                         <RotateCcw className="h-4 w-4 mr-2" />
                         Create Carryover
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={async (e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          
+                          setProcessingTaskId(task.id);
+                          setError(null);
+                          
+                          try {
+                            const response = await fetch(`/api/tasks/${task.id}`, {
+                              method: "PUT",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({
+                                status: "completed",
+                              }),
+                            });
+                            
+                            if (!response.ok) {
+                              const data = await response.json();
+                              throw new Error(data.error || `Failed to complete ${task.title}`);
+                            }
+                            
+                            const responseData = await response.json();
+                            const updatedTask = responseData.task;
+                            
+                            // Update task locally if callback provided, otherwise refresh all
+                            if (onTaskUpdate && updatedTask) {
+                              onTaskUpdate(task.id, updatedTask);
+                            } else {
+                              onTasksUpdated();
+                            }
+                            
+                            toast.success(`Task "${task.title}" marked as complete`, {
+                              description: "The dialog will stay open so you can process more tasks.",
+                            });
+                          } catch (err) {
+                            setError(
+                              err instanceof Error
+                                ? err.message
+                                : "Failed to mark task as complete"
+                            );
+                          } finally {
+                            setProcessingTaskId(null);
+                          }
+                        }}
+                        className="flex-1"
+                        type="button"
+                        disabled={processingTaskId === task.id}
+                        loading={processingTaskId === task.id}
+                      >
+                        <CheckCircle2 className="h-4 w-4 mr-2" />
+                        Mark Complete
                       </Button>
                       {actionState?.action === "carryover" && (
                         <Button
@@ -455,10 +527,10 @@ export function ProcessOverdueDialog({
                     ) : null}
                   </div>
                 ) : (
-                  // Due date task: three options
+                  // Due date task: four options
                   <div className="space-y-2">
                     <Label>Action</Label>
-                    <div className="grid grid-cols-3 gap-2">
+                    <div className="grid grid-cols-2 gap-2">
                       <Button
                         variant={actionState?.action === "schedule-now" ? "default" : "outline"}
                         size="sm"
@@ -478,6 +550,61 @@ export function ProcessOverdueDialog({
                       >
                         <Calendar className="h-3 w-3 mr-1" />
                         Update Due Date
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={async (e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          
+                          setProcessingTaskId(task.id);
+                          setError(null);
+                          
+                          try {
+                            const response = await fetch(`/api/tasks/${task.id}`, {
+                              method: "PUT",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({
+                                status: "completed",
+                              }),
+                            });
+                            
+                            if (!response.ok) {
+                              const data = await response.json();
+                              throw new Error(data.error || `Failed to complete ${task.title}`);
+                            }
+                            
+                            const responseData = await response.json();
+                            const updatedTask = responseData.task;
+                            
+                            // Update task locally if callback provided, otherwise refresh all
+                            if (onTaskUpdate && updatedTask) {
+                              onTaskUpdate(task.id, updatedTask);
+                            } else {
+                              onTasksUpdated();
+                            }
+                            
+                            toast.success(`Task "${task.title}" marked as complete`, {
+                              description: "The dialog will stay open so you can process more tasks.",
+                            });
+                          } catch (err) {
+                            setError(
+                              err instanceof Error
+                                ? err.message
+                                : "Failed to mark task as complete"
+                            );
+                          } finally {
+                            setProcessingTaskId(null);
+                          }
+                        }}
+                        className="text-xs"
+                        type="button"
+                        disabled={processingTaskId === task.id}
+                        loading={processingTaskId === task.id}
+                      >
+                        <CheckCircle2 className="h-3 w-3 mr-1" />
+                        Mark Complete
                       </Button>
                       <Button
                         variant={actionState?.action === "ignore" ? "default" : "outline"}

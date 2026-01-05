@@ -1518,6 +1518,13 @@ export default function CalendarPage() {
         open={processOverdueOpen}
         onOpenChange={setProcessOverdueOpen}
         onTasksUpdated={fetchTasks}
+        onTaskUpdate={(taskId, updatedTask) => {
+          setTasks((prev) => prev.map((task) => (task.id === taskId ? updatedTask : task)));
+          // Update selected task if it's the one being updated
+          if (selectedTask?.id === taskId) {
+            setSelectedTask(updatedTask);
+          }
+        }}
       />
 
       {/* Drag Overlay - renders dragged item in a portal to avoid overflow clipping */}
