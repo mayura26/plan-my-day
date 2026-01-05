@@ -49,6 +49,7 @@ interface TaskGroupManagerProps {
   showAllTasks?: boolean;
   onShowAllTasksChange?: (show: boolean) => void;
   onHiddenGroupsChange?: (hiddenGroups: Set<string>) => void;
+  onQuickAddTask?: (groupId: string | null) => void;
 }
 
 const defaultColors = [
@@ -197,6 +198,8 @@ interface GroupCardProps {
   onTaskClick?: (taskId: string) => void;
   onEdit?: () => void;
   onDelete?: () => void;
+  onQuickAddTask?: (groupId: string | null) => void;
+  groupId?: string | null;
   isUngrouped?: boolean;
   isParent?: boolean;
   indentLevel?: number;
@@ -221,6 +224,8 @@ function GroupCard({
   onTaskClick,
   onEdit,
   onDelete,
+  onQuickAddTask,
+  groupId,
   isUngrouped = false,
   isParent = false,
   indentLevel = 0,
@@ -358,6 +363,20 @@ function GroupCard({
       {/* Buttons Row - Shown when collapsed */}
       {!isExpanded && (
         <div className="flex items-center gap-1 px-2 py-1 bg-muted/30">
+          {onQuickAddTask && (
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-7 w-7 p-0 flex-shrink-0"
+              onClick={(e) => {
+                e.stopPropagation();
+                onQuickAddTask(isUngrouped ? null : groupId || null);
+              }}
+              title="Quick add task to this group"
+            >
+              <Plus className="h-3.5 w-3.5" />
+            </Button>
+          )}
           <Button
             size="sm"
             variant="ghost"
@@ -418,7 +437,22 @@ function GroupCard({
       {isExpanded && (
         <CardContent className="pt-0 pb-2 px-2 space-y-1 overflow-y-auto max-h-64">
           {/* Minimal header when expanded */}
-          <div className="flex items-center justify-end py-1">
+          <div className="flex items-center justify-between py-1">
+            {onQuickAddTask && (
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-6 w-6 p-0"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onQuickAddTask(isUngrouped ? null : groupId || null);
+                }}
+                title="Quick add task to this group"
+              >
+                <Plus className="h-3.5 w-3.5" />
+              </Button>
+            )}
+            <div className="flex-1" />
             <Button
               size="sm"
               variant="ghost"
@@ -471,6 +505,7 @@ export function TaskGroupManager({
   showAllTasks = false,
   onShowAllTasksChange,
   onHiddenGroupsChange,
+  onQuickAddTask,
 }: TaskGroupManagerProps) {
   const { confirm } = useConfirmDialog();
   const [groups, setGroups] = useState<TaskGroup[]>([]);
@@ -852,32 +887,34 @@ export function TaskGroupManager({
     if (isParentGroup) {
       return (
         <div key={group.id}>
-          <GroupCard
-            groupName={group.name}
-            groupColor={group.color}
-            taskCount={getTaskCountForGroup(group.id)}
-            childGroupCount={childGroupCount}
-            tasks={getTasksForGroup(group.id)}
-            isExpanded={isExpanded}
-            isHidden={hiddenGroups.has(group.id)}
-            isOtherSelected={selectedGroupId !== null && selectedGroupId !== group.id}
-            showAllTasks={showAllTasks}
-            onToggleExpand={() => toggleGroupExpansion(group.id)}
-            onToggleVisibility={() => toggleGroupVisibility(group.id)}
-            onSelect={() => {
-              if (selectedGroupId === group.id) {
-                onGroupSelect?.(null);
-              } else {
-                onGroupSelect?.(group.id);
-              }
-            }}
-            onTaskClick={onTaskClick}
-            onEdit={() => handleEditGroup(group)}
-            onDelete={() => deleteGroup(group.id)}
-            isParent={isParentGroup}
-            indentLevel={level}
-            isDeleting={deletingGroupId === group.id}
-          >
+        <GroupCard
+          groupName={group.name}
+          groupColor={group.color}
+          taskCount={getTaskCountForGroup(group.id)}
+          childGroupCount={childGroupCount}
+          tasks={getTasksForGroup(group.id)}
+          isExpanded={isExpanded}
+          isHidden={hiddenGroups.has(group.id)}
+          isOtherSelected={selectedGroupId !== null && selectedGroupId !== group.id}
+          showAllTasks={showAllTasks}
+          onToggleExpand={() => toggleGroupExpansion(group.id)}
+          onToggleVisibility={() => toggleGroupVisibility(group.id)}
+          onSelect={() => {
+            if (selectedGroupId === group.id) {
+              onGroupSelect?.(null);
+            } else {
+              onGroupSelect?.(group.id);
+            }
+          }}
+          onTaskClick={onTaskClick}
+          onEdit={() => handleEditGroup(group)}
+          onDelete={() => deleteGroup(group.id)}
+          onQuickAddTask={onQuickAddTask}
+          groupId={group.id}
+          isParent={isParentGroup}
+          indentLevel={level}
+          isDeleting={deletingGroupId === group.id}
+        >
             {/* Render children inside parent wireframe when expanded */}
             {isExpanded && group.children.length > 0 && (
               <div className="mt-2 space-y-2">
@@ -914,6 +951,8 @@ export function TaskGroupManager({
           onTaskClick={onTaskClick}
           onEdit={() => handleEditGroup(group)}
           onDelete={() => deleteGroup(group.id)}
+          onQuickAddTask={onQuickAddTask}
+          groupId={group.id}
           isParent={isParentGroup}
           indentLevel={level}
           isDeleting={deletingGroupId === group.id}
@@ -1112,6 +1151,8 @@ export function TaskGroupManager({
               }
             }}
             onTaskClick={onTaskClick}
+            onQuickAddTask={onQuickAddTask}
+            groupId={null}
             isUngrouped
             isDeleting={false}
             subtasksMap={subtasksMap}

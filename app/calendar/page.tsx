@@ -1196,6 +1196,10 @@ export default function CalendarPage() {
                     showAllTasks={showAllTasks}
                     onShowAllTasksChange={setShowAllTasks}
                     onHiddenGroupsChange={setHiddenGroups}
+                    onQuickAddTask={(groupId) => {
+                      setQuickAddInitialData({ group_id: groupId || undefined });
+                      setShowCreateForm(true);
+                    }}
                   />
                 </div>
               )}
