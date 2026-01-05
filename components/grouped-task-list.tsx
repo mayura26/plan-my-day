@@ -605,6 +605,7 @@ export function GroupedTaskList({
                           onUnschedule={onUnscheduleTask}
                           groups={groups}
                           subtasks={subtasks.length > 0 ? subtasks : undefined}
+                          showAllTasks={showAllTasks}
                         />
                       );
                     })}
@@ -754,6 +755,7 @@ export function GroupedTaskList({
                                           onUnschedule={onUnscheduleTask}
                                           groups={groups}
                                           subtasks={subtasks.length > 0 ? subtasks : undefined}
+                                          showAllTasks={showAllTasks}
                                         />
                                       );
                                     })}
