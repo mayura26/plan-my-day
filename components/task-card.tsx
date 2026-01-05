@@ -49,6 +49,8 @@ export function TaskCard({
   const [isUpdating, setIsUpdating] = useState(false);
   const [_isUnscheduling, setIsUnscheduling] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [updatingSubtasks, setUpdatingSubtasks] = useState<Set<string>>(new Set());
+  const [deletingSubtasks, setDeletingSubtasks] = useState<Set<string>>(new Set());
   const { timezone } = useUserTimezone();
 
   const handleStatusChange = async (newStatus: TaskStatus) => {
@@ -103,7 +105,15 @@ export function TaskCard({
   const priorityColor = getTaskPriorityColor(task.priority);
   const statusColor = getTaskStatusColor(task.status);
   const energyColor = getEnergyLevelColor(task.energy_level_required);
-  const isUnscheduled = !task.scheduled_start || !task.scheduled_end;
+  const taskIsUnscheduled = !task.scheduled_start || !task.scheduled_end;
+  
+  // If task has subtasks, check if all subtasks are scheduled
+  // If all subtasks are scheduled, don't show unscheduled badge on parent
+  const allSubtasksScheduled = subtasks && subtasks.length > 0
+    ? subtasks.every((st) => st.scheduled_start && st.scheduled_end)
+    : false;
+  
+  const isUnscheduled = taskIsUnscheduled && !allSubtasksScheduled;
 
   // Get group color for the task
   const group = task.group_id ? groups.find((g) => g.id === task.group_id) : null;
@@ -226,6 +236,48 @@ export function TaskCard({
   // Render a subtask item
   const renderSubtask = (subtask: Task, index: number) => {
     const isCompleted = subtask.status === "completed";
+    const isUpdatingSubtask = updatingSubtasks.has(subtask.id);
+    const isDeletingSubtask = deletingSubtasks.has(subtask.id);
+
+    const handleSubtaskStatusChange = async (newStatus: TaskStatus) => {
+      setUpdatingSubtasks((prev) => new Set(prev).add(subtask.id));
+      try {
+        await onUpdate(subtask.id, { status: newStatus });
+      } catch (error) {
+        console.error("Error updating subtask status:", error);
+      } finally {
+        setUpdatingSubtasks((prev) => {
+          const next = new Set(prev);
+          next.delete(subtask.id);
+          return next;
+        });
+      }
+    };
+
+    const handleSubtaskDelete = async () => {
+      const confirmed = await confirm({
+        title: "Delete Subtask",
+        description: "Are you sure you want to delete this subtask?",
+        variant: "destructive",
+        confirmText: "Delete",
+      });
+
+      if (!confirmed) return;
+
+      setDeletingSubtasks((prev) => new Set(prev).add(subtask.id));
+      try {
+        await onDelete(subtask.id);
+      } catch (error) {
+        console.error("Error deleting subtask:", error);
+      } finally {
+        setDeletingSubtasks((prev) => {
+          const next = new Set(prev);
+          next.delete(subtask.id);
+          return next;
+        });
+      }
+    };
+
     return (
       <div
         key={subtask.id}
@@ -274,6 +326,46 @@ export function TaskCard({
           >
             {STATUS_LABELS[subtask.status]}
           </Badge>
+        </div>
+        {/* Action buttons for subtasks */}
+        <div
+          className="flex items-center gap-1 flex-shrink-0"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {subtask.status === "pending" && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => handleSubtaskStatusChange("in_progress")}
+              disabled={isUpdatingSubtask || isDeletingSubtask}
+              className="h-7 px-2 text-[10px]"
+              title="Start"
+            >
+              Start
+            </Button>
+          )}
+          {subtask.status === "in_progress" && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => handleSubtaskStatusChange("completed")}
+              disabled={isUpdatingSubtask || isDeletingSubtask}
+              className="h-7 px-2 text-[10px]"
+              title="Complete"
+            >
+              Done
+            </Button>
+          )}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleSubtaskDelete}
+            disabled={isUpdatingSubtask || isDeletingSubtask}
+            className="h-7 px-2 text-[10px] text-red-600 hover:text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:text-red-300 dark:hover:bg-red-950/20"
+            title="Delete"
+          >
+            <Trash2 className="h-3 w-3" />
+          </Button>
         </div>
       </div>
     );

@@ -44,7 +44,15 @@ export function SlimTaskCard({
     }
   };
 
-  const isUnscheduled = !task.scheduled_start || !task.scheduled_end;
+  const taskIsUnscheduled = !task.scheduled_start || !task.scheduled_end;
+  
+  // If task has subtasks, check if all subtasks are scheduled
+  // If all subtasks are scheduled, don't show unscheduled badge on parent
+  const allSubtasksScheduled = subtasks && subtasks.length > 0
+    ? subtasks.every((st) => st.scheduled_start && st.scheduled_end)
+    : false;
+  
+  const isUnscheduled = taskIsUnscheduled && !allSubtasksScheduled;
 
   const getStatusBadgeColor = (status: string) => {
     switch (status) {
