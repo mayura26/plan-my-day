@@ -278,12 +278,23 @@ export function TaskCard({
       }
     };
 
+    const handleSubtaskClick = (e: React.MouseEvent) => {
+      // Don't trigger edit if clicking on buttons (they already stop propagation)
+      const target = e.target as HTMLElement;
+      if (target.closest("button")) {
+        return;
+      }
+      onEdit?.(subtask.id);
+    };
+
     return (
       <div
         key={subtask.id}
+        onClick={handleSubtaskClick}
         className={cn(
-          "flex items-center gap-1.5 pl-6 pr-2 py-1 border-l-2 border-l-primary/30 bg-muted/30 rounded-r-md overflow-hidden",
-          isCompleted && "opacity-75"
+          "flex items-center gap-1.5 pl-6 pr-2 py-1 border-l-2 border-l-primary/30 bg-muted/30 rounded-r-md overflow-hidden cursor-pointer transition-colors",
+          isCompleted && "opacity-75",
+          onEdit && "hover:bg-muted/50"
         )}
       >
         <div className="flex items-center gap-2 flex-1 min-w-0 overflow-hidden">
@@ -311,12 +322,18 @@ export function TaskCard({
           </div>
         </div>
         <div className="flex items-center gap-1 flex-shrink-0">
-          {subtask.duration && (
-            <span className="text-[9px] text-muted-foreground flex items-center gap-0.5">
-              <Clock className="h-2 w-2 flex-shrink-0" />
-              {formatDuration(subtask.duration)}
-            </span>
-          )}
+          {/* Priority badge */}
+          <Badge
+            variant="outline"
+            className={cn(
+              "text-[9px] h-3.5 px-1 flex-shrink-0",
+              getTaskPriorityColor(subtask.priority)
+            )}
+          >
+            P{subtask.priority}
+          </Badge>
+
+          {/* Status badge */}
           <Badge
             variant="outline"
             className={cn(
@@ -326,6 +343,22 @@ export function TaskCard({
           >
             {STATUS_LABELS[subtask.status]}
           </Badge>
+
+          {/* Duration */}
+          {subtask.duration && (
+            <span className="text-[9px] text-muted-foreground flex items-center gap-0.5 flex-shrink-0">
+              <Clock className="h-2 w-2 flex-shrink-0" />
+              {formatDuration(subtask.duration)}
+            </span>
+          )}
+
+          {/* Energy level */}
+          {subtask.energy_level_required && (
+            <span className={`text-[9px] flex items-center gap-0.5 flex-shrink-0 ${getEnergyLevelColor(subtask.energy_level_required)}`}>
+              <Zap className="h-2 w-2 flex-shrink-0" />
+              {subtask.energy_level_required}
+            </span>
+          )}
         </div>
         {/* Action buttons for subtasks */}
         <div
