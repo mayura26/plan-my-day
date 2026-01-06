@@ -551,18 +551,22 @@ export function findNextWorkingHoursSlot(
     }
 
     // After working hours or couldn't find today's start, move to next working day
-    const nextDay = new Date(currentTimeUTC);
-    nextDay.setUTCDate(nextDay.getUTCDate() + 1);
-    for (let dayOffset = 0; dayOffset < 7; dayOffset++) {
-      const candidateDay = new Date(nextDay);
-      candidateDay.setUTCDate(candidateDay.getUTCDate() + dayOffset);
-      const candidateTz = getTimeInTimezone(candidateDay, timezone);
+    // Start from tomorrow and iterate through the next 7 days to find a working day
+    for (let dayOffset = 1; dayOffset <= 7; dayOffset++) {
+      // Create a date for the target day at noon UTC (to avoid timezone edge cases)
+      const targetDayUTC = new Date(currentTimeUTC);
+      targetDayUTC.setUTCDate(targetDayUTC.getUTCDate() + dayOffset);
+      targetDayUTC.setUTCHours(12, 0, 0, 0); // Set to noon to get the date in timezone
+      
+      // Get what date this represents in the user's timezone
+      const candidateTz = getTimeInTimezone(targetDayUTC, timezone);
       const candidateDayHours = getWorkingHoursForDay(candidateTz.dayOfWeek, workingHours);
 
       if (candidateDayHours) {
-        // Found a working day, set to start of working hours
-        for (let offsetHours = -12; offsetHours <= 12; offsetHours++) {
-          const candidate = new Date(candidateDay.getTime() + offsetHours * 60 * 60 * 1000);
+        // Found a working day, find the UTC time that represents start of working hours on this day
+        // Search from 24 hours before to 24 hours after noon UTC to find the right time
+        for (let offsetHours = -24; offsetHours <= 24; offsetHours++) {
+          const candidate = new Date(targetDayUTC.getTime() + offsetHours * 60 * 60 * 1000);
           const candidateTzTime = getTimeInTimezone(candidate, timezone);
           if (
             candidateTzTime.year === candidateTz.year &&
@@ -637,20 +641,22 @@ export function getStartOfNextWorkingDay(
   workingHours: GroupScheduleHours | null,
   timezone: string
 ): Date {
-  const nextDay = new Date(currentDate);
-  nextDay.setUTCDate(nextDay.getUTCDate() + 1);
-
-  // Find the next working day
-  for (let dayOffset = 0; dayOffset < 7; dayOffset++) {
-    const candidateDay = new Date(nextDay);
-    candidateDay.setUTCDate(candidateDay.getUTCDate() + dayOffset);
-    const candidateTz = getTimeInTimezone(candidateDay, timezone);
+  // Start from tomorrow and iterate through the next 7 days to find a working day
+  for (let dayOffset = 1; dayOffset <= 7; dayOffset++) {
+    // Create a date for the target day at noon UTC (to avoid timezone edge cases)
+    const targetDayUTC = new Date(currentDate);
+    targetDayUTC.setUTCDate(targetDayUTC.getUTCDate() + dayOffset);
+    targetDayUTC.setUTCHours(12, 0, 0, 0); // Set to noon to get the date in timezone
+    
+    // Get what date this represents in the user's timezone
+    const candidateTz = getTimeInTimezone(targetDayUTC, timezone);
     const candidateDayHours = getWorkingHoursForDay(candidateTz.dayOfWeek, workingHours);
 
     if (candidateDayHours) {
-      // Found a working day, set to start of working hours
-      for (let offsetHours = -12; offsetHours <= 12; offsetHours++) {
-        const candidate = new Date(candidateDay.getTime() + offsetHours * 60 * 60 * 1000);
+      // Found a working day, find the UTC time that represents start of working hours on this day
+      // Search from 24 hours before to 24 hours after noon UTC to find the right time
+      for (let offsetHours = -24; offsetHours <= 24; offsetHours++) {
+        const candidate = new Date(targetDayUTC.getTime() + offsetHours * 60 * 60 * 1000);
         const candidateTzTime = getTimeInTimezone(candidate, timezone);
         if (
           candidateTzTime.year === candidateTz.year &&
