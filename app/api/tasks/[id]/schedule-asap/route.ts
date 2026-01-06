@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { scheduleTask } from "@/lib/scheduler-utils";
+import { rescheduleTaskWithShuffling } from "@/lib/scheduler-utils";
 import { getUserTimezone } from "@/lib/timezone-utils";
 import { db } from "@/lib/turso";
 import type { Task, TaskStatus, TaskType } from "@/lib/types";
@@ -34,7 +34,7 @@ function mapRowToTask(row: any): Task {
   };
 }
 
-// POST /api/tasks/[id]/schedule-now - Auto-schedule a task to the nearest available slot
+// POST /api/tasks/[id]/schedule-asap - Schedule a task ASAP with shuffling
 export async function POST(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const session = await auth();
@@ -89,46 +89,56 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
     ]);
     const allTasks = allTasksResult.rows.map(mapRowToTask);
 
-    // "Schedule Now" uses ASAP strategy (ignores due date)
-    const slot = scheduleTask(task, allTasks, workingHours, userTimezone, {
-      strategy: "asap",
-    });
-
-    if (!slot) {
-      // Provide more helpful error message
-      const scheduledTasksCount = allTasks.filter(
-        (t) =>
-          t.scheduled_start &&
-          t.scheduled_end &&
-          t.status !== "completed" &&
-          t.status !== "cancelled"
-      ).length;
-
-      // Check if working hours are configured
-      const hasWorkingHours =
-        workingHours &&
-        Object.keys(workingHours).length > 0 &&
-        Object.values(workingHours).some((hours) => hours !== null);
-
-      let errorMessage =
-        "Unable to schedule task. No available time slot found within the next 7 days.";
-      if (!hasWorkingHours) {
-        errorMessage +=
-          " Please configure your working hours in settings to enable scheduling.";
-      } else if (scheduledTasksCount > 0) {
-        errorMessage +=
-          " Your calendar may be too full. Try unscheduling some tasks or use 'Schedule ASAP' to shuffle existing tasks.";
-      }
-
+    // Use rescheduleTaskWithShuffling to place task at next working hour slot and shuffle conflicts
+    // This should always succeed since it shuffles tasks to make room, but handle errors gracefully
+    let result;
+    try {
+      result = rescheduleTaskWithShuffling(task, allTasks, workingHours, userTimezone);
+    } catch (error) {
+      // If shuffling fails (e.g., all tasks are locked), provide helpful error
+      const errorMessage =
+        error instanceof Error
+          ? error.message
+          : "Unable to schedule task. Could not find an available slot or resolve conflicts.";
       return NextResponse.json({ error: errorMessage }, { status: 422 });
     }
 
-    // Update task with the scheduled times
+    // Update the scheduled task
     const updatedAt = new Date().toISOString();
     await db.execute(
       `UPDATE tasks SET scheduled_start = ?, scheduled_end = ?, updated_at = ? WHERE id = ? AND user_id = ?`,
-      [slot.start.toISOString(), slot.end.toISOString(), updatedAt, id, session.user.id]
+      [
+        result.taskSlot.start.toISOString(),
+        result.taskSlot.end.toISOString(),
+        updatedAt,
+        id,
+        session.user.id,
+      ]
     );
+
+    // Update all shuffled tasks
+    const shuffledTasks: Task[] = [];
+    for (const shuffled of result.shuffledTasks) {
+      await db.execute(
+        `UPDATE tasks SET scheduled_start = ?, scheduled_end = ?, updated_at = ? WHERE id = ? AND user_id = ?`,
+        [
+          shuffled.newSlot.start.toISOString(),
+          shuffled.newSlot.end.toISOString(),
+          updatedAt,
+          shuffled.taskId,
+          session.user.id,
+        ]
+      );
+
+      // Fetch updated shuffled task
+      const shuffledResult = await db.execute(
+        "SELECT * FROM tasks WHERE id = ? AND user_id = ?",
+        [shuffled.taskId, session.user.id]
+      );
+      if (shuffledResult.rows.length > 0) {
+        shuffledTasks.push(mapRowToTask(shuffledResult.rows[0]));
+      }
+    }
 
     // Fetch updated task
     const updatedResult = await db.execute("SELECT * FROM tasks WHERE id = ? AND user_id = ?", [
@@ -140,10 +150,21 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
 
     return NextResponse.json({
       task: updatedTask,
-      message: "Task scheduled successfully",
+      shuffledTasks,
+      message:
+        shuffledTasks.length > 0
+          ? `Task scheduled with ${shuffledTasks.length} task(s) shuffled forward.`
+          : "Task scheduled successfully.",
     });
   } catch (error) {
-    console.error("Error scheduling task:", error);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    console.error("Error scheduling task ASAP:", error);
+    return NextResponse.json(
+      {
+        error:
+          error instanceof Error ? error.message : "Internal server error",
+      },
+      { status: 500 }
+    );
   }
 }
+

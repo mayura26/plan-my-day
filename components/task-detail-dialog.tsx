@@ -71,6 +71,7 @@ export function TaskDetailDialog({
   const [isStartingTask, setIsStartingTask] = useState(false);
   const [isMarkingComplete, setIsMarkingComplete] = useState(false);
   const [isScheduling, setIsScheduling] = useState(false);
+  const [isSchedulingAsap, setIsSchedulingAsap] = useState(false);
   const [isLoadingParent, setIsLoadingParent] = useState(false);
   const [dependencies, setDependencies] = useState<DependencyInfo[]>([]);
   const [blockedBy, setBlockedBy] = useState<Task[]>([]);
@@ -367,6 +368,44 @@ export function TaskDetailDialog({
     }
   };
 
+  const handleScheduleAsap = async () => {
+    if (!task) return;
+
+    setIsSchedulingAsap(true);
+    try {
+      const response = await fetch(`/api/tasks/${task.id}/schedule-asap`, {
+        method: "POST",
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Failed to schedule task ASAP");
+      }
+
+      const data = await response.json();
+      const updatedTask = data.task;
+      const shuffledTasks = data.shuffledTasks || [];
+      
+      onTaskRefresh?.(updatedTask);
+      setHasChanges(true);
+      
+      // Refresh task list to show shuffled tasks
+      onTaskUpdate?.();
+      
+      // Show success message with shuffle count
+      if (shuffledTasks.length > 0) {
+        toast.success(`Task scheduled ASAP. ${shuffledTasks.length} task(s) shuffled forward.`);
+      } else {
+        toast.success("Task scheduled ASAP successfully");
+      }
+    } catch (error) {
+      console.error("Error scheduling task ASAP:", error);
+      toast.error(error instanceof Error ? error.message : "Failed to schedule task ASAP");
+    } finally {
+      setIsSchedulingAsap(false);
+    }
+  };
+
   const getStatusColor = (status: Task["status"]) => {
     switch (status) {
       case "completed":
@@ -635,23 +674,35 @@ export function TaskDetailDialog({
             (task.task_type === "task" && task.duration)) && (
             <Card className="py-2 overflow-x-hidden">
               <CardContent className="pt-0 pb-0 px-3 sm:px-6 overflow-x-hidden">
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-0 mb-2 sm:mb-3">
+                <div className="flex flex-col gap-2 mb-2 sm:mb-3">
                   <h3 className="text-sm font-semibold flex items-center gap-2">
                     <Calendar className="h-4 w-4" />
                     Schedule
                   </h3>
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 flex-wrap">
                     {task.task_type === "task" && task.duration && task.duration > 0 && (
-                      <Button
-                        size="sm"
-                        variant="default"
-                        onClick={handleScheduleNow}
-                        loading={isScheduling}
-                        className="text-xs sm:text-sm w-full sm:w-auto"
-                      >
-                        <Clock className="h-4 w-4 mr-2" />
-                        {isScheduling ? "Scheduling..." : "Schedule Now"}
-                      </Button>
+                      <>
+                        <Button
+                          size="sm"
+                          variant="default"
+                          onClick={handleScheduleNow}
+                          loading={isScheduling}
+                          className="text-xs sm:text-sm flex-1 min-w-[140px]"
+                        >
+                          <Clock className="h-4 w-4 mr-2" />
+                          {isScheduling ? "Scheduling..." : "Schedule Now"}
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          onClick={handleScheduleAsap}
+                          loading={isSchedulingAsap}
+                          className="text-xs sm:text-sm flex-1 min-w-[140px]"
+                        >
+                          <Zap className="h-4 w-4 mr-2" />
+                          {isSchedulingAsap ? "Scheduling..." : "Schedule ASAP"}
+                        </Button>
+                      </>
                     )}
                     {onUnschedule && (task.scheduled_start || task.scheduled_end) && (
                       <Button
@@ -659,7 +710,7 @@ export function TaskDetailDialog({
                         variant="outline"
                         onClick={handleUnschedule}
                         loading={isUnscheduling}
-                        className="text-xs sm:text-sm w-full sm:w-auto"
+                        className="text-xs sm:text-sm flex-1 min-w-[140px]"
                       >
                         <CalendarX className="h-4 w-4 mr-2" />
                         {isUnscheduling ? "Unscheduling..." : "Unschedule"}

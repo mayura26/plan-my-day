@@ -170,9 +170,54 @@ export function findNearestAvailableSlot(
       slotTimeInMinutes >= startInMinutes && slotTimeInMinutes < endInMinutes;
 
     if (!isInWorkingHours) {
-      // Not in working hours - only allow if it's today and before 11 PM
-      if (!isToday || slotTimeInMinutes >= 23 * 60) {
-        // Move to next day
+      // Not in working hours - if it's after working hours on today, immediately jump to next working day
+      // This prevents getting stuck when scheduling outside work hours
+      if (isToday && slotTimeInMinutes >= endInMinutes) {
+        // After working hours today - jump to start of next working day
+        const nextDay = new Date(slotStartUTC);
+        nextDay.setUTCDate(nextDay.getUTCDate() + 1);
+        // Find the next working day
+        for (let dayOffset = 0; dayOffset < 7; dayOffset++) {
+          const candidateDay = new Date(nextDay);
+          candidateDay.setUTCDate(candidateDay.getUTCDate() + dayOffset);
+          const candidateTz = getTimeInTimezone(candidateDay);
+          const candidateDayHours = getWorkingHoursForDay(candidateTz.dayOfWeek);
+          if (candidateDayHours) {
+            // Found a working day, set to start of working hours
+            for (let offsetHours = -12; offsetHours <= 12; offsetHours++) {
+              const candidate = new Date(candidateDay.getTime() + offsetHours * 60 * 60 * 1000);
+              const candidateTzTime = getTimeInTimezone(candidate);
+              if (
+                candidateTzTime.year === candidateTz.year &&
+                candidateTzTime.month === candidateTz.month &&
+                candidateTzTime.day === candidateTz.day &&
+                candidateTzTime.hour === candidateDayHours.start &&
+                candidateTzTime.minute === 0
+              ) {
+                currentTimeUTC = candidate;
+                break;
+              }
+            }
+            // Check if we successfully moved
+            const checkTzTime = getTimeInTimezone(currentTimeUTC);
+            if (
+              checkTzTime.year === candidateTz.year &&
+              checkTzTime.month === candidateTz.month &&
+              checkTzTime.day === candidateTz.day &&
+              checkTzTime.hour === candidateDayHours.start
+            ) {
+              break; // Successfully moved to next working day
+            }
+          }
+        }
+        // Fallback: add 24 hours
+        if (currentTimeUTC.getTime() <= slotStartUTC.getTime()) {
+          currentTimeUTC = new Date(slotStartUTC.getTime() + 24 * 60 * 60 * 1000);
+          currentTimeUTC.setUTCMinutes(Math.floor(currentTimeUTC.getUTCMinutes() / 15) * 15, 0, 0);
+        }
+        continue;
+      } else if (!isToday || slotTimeInMinutes >= 23 * 60) {
+        // Not today, or after 11 PM - move to next day
         const nextDay = new Date(slotStartUTC);
         nextDay.setUTCDate(nextDay.getUTCDate() + 1);
         // Find start of next day in timezone
@@ -190,12 +235,13 @@ export function findNearestAvailableSlot(
           }
         }
         // If we didn't find exact start, just add 24 hours as fallback
-        if (currentTimeUTC === slotStartUTC) {
+        if (currentTimeUTC.getTime() <= slotStartUTC.getTime()) {
           currentTimeUTC = new Date(slotStartUTC.getTime() + 24 * 60 * 60 * 1000);
           currentTimeUTC.setUTCMinutes(Math.floor(currentTimeUTC.getUTCMinutes() / 15) * 15, 0, 0);
         }
         continue;
       }
+      // Before working hours on today - allow it, but check if slot end fits
     }
 
     // Check if slot end is within working hours (or same day if after hours today)
@@ -667,8 +713,14 @@ export function rescheduleTaskWithShuffling(
   // Track shuffled tasks to prevent infinite loops
   const shuffledTasks: Array<{ taskId: string; newSlot: TimeSlot }> = [];
   const shuffledTaskIds = new Set<string>();
+  const shuffledTaskSlots = new Map<string, TimeSlot>(); // Map of task ID to new slot
   const maxRecursionDepth = 100; // Prevent infinite loops
   let recursionDepth = 0;
+
+  // Helper function to check if two time slots overlap
+  const slotsOverlap = (slot1: TimeSlot, slot2: TimeSlot): boolean => {
+    return slot1.start.getTime() < slot2.end.getTime() && slot1.end.getTime() > slot2.start.getTime();
+  };
 
   // Recursive function to shuffle a conflicting task
   const shuffleTask = (
@@ -719,8 +771,11 @@ export function rescheduleTaskWithShuffling(
       candidateSlot.end = candidateSlotEnd;
     }
 
-    // Check for conflicts with other scheduled tasks (excluding already shuffled ones)
+    // Check for conflicts with other scheduled tasks
+    // Must check against both original slots and new shuffled slots
     const conflicts: Task[] = [];
+    
+    // Check conflicts with original scheduled tasks (not yet shuffled)
     for (const otherTask of scheduledTasks) {
       if (
         otherTask.id === conflictingTask.id ||
@@ -735,13 +790,28 @@ export function rescheduleTaskWithShuffling(
         continue;
       }
 
-      const otherStart = new Date(otherTask.scheduled_start).getTime();
-      const otherEnd = new Date(otherTask.scheduled_end).getTime();
-      const ourStart = candidateSlot.start.getTime();
-      const ourEnd = candidateSlot.end.getTime();
+      const otherSlot: TimeSlot = {
+        start: new Date(otherTask.scheduled_start),
+        end: new Date(otherTask.scheduled_end),
+      };
 
-      if (ourStart < otherEnd && ourEnd > otherStart) {
+      if (slotsOverlap(candidateSlot, otherSlot)) {
         conflicts.push(otherTask);
+      }
+    }
+
+    // Check conflicts with already-shuffled tasks (using their new slots)
+    for (const [taskId, shuffledSlot] of shuffledTaskSlots.entries()) {
+      if (taskId === conflictingTask.id) {
+        continue;
+      }
+
+      if (slotsOverlap(candidateSlot, shuffledSlot)) {
+        // Find the task from scheduledTasks to add to conflicts
+        const shuffledTask = scheduledTasks.find((t) => t.id === taskId);
+        if (shuffledTask && !conflicts.includes(shuffledTask)) {
+          conflicts.push(shuffledTask);
+        }
       }
     }
 
@@ -761,6 +831,7 @@ export function rescheduleTaskWithShuffling(
         if (shuffledSlot) {
           shuffledTasks.push({ taskId: conflictTask.id, newSlot: shuffledSlot });
           shuffledTaskIds.add(conflictTask.id);
+          shuffledTaskSlots.set(conflictTask.id, shuffledSlot); // Track new slot
           latestConflictEnd = shuffledSlot.end;
         }
       }
@@ -829,6 +900,7 @@ export function rescheduleTaskWithShuffling(
       if (shuffledSlot) {
         shuffledTasks.push({ taskId: conflictTask.id, newSlot: shuffledSlot });
         shuffledTaskIds.add(conflictTask.id);
+        shuffledTaskSlots.set(conflictTask.id, shuffledSlot); // Track new slot
         latestConflictEnd = shuffledSlot.end;
       }
     }
