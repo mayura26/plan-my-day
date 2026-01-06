@@ -126,7 +126,7 @@ export function SlimTaskCard({
         )}
         <span className="truncate min-w-0">{task.title}</span>
       </div>
-      
+
       {/* Parent task subtitle for subtasks */}
       {isSubtask && parentTask && (
         <div className="text-[10px] text-muted-foreground/70 truncate mt-0.5 italic">

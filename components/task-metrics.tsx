@@ -106,7 +106,7 @@ function MetricSection({
             const parentTask = task.parent_task_id
               ? taskList.find((t) => t.id === task.parent_task_id) || undefined
               : undefined;
-            
+
             return (
               <SlimTaskCard
                 key={task.id}

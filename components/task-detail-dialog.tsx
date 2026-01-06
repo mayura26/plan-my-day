@@ -385,13 +385,13 @@ export function TaskDetailDialog({
       const data = await response.json();
       const updatedTask = data.task;
       const shuffledTasks = data.shuffledTasks || [];
-      
+
       onTaskRefresh?.(updatedTask);
       setHasChanges(true);
-      
+
       // Refresh task list to show shuffled tasks
       onTaskUpdate?.();
-      
+
       // Show success message with shuffle count
       if (shuffledTasks.length > 0) {
         toast.success(`Task scheduled ASAP. ${shuffledTasks.length} task(s) shuffled forward.`);

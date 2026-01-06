@@ -91,7 +91,10 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
 
     // Use rescheduleTaskWithShuffling to place task at next working hour slot and shuffle conflicts
     // This should always succeed since it shuffles tasks to make room, but handle errors gracefully
-    let result;
+    let result: {
+      taskSlot: { start: Date; end: Date };
+      shuffledTasks: Array<{ taskId: string; newSlot: { start: Date; end: Date } }>;
+    };
     try {
       result = rescheduleTaskWithShuffling(task, allTasks, workingHours, userTimezone);
     } catch (error) {
@@ -131,10 +134,10 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
       );
 
       // Fetch updated shuffled task
-      const shuffledResult = await db.execute(
-        "SELECT * FROM tasks WHERE id = ? AND user_id = ?",
-        [shuffled.taskId, session.user.id]
-      );
+      const shuffledResult = await db.execute("SELECT * FROM tasks WHERE id = ? AND user_id = ?", [
+        shuffled.taskId,
+        session.user.id,
+      ]);
       if (shuffledResult.rows.length > 0) {
         shuffledTasks.push(mapRowToTask(shuffledResult.rows[0]));
       }
@@ -160,11 +163,9 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
     console.error("Error scheduling task ASAP:", error);
     return NextResponse.json(
       {
-        error:
-          error instanceof Error ? error.message : "Internal server error",
+        error: error instanceof Error ? error.message : "Internal server error",
       },
       { status: 500 }
     );
   }
 }
-

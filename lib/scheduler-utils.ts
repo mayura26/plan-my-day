@@ -557,7 +557,7 @@ export function findNextWorkingHoursSlot(
       const targetDayUTC = new Date(currentTimeUTC);
       targetDayUTC.setUTCDate(targetDayUTC.getUTCDate() + dayOffset);
       targetDayUTC.setUTCHours(12, 0, 0, 0); // Set to noon to get the date in timezone
-      
+
       // Get what date this represents in the user's timezone
       const candidateTz = getTimeInTimezone(targetDayUTC, timezone);
       const candidateDayHours = getWorkingHoursForDay(candidateTz.dayOfWeek, workingHours);
@@ -616,9 +616,7 @@ export function isWithinWorkingHours(
   const nowUTC = new Date();
   const nowTz = getTimeInTimezone(nowUTC, timezone);
   const isToday =
-    startTz.year === nowTz.year &&
-    startTz.month === nowTz.month &&
-    startTz.day === nowTz.day;
+    startTz.year === nowTz.year && startTz.month === nowTz.month && startTz.day === nowTz.day;
 
   if (isToday && startInMinutes >= endWorkingMinutes && startInMinutes < 23 * 60) {
     // After hours today but before 11 PM - allow it
@@ -647,7 +645,7 @@ export function getStartOfNextWorkingDay(
     const targetDayUTC = new Date(currentDate);
     targetDayUTC.setUTCDate(targetDayUTC.getUTCDate() + dayOffset);
     targetDayUTC.setUTCHours(12, 0, 0, 0); // Set to noon to get the date in timezone
-    
+
     // Get what date this represents in the user's timezone
     const candidateTz = getTimeInTimezone(targetDayUTC, timezone);
     const candidateDayHours = getWorkingHoursForDay(candidateTz.dayOfWeek, workingHours);
@@ -721,11 +719,13 @@ export function rescheduleTaskWithShuffling(
   const shuffledTaskIds = new Set<string>();
   const shuffledTaskSlots = new Map<string, TimeSlot>(); // Map of task ID to new slot
   const maxRecursionDepth = 100; // Prevent infinite loops
-  let recursionDepth = 0;
+  const recursionDepth = 0;
 
   // Helper function to check if two time slots overlap
   const slotsOverlap = (slot1: TimeSlot, slot2: TimeSlot): boolean => {
-    return slot1.start.getTime() < slot2.end.getTime() && slot1.end.getTime() > slot2.start.getTime();
+    return (
+      slot1.start.getTime() < slot2.end.getTime() && slot1.end.getTime() > slot2.start.getTime()
+    );
   };
 
   // Recursive function to shuffle a conflicting task
@@ -780,7 +780,7 @@ export function rescheduleTaskWithShuffling(
     // Check for conflicts with other scheduled tasks
     // Must check against both original slots and new shuffled slots
     const conflicts: Task[] = [];
-    
+
     // Check conflicts with original scheduled tasks (not yet shuffled)
     for (const otherTask of scheduledTasks) {
       if (

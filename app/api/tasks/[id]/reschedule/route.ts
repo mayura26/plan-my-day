@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { scheduleTask, rescheduleTaskWithShuffling } from "@/lib/scheduler-utils";
+import { rescheduleTaskWithShuffling, scheduleTask } from "@/lib/scheduler-utils";
 import { getUserTimezone } from "@/lib/timezone-utils";
 import { db } from "@/lib/turso";
 import type { RescheduleTaskRequest, Task, TaskStatus, TaskType } from "@/lib/types";
@@ -67,10 +67,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     // Task must not be completed to be rescheduled
     if (task.status === "completed") {
-      return NextResponse.json(
-        { error: "Cannot reschedule a completed task" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "Cannot reschedule a completed task" }, { status: 400 });
     }
 
     // Task must have a duration to be scheduled
@@ -205,4 +202,3 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     );
   }
 }
-

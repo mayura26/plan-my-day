@@ -46,10 +46,7 @@ function calculateParentDurationExpansion(
   requiredTotal: number;
   expansionAmount: number;
 } {
-  const currentTotal = existingSubtasks.reduce(
-    (sum, subtask) => sum + (subtask.duration || 0),
-    0
-  );
+  const currentTotal = existingSubtasks.reduce((sum, subtask) => sum + (subtask.duration || 0), 0);
   const requiredTotal = currentTotal + carryoverDuration;
 
   if (parentDuration === null || parentDuration === undefined) {
@@ -75,10 +72,7 @@ function calculateParentDurationExpansion(
 
 // Helper function to calculate created_at timestamp for proper sequencing
 // Positions the carryover subtask immediately after the original subtask
-function calculateCarryoverTimestamp(
-  originalSubtask: Task,
-  allSubtasks: Task[]
-): string {
+function calculateCarryoverTimestamp(originalSubtask: Task, allSubtasks: Task[]): string {
   // Sort subtasks by priority ASC, created_at ASC (same as query order)
   const sortedSubtasks = [...allSubtasks].sort((a, b) => {
     if (a.priority !== b.priority) {
@@ -171,10 +165,10 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       }
 
       // Fetch parent task
-      const parentResult = await db.execute(
-        "SELECT * FROM tasks WHERE id = ? AND user_id = ?",
-        [originalTask.parent_task_id, session.user.id]
-      );
+      const parentResult = await db.execute("SELECT * FROM tasks WHERE id = ? AND user_id = ?", [
+        originalTask.parent_task_id,
+        session.user.id,
+      ]);
 
       if (parentResult.rows.length === 0) {
         return NextResponse.json({ error: "Parent task not found" }, { status: 404 });
@@ -191,7 +185,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
       // Calculate if parent duration expansion is needed
       const durationCheck = calculateParentDurationExpansion(
-        parentTask.duration,
+        parentTask.duration ?? null,
         existingSubtasks,
         body.additional_duration
       );
@@ -320,7 +314,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
             status: "rescheduled" as TaskStatus,
             updated_at: now,
           },
-          message: "Carryover subtask created successfully. Original subtask marked as rescheduled.",
+          message:
+            "Carryover subtask created successfully. Original subtask marked as rescheduled.",
         },
         { status: 201 }
       );

@@ -14,6 +14,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { useConfirmDialog } from "@/components/ui/confirm-dialog";
 import {
   Dialog,
   DialogContent,
@@ -26,7 +27,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useUserTimezone } from "@/hooks/use-user-timezone";
-import { useConfirmDialog } from "@/components/ui/confirm-dialog";
 import { getOverdueTasks } from "@/lib/task-utils";
 import { formatDateTimeLocalForTimezone, parseDateTimeLocalToUTC } from "@/lib/timezone-utils";
 import type { Task } from "@/lib/types";
@@ -155,7 +155,7 @@ export function ProcessOverdueDialog({
           // Create carryover task
           const createCarryover = async () => {
             const duration = actionState.additionalDuration || task.duration || 30;
-            
+
             // First attempt
             let response = await fetch(`/api/tasks/${taskId}/carryover`, {
               method: "POST",
@@ -170,10 +170,7 @@ export function ProcessOverdueDialog({
             // If it's a subtask and we got an expansion error, show confirmation
             if (!response.ok && task.task_type === "subtask") {
               const errorData = await response.json();
-              if (
-                errorData.error &&
-                errorData.error.includes("exceeds parent task duration")
-              ) {
+              if (errorData.error?.includes("exceeds parent task duration")) {
                 // Show confirmation dialog for parent duration expansion
                 const confirmed = await confirm({
                   title: "Expand Parent Task Duration?",
@@ -360,14 +357,15 @@ export function ProcessOverdueDialog({
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
                     <h4 className="font-medium">{task.title}</h4>
-                    {task.parent_task_id && (() => {
-                      const parentTask = tasks.find((t) => t.id === task.parent_task_id);
-                      return parentTask ? (
-                        <p className="text-sm text-muted-foreground/70 mt-0.5 italic">
-                          {parentTask.title}
-                        </p>
-                      ) : null;
-                    })()}
+                    {task.parent_task_id &&
+                      (() => {
+                        const parentTask = tasks.find((t) => t.id === task.parent_task_id);
+                        return parentTask ? (
+                          <p className="text-sm text-muted-foreground/70 mt-0.5 italic">
+                            {parentTask.title}
+                          </p>
+                        ) : null;
+                      })()}
                     <div className="flex items-center gap-4 mt-1 text-sm text-muted-foreground">
                       {task.duration && (
                         <span className="flex items-center gap-1">
@@ -492,7 +490,8 @@ export function ProcessOverdueDialog({
                         <CheckCircle2 className="h-4 w-4 mr-2" />
                         Mark Complete
                       </Button>
-                      {(actionState?.action === "carryover" || actionState?.action === "reschedule") && (
+                      {(actionState?.action === "carryover" ||
+                        actionState?.action === "reschedule") && (
                         <Button
                           variant="ghost"
                           size="sm"
@@ -584,10 +583,7 @@ export function ProcessOverdueDialog({
                                 // If it's a subtask and we got an expansion error, show confirmation
                                 if (!response.ok && task.task_type === "subtask") {
                                   const errorData = await response.json();
-                                  if (
-                                    errorData.error &&
-                                    errorData.error.includes("exceeds parent task duration")
-                                  ) {
+                                  if (errorData.error?.includes("exceeds parent task duration")) {
                                     // Show confirmation dialog for parent duration expansion
                                     const confirmed = await confirm({
                                       title: "Expand Parent Task Duration?",
@@ -759,9 +755,7 @@ export function ProcessOverdueDialog({
                                 onTasksUpdated();
                               } catch (err) {
                                 setError(
-                                  err instanceof Error
-                                    ? err.message
-                                    : "Failed to reschedule task"
+                                  err instanceof Error ? err.message : "Failed to reschedule task"
                                 );
                               } finally {
                                 setProcessingTaskId(null);

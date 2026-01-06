@@ -113,8 +113,7 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
       let errorMessage =
         "Unable to schedule task. No available time slot found within the next 7 days.";
       if (!hasWorkingHours) {
-        errorMessage +=
-          " Please configure your working hours in settings to enable scheduling.";
+        errorMessage += " Please configure your working hours in settings to enable scheduling.";
       } else if (scheduledTasksCount > 0) {
         errorMessage +=
           " Your calendar may be too full. Try unscheduling some tasks or use 'Schedule ASAP' to shuffle existing tasks.";
