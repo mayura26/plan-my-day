@@ -35,6 +35,90 @@ function mapRowToTask(row: any): Task {
   };
 }
 
+// Helper function to calculate parent duration expansion needs
+function calculateParentDurationExpansion(
+  parentDuration: number | null,
+  existingSubtasks: Task[],
+  carryoverDuration: number
+): {
+  needsExpansion: boolean;
+  currentTotal: number;
+  requiredTotal: number;
+  expansionAmount: number;
+} {
+  const currentTotal = existingSubtasks.reduce(
+    (sum, subtask) => sum + (subtask.duration || 0),
+    0
+  );
+  const requiredTotal = currentTotal + carryoverDuration;
+
+  if (parentDuration === null || parentDuration === undefined) {
+    // No parent duration set, so no expansion needed
+    return {
+      needsExpansion: false,
+      currentTotal,
+      requiredTotal,
+      expansionAmount: 0,
+    };
+  }
+
+  const needsExpansion = requiredTotal > parentDuration;
+  const expansionAmount = needsExpansion ? requiredTotal - parentDuration : 0;
+
+  return {
+    needsExpansion,
+    currentTotal,
+    requiredTotal,
+    expansionAmount,
+  };
+}
+
+// Helper function to calculate created_at timestamp for proper sequencing
+// Positions the carryover subtask immediately after the original subtask
+function calculateCarryoverTimestamp(
+  originalSubtask: Task,
+  allSubtasks: Task[]
+): string {
+  // Sort subtasks by priority ASC, created_at ASC (same as query order)
+  const sortedSubtasks = [...allSubtasks].sort((a, b) => {
+    if (a.priority !== b.priority) {
+      return a.priority - b.priority;
+    }
+    return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+  });
+
+  // Find the index of the original subtask
+  const originalIndex = sortedSubtasks.findIndex((st) => st.id === originalSubtask.id);
+
+  if (originalIndex === -1) {
+    // Original not found, use current time
+    return new Date().toISOString();
+  }
+
+  // If original is the last subtask, use current time
+  if (originalIndex === sortedSubtasks.length - 1) {
+    return new Date().toISOString();
+  }
+
+  // Get the next subtask after the original
+  const nextSubtask = sortedSubtasks[originalIndex + 1];
+
+  // Calculate midpoint between original and next subtask
+  const originalTime = new Date(originalSubtask.created_at).getTime();
+  const nextTime = new Date(nextSubtask.created_at).getTime();
+
+  // If they're the same time (unlikely but possible), add 1ms after original
+  if (nextTime <= originalTime) {
+    return new Date(originalTime + 1).toISOString();
+  }
+
+  // Use midpoint, but ensure it's at least 1ms after original
+  const midpoint = Math.floor((originalTime + nextTime) / 2);
+  const resultTime = Math.max(midpoint, originalTime + 1);
+
+  return new Date(resultTime).toISOString();
+}
+
 // POST /api/tasks/[id]/carryover - Create a carryover task from an incomplete task
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -74,17 +158,175 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       );
     }
 
-    // Subtasks cannot have carryovers directly (handle through parent)
-    if (originalTask.task_type === "subtask") {
-      return NextResponse.json(
-        { error: "Cannot create carryover for a subtask directly" },
-        { status: 400 }
-      );
-    }
-
     const taskId = generateTaskId();
     const now = new Date().toISOString();
 
+    // Handle subtask carryover
+    if (originalTask.task_type === "subtask") {
+      if (!originalTask.parent_task_id) {
+        return NextResponse.json(
+          { error: "Subtask missing parent task reference" },
+          { status: 400 }
+        );
+      }
+
+      // Fetch parent task
+      const parentResult = await db.execute(
+        "SELECT * FROM tasks WHERE id = ? AND user_id = ?",
+        [originalTask.parent_task_id, session.user.id]
+      );
+
+      if (parentResult.rows.length === 0) {
+        return NextResponse.json({ error: "Parent task not found" }, { status: 404 });
+      }
+
+      const parentTask = mapRowToTask(parentResult.rows[0]);
+
+      // Get all existing subtasks for the parent (excluding the original one for calculation)
+      const existingSubtasksResult = await db.execute(
+        `SELECT * FROM tasks WHERE parent_task_id = ? AND user_id = ? AND id != ?`,
+        [originalTask.parent_task_id, session.user.id, originalTaskId]
+      );
+      const existingSubtasks = existingSubtasksResult.rows.map(mapRowToTask);
+
+      // Calculate if parent duration expansion is needed
+      const durationCheck = calculateParentDurationExpansion(
+        parentTask.duration,
+        existingSubtasks,
+        body.additional_duration
+      );
+
+      // If expansion is needed, check if user confirmed it
+      if (durationCheck.needsExpansion) {
+        if (!body.extend_parent_duration) {
+          return NextResponse.json(
+            {
+              error: "Subtask carryover duration exceeds parent task duration",
+              details: [
+                `Total subtask duration (${durationCheck.requiredTotal} min) exceeds parent task duration (${parentTask.duration} min) by ${durationCheck.expansionAmount} min`,
+              ],
+              current_total: durationCheck.currentTotal,
+              carryover_duration: body.additional_duration,
+              total_with_carryover: durationCheck.requiredTotal,
+              parent_duration: parentTask.duration,
+              required_extension: durationCheck.expansionAmount,
+            },
+            { status: 400 }
+          );
+        }
+
+        // Expand parent task duration
+        const newParentDuration = durationCheck.requiredTotal;
+        await db.execute(
+          `UPDATE tasks SET duration = ?, updated_at = ? WHERE id = ? AND user_id = ?`,
+          [newParentDuration, now, originalTask.parent_task_id, session.user.id]
+        );
+      }
+
+      // Get all subtasks including the original for timestamp calculation
+      const allSubtasksResult = await db.execute(
+        `SELECT * FROM tasks WHERE parent_task_id = ? AND user_id = ? ORDER BY priority ASC, created_at ASC`,
+        [originalTask.parent_task_id, session.user.id]
+      );
+      const allSubtasks = allSubtasksResult.rows.map(mapRowToTask);
+
+      // Calculate timestamp to position carryover immediately after original
+      const carryoverTimestamp = calculateCarryoverTimestamp(originalTask, allSubtasks);
+
+      // Build description for carryover subtask
+      let carryoverDescription = originalTask.description || "";
+      if (body.notes) {
+        carryoverDescription =
+          body.notes +
+          (carryoverDescription ? `\n\n---\nOriginal description:\n${carryoverDescription}` : "");
+      }
+
+      // Create the carryover subtask
+      const carryoverSubtask: Task = {
+        id: taskId,
+        user_id: session.user.id,
+        title: `${originalTask.title} (continued)`,
+        description: carryoverDescription || null,
+        priority: originalTask.priority,
+        status: "pending",
+        duration: body.additional_duration,
+        scheduled_start: null,
+        scheduled_end: null,
+        due_date: originalTask.due_date || parentTask.due_date || null,
+        locked: false,
+        group_id: originalTask.group_id,
+        template_id: null,
+        task_type: "subtask",
+        google_calendar_event_id: null,
+        notification_sent: false,
+        depends_on_task_id: null,
+        energy_level_required: originalTask.energy_level_required,
+        parent_task_id: originalTask.parent_task_id,
+        continued_from_task_id: originalTaskId,
+        ignored: false,
+        created_at: carryoverTimestamp,
+        updated_at: now,
+      };
+
+      await db.execute(
+        `
+        INSERT INTO tasks (
+          id, user_id, title, description, priority, status, duration,
+          scheduled_start, scheduled_end, due_date, locked, group_id, template_id,
+          task_type, google_calendar_event_id, notification_sent,
+          depends_on_task_id, energy_level_required, parent_task_id, continued_from_task_id,
+          ignored, created_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `,
+        [
+          carryoverSubtask.id,
+          carryoverSubtask.user_id,
+          carryoverSubtask.title,
+          carryoverSubtask.description ?? null,
+          carryoverSubtask.priority,
+          carryoverSubtask.status,
+          carryoverSubtask.duration ?? null,
+          carryoverSubtask.scheduled_start ?? null,
+          carryoverSubtask.scheduled_end ?? null,
+          carryoverSubtask.due_date ?? null,
+          carryoverSubtask.locked,
+          carryoverSubtask.group_id ?? null,
+          carryoverSubtask.template_id ?? null,
+          carryoverSubtask.task_type,
+          carryoverSubtask.google_calendar_event_id ?? null,
+          carryoverSubtask.notification_sent,
+          carryoverSubtask.depends_on_task_id ?? null,
+          carryoverSubtask.energy_level_required,
+          carryoverSubtask.parent_task_id ?? null,
+          carryoverSubtask.continued_from_task_id ?? null,
+          carryoverSubtask.ignored,
+          carryoverSubtask.created_at,
+          carryoverSubtask.updated_at,
+        ]
+      );
+
+      // Mark the original subtask as rescheduled
+      await db.execute(`UPDATE tasks SET status = 'rescheduled', updated_at = ? WHERE id = ?`, [
+        now,
+        originalTaskId,
+      ]);
+
+      // Return the carryover subtask
+      return NextResponse.json(
+        {
+          carryover_task: carryoverSubtask,
+          original_task: {
+            ...originalTask,
+            status: "rescheduled" as TaskStatus,
+            updated_at: now,
+          },
+          message: "Carryover subtask created successfully. Original subtask marked as rescheduled.",
+        },
+        { status: 201 }
+      );
+    }
+
+    // Handle regular task carryover (existing logic)
     // Build description for carryover task
     let carryoverDescription = originalTask.description || "";
     if (body.notes) {

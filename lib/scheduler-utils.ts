@@ -357,3 +357,485 @@ export function scheduleTask(
   // Use the core scheduling algorithm
   return findNearestAvailableSlot(task, allTasks, startFrom, workingHours, maxDaysAhead, timezone);
 }
+
+/**
+ * Helper: Get what day/time a UTC timestamp represents in the user's timezone
+ */
+function getTimeInTimezone(
+  utcDate: Date,
+  timezone: string
+): {
+  year: number;
+  month: number;
+  day: number;
+  hour: number;
+  minute: number;
+  dayOfWeek: "monday" | "tuesday" | "wednesday" | "thursday" | "friday" | "saturday" | "sunday";
+} {
+  const formatter = new Intl.DateTimeFormat("en-US", {
+    timeZone: timezone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    weekday: "long",
+    hour12: false,
+  });
+  const parts = formatter.formatToParts(utcDate);
+  const weekday = parts.find((p) => p.type === "weekday")?.value?.toLowerCase() || "monday";
+  return {
+    year: parseInt(parts.find((p) => p.type === "year")?.value || "0", 10),
+    month: parseInt(parts.find((p) => p.type === "month")?.value || "0", 10) - 1,
+    day: parseInt(parts.find((p) => p.type === "day")?.value || "0", 10),
+    hour: parseInt(parts.find((p) => p.type === "hour")?.value || "0", 10),
+    minute: parseInt(parts.find((p) => p.type === "minute")?.value || "0", 10),
+    dayOfWeek: weekday as
+      | "monday"
+      | "tuesday"
+      | "wednesday"
+      | "thursday"
+      | "friday"
+      | "saturday"
+      | "sunday",
+  };
+}
+
+/**
+ * Helper: Get working hours for a specific day (defaults to 9-17 if not configured)
+ */
+function getWorkingHoursForDay(
+  day: string,
+  workingHours: GroupScheduleHours | null
+): { start: number; end: number } | null {
+  const daySchedule = workingHours?.[day as keyof GroupScheduleHours];
+  if (daySchedule && daySchedule !== null) {
+    return daySchedule;
+  }
+  // Default to 9 AM - 5 PM if not configured
+  if (!workingHours || Object.keys(workingHours).length === 0) {
+    return { start: 9, end: 17 };
+  }
+  // If working hours are configured but this day is not, skip this day
+  return null;
+}
+
+/**
+ * Find the next working hours slot from a given time
+ * If after hours, returns start of next working day
+ */
+export function findNextWorkingHoursSlot(
+  startFrom: Date,
+  workingHours: GroupScheduleHours | null,
+  timezone: string
+): Date {
+  const nowUTC = new Date();
+  let currentTimeUTC = new Date(Math.max(startFrom.getTime(), nowUTC.getTime()));
+
+  // Round to next 15-minute interval
+  const currentMinutes = currentTimeUTC.getUTCMinutes();
+  const roundedMinutes = Math.ceil(currentMinutes / 15) * 15;
+  if (roundedMinutes >= 60) {
+    currentTimeUTC.setUTCHours(currentTimeUTC.getUTCHours() + 1, 0, 0, 0);
+  } else {
+    currentTimeUTC.setUTCMinutes(roundedMinutes, 0, 0);
+  }
+
+  // Find next working hours slot
+  const maxSearchTime = new Date(currentTimeUTC);
+  maxSearchTime.setUTCDate(maxSearchTime.getUTCDate() + 7); // Search up to 7 days ahead
+
+  while (currentTimeUTC < maxSearchTime) {
+    const tzTime = getTimeInTimezone(currentTimeUTC, timezone);
+    const dayHours = getWorkingHoursForDay(tzTime.dayOfWeek, workingHours);
+
+    if (!dayHours) {
+      // No working hours for this day, move to next day
+      const nextDay = new Date(currentTimeUTC);
+      nextDay.setUTCDate(nextDay.getUTCDate() + 1);
+      for (let offsetHours = -12; offsetHours <= 12; offsetHours++) {
+        const candidate = new Date(nextDay.getTime() + offsetHours * 60 * 60 * 1000);
+        const candidateTz = getTimeInTimezone(candidate, timezone);
+        if (candidateTz.hour === 0 && candidateTz.minute === 0) {
+          currentTimeUTC = candidate;
+          break;
+        }
+      }
+      if (currentTimeUTC.getTime() === nextDay.getTime() - 12 * 60 * 60 * 1000) {
+        currentTimeUTC = new Date(currentTimeUTC.getTime() + 24 * 60 * 60 * 1000);
+        currentTimeUTC.setUTCMinutes(Math.floor(currentTimeUTC.getUTCMinutes() / 15) * 15, 0, 0);
+      }
+      continue;
+    }
+
+    const timeInMinutes = tzTime.hour * 60 + tzTime.minute;
+    const startInMinutes = dayHours.start * 60;
+    const endInMinutes = dayHours.end * 60;
+
+    if (timeInMinutes >= startInMinutes && timeInMinutes < endInMinutes) {
+      // Within working hours
+      return currentTimeUTC;
+    }
+
+    // Not in working hours, move to start of working hours for this day or next day
+    if (timeInMinutes < startInMinutes) {
+      // Before working hours today, move to start of working hours
+      const nowTzTime = getTimeInTimezone(nowUTC, timezone);
+      const isToday =
+        tzTime.year === nowTzTime.year &&
+        tzTime.month === nowTzTime.month &&
+        tzTime.day === nowTzTime.day;
+
+      if (isToday) {
+        // Set to start of working hours today
+        for (let offsetHours = -12; offsetHours <= 12; offsetHours++) {
+          const candidate = new Date(currentTimeUTC.getTime() + offsetHours * 60 * 60 * 1000);
+          const candidateTz = getTimeInTimezone(candidate, timezone);
+          if (
+            candidateTz.year === tzTime.year &&
+            candidateTz.month === tzTime.month &&
+            candidateTz.day === tzTime.day &&
+            candidateTz.hour === dayHours.start &&
+            candidateTz.minute === 0
+          ) {
+            return candidate;
+          }
+        }
+      }
+    }
+
+    // After working hours or couldn't find today's start, move to next working day
+    const nextDay = new Date(currentTimeUTC);
+    nextDay.setUTCDate(nextDay.getUTCDate() + 1);
+    for (let dayOffset = 0; dayOffset < 7; dayOffset++) {
+      const candidateDay = new Date(nextDay);
+      candidateDay.setUTCDate(candidateDay.getUTCDate() + dayOffset);
+      const candidateTz = getTimeInTimezone(candidateDay, timezone);
+      const candidateDayHours = getWorkingHoursForDay(candidateTz.dayOfWeek, workingHours);
+
+      if (candidateDayHours) {
+        // Found a working day, set to start of working hours
+        for (let offsetHours = -12; offsetHours <= 12; offsetHours++) {
+          const candidate = new Date(candidateDay.getTime() + offsetHours * 60 * 60 * 1000);
+          const candidateTzTime = getTimeInTimezone(candidate, timezone);
+          if (
+            candidateTzTime.year === candidateTz.year &&
+            candidateTzTime.month === candidateTz.month &&
+            candidateTzTime.day === candidateTz.day &&
+            candidateTzTime.hour === candidateDayHours.start &&
+            candidateTzTime.minute === 0
+          ) {
+            return candidate;
+          }
+        }
+      }
+    }
+
+    // Fallback: add 24 hours
+    currentTimeUTC = new Date(currentTimeUTC.getTime() + 24 * 60 * 60 * 1000);
+    currentTimeUTC.setUTCMinutes(Math.floor(currentTimeUTC.getUTCMinutes() / 15) * 15, 0, 0);
+  }
+
+  // Fallback: return current time rounded
+  return currentTimeUTC;
+}
+
+/**
+ * Check if a time slot is within working hours
+ */
+export function isWithinWorkingHours(
+  slot: TimeSlot,
+  workingHours: GroupScheduleHours | null,
+  timezone: string
+): boolean {
+  const startTz = getTimeInTimezone(slot.start, timezone);
+  const endTz = getTimeInTimezone(slot.end, timezone);
+  const dayHours = getWorkingHoursForDay(startTz.dayOfWeek, workingHours);
+
+  if (!dayHours) {
+    return false;
+  }
+
+  const startInMinutes = startTz.hour * 60 + startTz.minute;
+  const endInMinutes = endTz.hour * 60 + endTz.minute;
+  const startWorkingMinutes = dayHours.start * 60;
+  const endWorkingMinutes = dayHours.end * 60;
+
+  // Check if both start and end are within working hours
+  // Also allow if it's the same day and we're after hours (for today only)
+  const nowUTC = new Date();
+  const nowTz = getTimeInTimezone(nowUTC, timezone);
+  const isToday =
+    startTz.year === nowTz.year &&
+    startTz.month === nowTz.month &&
+    startTz.day === nowTz.day;
+
+  if (isToday && startInMinutes >= endWorkingMinutes && startInMinutes < 23 * 60) {
+    // After hours today but before 11 PM - allow it
+    return true;
+  }
+
+  return (
+    startInMinutes >= startWorkingMinutes &&
+    startInMinutes < endWorkingMinutes &&
+    endInMinutes >= startWorkingMinutes &&
+    endInMinutes <= endWorkingMinutes
+  );
+}
+
+/**
+ * Get the start of the next working day
+ */
+export function getStartOfNextWorkingDay(
+  currentDate: Date,
+  workingHours: GroupScheduleHours | null,
+  timezone: string
+): Date {
+  const nextDay = new Date(currentDate);
+  nextDay.setUTCDate(nextDay.getUTCDate() + 1);
+
+  // Find the next working day
+  for (let dayOffset = 0; dayOffset < 7; dayOffset++) {
+    const candidateDay = new Date(nextDay);
+    candidateDay.setUTCDate(candidateDay.getUTCDate() + dayOffset);
+    const candidateTz = getTimeInTimezone(candidateDay, timezone);
+    const candidateDayHours = getWorkingHoursForDay(candidateTz.dayOfWeek, workingHours);
+
+    if (candidateDayHours) {
+      // Found a working day, set to start of working hours
+      for (let offsetHours = -12; offsetHours <= 12; offsetHours++) {
+        const candidate = new Date(candidateDay.getTime() + offsetHours * 60 * 60 * 1000);
+        const candidateTzTime = getTimeInTimezone(candidate, timezone);
+        if (
+          candidateTzTime.year === candidateTz.year &&
+          candidateTzTime.month === candidateTz.month &&
+          candidateTzTime.day === candidateTz.day &&
+          candidateTzTime.hour === candidateDayHours.start &&
+          candidateTzTime.minute === 0
+        ) {
+          return candidate;
+        }
+      }
+    }
+  }
+
+  // Fallback: add 24 hours and set to 9 AM
+  const fallback = new Date(currentDate);
+  fallback.setUTCDate(fallback.getUTCDate() + 1);
+  fallback.setUTCHours(9, 0, 0, 0);
+  return fallback;
+}
+
+/**
+ * Reschedule a task with ASAP shuffling - places task at next working hours slot
+ * and recursively shuffles conflicting tasks forward
+ */
+export function rescheduleTaskWithShuffling(
+  task: Task,
+  allTasks: Task[],
+  workingHours: GroupScheduleHours | null,
+  timezone: string
+): {
+  taskSlot: TimeSlot;
+  shuffledTasks: Array<{ taskId: string; newSlot: TimeSlot }>;
+} {
+  if (!task.duration || task.duration <= 0) {
+    throw new Error("Task must have a duration to be rescheduled");
+  }
+
+  const durationMs = task.duration * 60 * 1000;
+  const nowUTC = new Date();
+
+  // Find next working hours slot for the task
+  const nextWorkingSlotStart = findNextWorkingHoursSlot(nowUTC, workingHours, timezone);
+  const nextWorkingSlotEnd = new Date(nextWorkingSlotStart.getTime() + durationMs);
+  const taskSlot: TimeSlot = {
+    start: nextWorkingSlotStart,
+    end: nextWorkingSlotEnd,
+  };
+
+  // Get all scheduled tasks (excluding the one being rescheduled, completed, and cancelled)
+  const scheduledTasks = allTasks.filter(
+    (t) =>
+      t.id !== task.id &&
+      t.scheduled_start &&
+      t.scheduled_end &&
+      t.status !== "completed" &&
+      t.status !== "cancelled"
+  );
+
+  // Track shuffled tasks to prevent infinite loops
+  const shuffledTasks: Array<{ taskId: string; newSlot: TimeSlot }> = [];
+  const shuffledTaskIds = new Set<string>();
+  const maxRecursionDepth = 100; // Prevent infinite loops
+  let recursionDepth = 0;
+
+  // Recursive function to shuffle a conflicting task
+  const shuffleTask = (
+    conflictingTask: Task,
+    newSlotStart: Date,
+    depth: number
+  ): TimeSlot | null => {
+    if (depth > maxRecursionDepth) {
+      console.error("Maximum recursion depth reached in shuffling algorithm");
+      return null;
+    }
+
+    if (shuffledTaskIds.has(conflictingTask.id)) {
+      // Already shuffled this task, skip to prevent circular dependencies
+      return null;
+    }
+
+    if (conflictingTask.locked) {
+      // Locked tasks cannot be shuffled - this will cause a conflict that we can't resolve
+      // For now, we'll skip locked tasks and let the caller handle it
+      return null;
+    }
+
+    const taskDuration = (conflictingTask.duration || 30) * 60 * 1000;
+    let candidateSlotStart = new Date(newSlotStart);
+
+    // Round to next 15-minute interval
+    const minutes = candidateSlotStart.getUTCMinutes();
+    const roundedMinutes = Math.ceil(minutes / 15) * 15;
+    if (roundedMinutes >= 60) {
+      candidateSlotStart.setUTCHours(candidateSlotStart.getUTCHours() + 1, 0, 0, 0);
+    } else {
+      candidateSlotStart.setUTCMinutes(roundedMinutes, 0, 0);
+    }
+
+    const candidateSlotEnd = new Date(candidateSlotStart.getTime() + taskDuration);
+    const candidateSlot: TimeSlot = {
+      start: candidateSlotStart,
+      end: candidateSlotEnd,
+    };
+
+    // Check if slot is within working hours
+    if (!isWithinWorkingHours(candidateSlot, workingHours, timezone)) {
+      // Move to start of next working day
+      candidateSlotStart = getStartOfNextWorkingDay(candidateSlotStart, workingHours, timezone);
+      candidateSlotEnd.setTime(candidateSlotStart.getTime() + taskDuration);
+      candidateSlot.start = candidateSlotStart;
+      candidateSlot.end = candidateSlotEnd;
+    }
+
+    // Check for conflicts with other scheduled tasks (excluding already shuffled ones)
+    const conflicts: Task[] = [];
+    for (const otherTask of scheduledTasks) {
+      if (
+        otherTask.id === conflictingTask.id ||
+        shuffledTaskIds.has(otherTask.id) ||
+        otherTask.status === "completed" ||
+        otherTask.status === "cancelled"
+      ) {
+        continue;
+      }
+
+      if (!otherTask.scheduled_start || !otherTask.scheduled_end) {
+        continue;
+      }
+
+      const otherStart = new Date(otherTask.scheduled_start).getTime();
+      const otherEnd = new Date(otherTask.scheduled_end).getTime();
+      const ourStart = candidateSlot.start.getTime();
+      const ourEnd = candidateSlot.end.getTime();
+
+      if (ourStart < otherEnd && ourEnd > otherStart) {
+        conflicts.push(otherTask);
+      }
+    }
+
+    // If there are conflicts, recursively shuffle them first
+    if (conflicts.length > 0) {
+      // Sort conflicts chronologically by scheduled_start
+      conflicts.sort((a, b) => {
+        const aStart = a.scheduled_start ? new Date(a.scheduled_start).getTime() : 0;
+        const bStart = b.scheduled_start ? new Date(b.scheduled_start).getTime() : 0;
+        return aStart - bStart;
+      });
+
+      // Shuffle each conflicting task
+      let latestConflictEnd = candidateSlot.end;
+      for (const conflictTask of conflicts) {
+        const shuffledSlot = shuffleTask(conflictTask, latestConflictEnd, depth + 1);
+        if (shuffledSlot) {
+          shuffledTasks.push({ taskId: conflictTask.id, newSlot: shuffledSlot });
+          shuffledTaskIds.add(conflictTask.id);
+          latestConflictEnd = shuffledSlot.end;
+        }
+      }
+
+      // Update our slot to start after the last shuffled conflict
+      candidateSlotStart = new Date(latestConflictEnd);
+      // Round to next 15-minute interval
+      const newMinutes = candidateSlotStart.getUTCMinutes();
+      const newRoundedMinutes = Math.ceil(newMinutes / 15) * 15;
+      if (newRoundedMinutes >= 60) {
+        candidateSlotStart.setUTCHours(candidateSlotStart.getUTCHours() + 1, 0, 0, 0);
+      } else {
+        candidateSlotStart.setUTCMinutes(newRoundedMinutes, 0, 0);
+      }
+      candidateSlotEnd.setTime(candidateSlotStart.getTime() + taskDuration);
+      candidateSlot.start = candidateSlotStart;
+      candidateSlot.end = candidateSlotEnd;
+
+      // Check if still within working hours
+      if (!isWithinWorkingHours(candidateSlot, workingHours, timezone)) {
+        candidateSlotStart = getStartOfNextWorkingDay(candidateSlotStart, workingHours, timezone);
+        candidateSlotEnd.setTime(candidateSlotStart.getTime() + taskDuration);
+        candidateSlot.start = candidateSlotStart;
+        candidateSlot.end = candidateSlotEnd;
+      }
+    }
+
+    return candidateSlot;
+  };
+
+  // Check for conflicts with the task slot
+  const initialConflicts: Task[] = [];
+  for (const scheduledTask of scheduledTasks) {
+    if (
+      scheduledTask.status === "completed" ||
+      scheduledTask.status === "cancelled" ||
+      !scheduledTask.scheduled_start ||
+      !scheduledTask.scheduled_end
+    ) {
+      continue;
+    }
+
+    const theirStart = new Date(scheduledTask.scheduled_start).getTime();
+    const theirEnd = new Date(scheduledTask.scheduled_end).getTime();
+    const ourStart = taskSlot.start.getTime();
+    const ourEnd = taskSlot.end.getTime();
+
+    if (ourStart < theirEnd && ourEnd > theirStart) {
+      initialConflicts.push(scheduledTask);
+    }
+  }
+
+  // Shuffle all conflicting tasks
+  if (initialConflicts.length > 0) {
+    // Sort conflicts chronologically
+    initialConflicts.sort((a, b) => {
+      const aStart = a.scheduled_start ? new Date(a.scheduled_start).getTime() : 0;
+      const bStart = b.scheduled_start ? new Date(b.scheduled_start).getTime() : 0;
+      return aStart - bStart;
+    });
+
+    // Shuffle each conflict
+    let latestConflictEnd = taskSlot.end;
+    for (const conflictTask of initialConflicts) {
+      const shuffledSlot = shuffleTask(conflictTask, latestConflictEnd, recursionDepth);
+      if (shuffledSlot) {
+        shuffledTasks.push({ taskId: conflictTask.id, newSlot: shuffledSlot });
+        shuffledTaskIds.add(conflictTask.id);
+        latestConflictEnd = shuffledSlot.end;
+      }
+    }
+  }
+
+  return {
+    taskSlot,
+    shuffledTasks,
+  };
+}

@@ -26,6 +26,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useUserTimezone } from "@/hooks/use-user-timezone";
+import { useConfirmDialog } from "@/components/ui/confirm-dialog";
 import { getOverdueTasks } from "@/lib/task-utils";
 import { formatDateTimeLocalForTimezone, parseDateTimeLocalToUTC } from "@/lib/timezone-utils";
 import type { Task } from "@/lib/types";
@@ -41,6 +42,7 @@ interface ProcessOverdueDialogProps {
 
 type TaskAction =
   | "carryover"
+  | "reschedule"
   | "schedule-now"
   | "update-due-date"
   | "ignore"
@@ -53,6 +55,7 @@ interface TaskActionState {
   notes?: string;
   newDueDate?: string;
   autoSchedule?: boolean;
+  rescheduleMode?: "next-available" | "asap-shuffle";
 }
 
 export function ProcessOverdueDialog({
@@ -63,6 +66,7 @@ export function ProcessOverdueDialog({
   onTaskUpdate,
 }: ProcessOverdueDialogProps) {
   const { timezone } = useUserTimezone();
+  const { confirm } = useConfirmDialog();
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [taskActions, setTaskActions] = useState<Map<string, TaskActionState>>(new Map());
   const [isProcessing, setIsProcessing] = useState(false);
@@ -107,9 +111,15 @@ export function ProcessOverdueDialog({
                 additionalDuration: existing.additionalDuration,
                 notes: existing.notes,
                 newDueDate: existing.newDueDate,
+                rescheduleMode: existing.rescheduleMode,
               }
             : {};
-        newActions.set(taskId, { action, ...preservedState });
+        // Set default reschedule mode if action is reschedule
+        const defaultState =
+          action === "reschedule" && !preservedState.rescheduleMode
+            ? { rescheduleMode: "next-available" as const }
+            : {};
+        newActions.set(taskId, { action, ...preservedState, ...defaultState });
         setSelectedTaskId(taskId);
       }
     }
@@ -143,18 +153,74 @@ export function ProcessOverdueDialog({
 
         if (actionState.action === "carryover") {
           // Create carryover task
-          const promise = fetch(`/api/tasks/${taskId}/carryover`, {
+          const createCarryover = async () => {
+            const duration = actionState.additionalDuration || task.duration || 30;
+            
+            // First attempt
+            let response = await fetch(`/api/tasks/${taskId}/carryover`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                additional_duration: duration,
+                notes: actionState.notes,
+                auto_schedule: actionState.autoSchedule ?? false,
+              }),
+            });
+
+            // If it's a subtask and we got an expansion error, show confirmation
+            if (!response.ok && task.task_type === "subtask") {
+              const errorData = await response.json();
+              if (
+                errorData.error &&
+                errorData.error.includes("exceeds parent task duration")
+              ) {
+                // Show confirmation dialog for parent duration expansion
+                const confirmed = await confirm({
+                  title: "Expand Parent Task Duration?",
+                  description: `Creating this carryover subtask requires expanding the parent task duration from ${errorData.parent_duration} min to ${errorData.total_with_carryover} min (an increase of ${errorData.required_extension} min). Do you want to proceed?`,
+                  confirmText: "Expand & Create",
+                  cancelText: "Cancel",
+                  variant: "default",
+                });
+
+                if (!confirmed) {
+                  throw new Error(`Carryover cancelled for ${task.title}`);
+                }
+
+                // Retry with extend_parent_duration flag
+                response = await fetch(`/api/tasks/${taskId}/carryover`, {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    additional_duration: duration,
+                    notes: actionState.notes,
+                    auto_schedule: actionState.autoSchedule ?? false,
+                    extend_parent_duration: true,
+                  }),
+                });
+              }
+            }
+
+            if (!response.ok) {
+              const data = await response.json();
+              throw new Error(data.error || `Failed to process ${task.title}`);
+            }
+          };
+
+          promises.push(createCarryover());
+        } else if (actionState.action === "reschedule") {
+          // Reschedule task
+          const promise = fetch(`/api/tasks/${taskId}/reschedule`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              additional_duration: actionState.additionalDuration || task.duration || 30,
-              notes: actionState.notes,
+              mode: actionState.rescheduleMode || "next-available",
               auto_schedule: actionState.autoSchedule ?? false,
             }),
           }).then(async (res) => {
             if (!res.ok) {
               const data = await res.json();
-              throw new Error(data.error || `Failed to process ${task.title}`);
+              throw new Error(data.error || `Failed to reschedule ${task.title}`);
             }
           });
           promises.push(promise);
@@ -337,10 +403,26 @@ export function ProcessOverdueDialog({
 
                 {/* Action Selection */}
                 {taskType === "scheduled" ? (
-                  // Scheduled task: carryover and mark complete options
+                  // Scheduled task: carryover, reschedule, and mark complete options
                   <div className="space-y-2">
                     <Label>Action</Label>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {task.status === "pending" && (
+                        <Button
+                          variant={actionState?.action === "reschedule" ? "default" : "outline"}
+                          size="sm"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            handleSelectAction(task.id, "reschedule", e);
+                          }}
+                          className="flex-1"
+                          type="button"
+                        >
+                          <CalendarClock className="h-4 w-4 mr-2" />
+                          Reschedule
+                        </Button>
+                      )}
                       <Button
                         variant={actionState?.action === "carryover" ? "default" : "outline"}
                         size="sm"
@@ -410,7 +492,7 @@ export function ProcessOverdueDialog({
                         <CheckCircle2 className="h-4 w-4 mr-2" />
                         Mark Complete
                       </Button>
-                      {actionState?.action === "carryover" && (
+                      {(actionState?.action === "carryover" || actionState?.action === "reschedule") && (
                         <Button
                           variant="ghost"
                           size="sm"
@@ -488,7 +570,8 @@ export function ProcessOverdueDialog({
                               setError(null);
 
                               try {
-                                const response = await fetch(`/api/tasks/${task.id}/carryover`, {
+                                // First attempt to create carryover
+                                let response = await fetch(`/api/tasks/${task.id}/carryover`, {
                                   method: "POST",
                                   headers: { "Content-Type": "application/json" },
                                   body: JSON.stringify({
@@ -497,6 +580,41 @@ export function ProcessOverdueDialog({
                                     auto_schedule: actionState.autoSchedule ?? false,
                                   }),
                                 });
+
+                                // If it's a subtask and we got an expansion error, show confirmation
+                                if (!response.ok && task.task_type === "subtask") {
+                                  const errorData = await response.json();
+                                  if (
+                                    errorData.error &&
+                                    errorData.error.includes("exceeds parent task duration")
+                                  ) {
+                                    // Show confirmation dialog for parent duration expansion
+                                    const confirmed = await confirm({
+                                      title: "Expand Parent Task Duration?",
+                                      description: `Creating this carryover subtask requires expanding the parent task duration from ${errorData.parent_duration} min to ${errorData.total_with_carryover} min (an increase of ${errorData.required_extension} min). Do you want to proceed?`,
+                                      confirmText: "Expand & Create",
+                                      cancelText: "Cancel",
+                                      variant: "default",
+                                    });
+
+                                    if (!confirmed) {
+                                      setProcessingTaskId(null);
+                                      return;
+                                    }
+
+                                    // Retry with extend_parent_duration flag
+                                    response = await fetch(`/api/tasks/${task.id}/carryover`, {
+                                      method: "POST",
+                                      headers: { "Content-Type": "application/json" },
+                                      body: JSON.stringify({
+                                        additional_duration: duration,
+                                        notes: actionState.notes,
+                                        auto_schedule: actionState.autoSchedule ?? false,
+                                        extend_parent_duration: true,
+                                      }),
+                                    });
+                                  }
+                                }
 
                                 if (!response.ok) {
                                   const data = await response.json();
@@ -543,6 +661,119 @@ export function ProcessOverdueDialog({
                           >
                             <RotateCcw className="h-4 w-4 mr-2" />
                             {processingTaskId === task.id ? "Creating..." : "Create"}
+                          </Button>
+                        </div>
+                      </div>
+                    ) : null}
+
+                    {actionState?.action === "reschedule" ? (
+                      <div className="space-y-2 pt-2 border-t">
+                        <div className="border rounded-lg p-4 space-y-3 bg-muted/30">
+                          <div>
+                            <Label>Reschedule Mode</Label>
+                            <div className="flex items-center gap-2 mt-2">
+                              <Button
+                                variant={
+                                  actionState.rescheduleMode === "next-available"
+                                    ? "default"
+                                    : "outline"
+                                }
+                                size="sm"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  updateTaskAction(task.id, { rescheduleMode: "next-available" });
+                                }}
+                                className="flex-1"
+                                type="button"
+                                disabled={processingTaskId === task.id}
+                              >
+                                Next Available Slot
+                              </Button>
+                              <Button
+                                variant={
+                                  actionState.rescheduleMode === "asap-shuffle"
+                                    ? "default"
+                                    : "outline"
+                                }
+                                size="sm"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  updateTaskAction(task.id, { rescheduleMode: "asap-shuffle" });
+                                }}
+                                className="flex-1"
+                                type="button"
+                                disabled={processingTaskId === task.id}
+                              >
+                                ASAP with Shuffling
+                              </Button>
+                            </div>
+                            <p className="text-xs text-muted-foreground mt-2">
+                              {actionState.rescheduleMode === "asap-shuffle"
+                                ? "Places task at next working hours slot and shuffles conflicting tasks forward"
+                                : "Finds the next available slot respecting due dates"}
+                            </p>
+                          </div>
+                          <Button
+                            onClick={async () => {
+                              const mode = actionState.rescheduleMode || "next-available";
+
+                              setProcessingTaskId(task.id);
+                              setError(null);
+
+                              try {
+                                const response = await fetch(`/api/tasks/${task.id}/reschedule`, {
+                                  method: "POST",
+                                  headers: { "Content-Type": "application/json" },
+                                  body: JSON.stringify({
+                                    mode,
+                                    auto_schedule: actionState.autoSchedule ?? false,
+                                  }),
+                                });
+
+                                if (!response.ok) {
+                                  const data = await response.json();
+                                  throw new Error(
+                                    data.error || `Failed to reschedule ${task.title}`
+                                  );
+                                }
+
+                                const responseData = await response.json();
+
+                                // Remove this task from the actions map
+                                const newActions = new Map(taskActions);
+                                newActions.delete(task.id);
+                                setTaskActions(newActions);
+                                setSelectedTaskId(null);
+
+                                // Show success message
+                                toast.success(`Task "${task.title}" rescheduled`, {
+                                  description:
+                                    responseData.shuffledTasks?.length > 0
+                                      ? `${responseData.shuffledTasks.length} task(s) were shuffled.`
+                                      : "The dialog will stay open so you can process more tasks.",
+                                });
+
+                                // Refresh tasks
+                                onTasksUpdated();
+                              } catch (err) {
+                                setError(
+                                  err instanceof Error
+                                    ? err.message
+                                    : "Failed to reschedule task"
+                                );
+                              } finally {
+                                setProcessingTaskId(null);
+                              }
+                            }}
+                            disabled={processingTaskId === task.id}
+                            loading={processingTaskId === task.id}
+                            className="w-full"
+                            size="sm"
+                          >
+                            <CalendarClock className="h-4 w-4 mr-2" />
+                            {processingTaskId === task.id ? "Rescheduling..." : "Reschedule"}
                           </Button>
                         </div>
                       </div>

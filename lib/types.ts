@@ -217,6 +217,13 @@ export interface CreateCarryoverTaskRequest {
   additional_duration: number; // Extra time needed in minutes
   notes?: string; // Optional notes about what's left to do
   auto_schedule?: boolean; // If true, automatically schedule the carryover task to the next available slot
+  extend_parent_duration?: boolean; // For subtask carryovers: if true, automatically expand parent task duration if needed
+}
+
+// Request for rescheduling a task
+export interface RescheduleTaskRequest {
+  mode: "next-available" | "asap-shuffle";
+  auto_schedule?: boolean; // For next-available mode
 }
 
 export interface CreateTaskGroupRequest {
