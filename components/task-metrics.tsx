@@ -29,6 +29,7 @@ interface MetricSectionProps {
   icon: React.ReactNode;
   label: string;
   tasks: Task[];
+  allTasks?: Task[]; // All tasks to find parent tasks for subtasks
   colorClass: string;
   isExpanded: boolean;
   onToggle: () => void;
@@ -40,6 +41,7 @@ function MetricSection({
   icon,
   label,
   tasks,
+  allTasks,
   colorClass,
   isExpanded,
   onToggle,
@@ -97,9 +99,24 @@ function MetricSection({
       {/* Expanded task list */}
       {isExpanded && count > 0 && (
         <div className="px-2 pb-2 space-y-1">
-          {tasks.map((task) => (
-            <SlimTaskCard key={task.id} task={task} onTaskClick={onTaskClick} />
-          ))}
+          {tasks.map((task) => {
+            // Find parent task if this is a subtask
+            // Use allTasks if provided, otherwise fall back to tasks
+            const taskList = allTasks || tasks;
+            const parentTask = task.parent_task_id
+              ? taskList.find((t) => t.id === task.parent_task_id) || undefined
+              : undefined;
+            
+            return (
+              <SlimTaskCard
+                key={task.id}
+                task={task}
+                onTaskClick={onTaskClick}
+                isSubtask={!!task.parent_task_id}
+                parentTask={parentTask}
+              />
+            );
+          })}
         </div>
       )}
 
@@ -164,6 +181,7 @@ export function TaskMetrics({
           icon={<AlertTriangle className="h-4 w-4" />}
           label="Overdue"
           tasks={overdueTasks}
+          allTasks={tasks}
           colorClass="text-red-600 dark:text-red-400"
           isExpanded={expandedSections.has("overdue")}
           onToggle={() => toggleSection("overdue")}
@@ -185,6 +203,7 @@ export function TaskMetrics({
           icon={<Clock className="h-4 w-4" />}
           label="Upcoming Soon"
           tasks={upcomingSoonTasks}
+          allTasks={tasks}
           colorClass="text-orange-600 dark:text-orange-400"
           isExpanded={expandedSections.has("upcoming")}
           onToggle={() => toggleSection("upcoming")}
@@ -194,6 +213,7 @@ export function TaskMetrics({
           icon={<PlayCircle className="h-4 w-4" />}
           label="In Progress"
           tasks={inProgressTasks}
+          allTasks={tasks}
           colorClass="text-blue-600 dark:text-blue-400"
           isExpanded={expandedSections.has("in_progress")}
           onToggle={() => toggleSection("in_progress")}
@@ -203,6 +223,7 @@ export function TaskMetrics({
           icon={<Star className="h-4 w-4" />}
           label="High Priority"
           tasks={highPriorityUnscheduledTasks}
+          allTasks={tasks}
           colorClass="text-purple-600 dark:text-purple-400"
           isExpanded={expandedSections.has("high_priority_unscheduled")}
           onToggle={() => toggleSection("high_priority_unscheduled")}

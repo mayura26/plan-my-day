@@ -294,6 +294,14 @@ export function ProcessOverdueDialog({
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
                     <h4 className="font-medium">{task.title}</h4>
+                    {task.parent_task_id && (() => {
+                      const parentTask = tasks.find((t) => t.id === task.parent_task_id);
+                      return parentTask ? (
+                        <p className="text-sm text-muted-foreground/70 mt-0.5 italic">
+                          {parentTask.title}
+                        </p>
+                      ) : null;
+                    })()}
                     <div className="flex items-center gap-4 mt-1 text-sm text-muted-foreground">
                       {task.duration && (
                         <span className="flex items-center gap-1">

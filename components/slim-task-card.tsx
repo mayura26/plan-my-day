@@ -17,6 +17,7 @@ interface SlimTaskCardProps {
   showAllTasks?: boolean;
   subtaskIndex?: number;
   subtaskTotal?: number;
+  parentTask?: Task; // Parent task information for subtasks
 }
 
 export function SlimTaskCard({
@@ -28,6 +29,7 @@ export function SlimTaskCard({
   showAllTasks = false,
   subtaskIndex,
   subtaskTotal,
+  parentTask,
 }: SlimTaskCardProps) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: task.id,
@@ -124,6 +126,13 @@ export function SlimTaskCard({
         )}
         <span className="truncate min-w-0">{task.title}</span>
       </div>
+      
+      {/* Parent task subtitle for subtasks */}
+      {isSubtask && parentTask && (
+        <div className="text-[10px] text-muted-foreground/70 truncate mt-0.5 italic">
+          {parentTask.title}
+        </div>
+      )}
 
       {/* Line 2: Priority, Status, Duration */}
       <div
