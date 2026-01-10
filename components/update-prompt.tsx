@@ -233,64 +233,70 @@ export function UpdatePrompt() {
     };
   }, []);
 
+  const clearCacheAndReload = async () => {
+    try {
+      // Clear all caches (like reference implementation)
+      if ("caches" in window) {
+        const cacheNames = await caches.keys();
+        await Promise.all(cacheNames.map((cacheName) => caches.delete(cacheName)));
+        console.log("All caches cleared");
+      }
+
+      // Unregister service worker to force fresh registration
+      const registration = await navigator.serviceWorker.getRegistration();
+      if (registration) {
+        await registration.unregister();
+        console.log("Service worker unregistered");
+      }
+
+      // Clear service worker registrations
+      if ("serviceWorker" in navigator && navigator.serviceWorker.getRegistrations) {
+        const registrations = await navigator.serviceWorker.getRegistrations();
+        await Promise.all(registrations.map((reg) => reg.unregister()));
+      }
+
+      // Reload the page to get fresh version
+      window.location.reload();
+    } catch (error) {
+      console.error("Error clearing cache:", error);
+      // Still reload even if cache clearing fails
+      window.location.reload();
+    }
+  };
+
   const handleUpdate = async () => {
+    if (typeof window === "undefined" || !("serviceWorker" in navigator)) {
+      return;
+    }
+
     setIsUpdating(true);
+    setShowPrompt(false);
     try {
       const registration = await navigator.serviceWorker.getRegistration();
       if (!registration) {
-        // No service worker registered, just reload to get new version
-        window.location.reload();
+        // No service worker, but still allow cache clear and reload
+        await clearCacheAndReload();
         return;
       }
 
       const waitingWorker = registration.waiting;
       if (waitingWorker) {
-        // Mark that we want to reload when controller changes
-        userRequestedReload = true;
-        // Tell the waiting service worker to skip waiting
+        // Tell the waiting service worker to skip waiting and activate
         waitingWorker.postMessage({ type: "SKIP_WAITING" });
-        setShowPrompt(false);
+
+        // Clear cache and reload after a short delay
+        setTimeout(async () => {
+          await clearCacheAndReload();
+        }, 500);
       } else {
-        // No waiting worker, but update is available (detected via version check)
-        // Trigger a service worker update check
-        await registration.update();
-
-        // Wait for the update to be detected (check every 200ms for up to 2 seconds)
-        let attempts = 0;
-        const maxAttempts = 10; // 10 attempts * 200ms = 2 seconds
-        const checkInterval = 200;
-
-        const waitForWaitingWorker = async (): Promise<ServiceWorker | null> => {
-          while (attempts < maxAttempts) {
-            await new Promise((resolve) => setTimeout(resolve, checkInterval));
-            attempts++;
-
-            const updatedRegistration = await navigator.serviceWorker.getRegistration();
-            if (updatedRegistration?.waiting) {
-              return updatedRegistration.waiting;
-            }
-          }
-          return null;
-        };
-
-        const newWaitingWorker = await waitForWaitingWorker();
-
-        if (newWaitingWorker) {
-          // A waiting worker appeared, send SKIP_WAITING
-          userRequestedReload = true;
-          newWaitingWorker.postMessage({ type: "SKIP_WAITING" });
-          setShowPrompt(false);
-        } else {
-          // No waiting worker appeared after update check, reload to get new version
-          userRequestedReload = true;
-          window.location.reload();
-        }
+        // No waiting worker, but user wants to force update
+        // Clear cache and reload anyway (like reference "clear cache and reload")
+        await clearCacheAndReload();
       }
     } catch (error) {
-      console.error("Error updating:", error);
-      userRequestedReload = false;
-      // On error, try to reload anyway to get the new version
-      window.location.reload();
+      console.error("Error forcing update:", error);
+      // Even on error, try to clear cache and reload
+      await clearCacheAndReload();
     } finally {
       setIsUpdating(false);
     }

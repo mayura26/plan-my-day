@@ -17,10 +17,25 @@ const navigation = [
   { name: "Settings", href: "/settings", icon: Settings },
 ];
 
+// Helper function to get server version
+async function getServerVersion(): Promise<string> {
+  try {
+    const response = await fetch("/api/version");
+    if (response.ok) {
+      const data = await response.json();
+      return data.version || "1";
+    }
+  } catch (error) {
+    console.error("Error fetching server version:", error);
+  }
+  return "1";
+}
+
 export function Navigation() {
   const { data: session } = useSession();
   const pathname = usePathname();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [version, setVersion] = useState<string | null>(null);
 
   // Close mobile menu when route changes
   useEffect(() => {
@@ -38,6 +53,15 @@ export function Navigation() {
       document.body.style.overflow = "";
     };
   }, [isMobileMenuOpen]);
+
+  // Fetch version on mount
+  useEffect(() => {
+    const fetchVersion = async () => {
+      const v = await getServerVersion();
+      setVersion(v);
+    };
+    fetchVersion();
+  }, []);
 
   if (!session) {
     return null;
@@ -65,6 +89,11 @@ export function Navigation() {
               </div>
               <span className="font-bold text-xl bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text text-transparent">
                 Plan My Day
+                {version && (
+                  <span className="ml-2 text-xs text-muted-foreground font-normal">
+                    v{version}
+                  </span>
+                )}
               </span>
             </Link>
           </div>

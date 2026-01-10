@@ -99,38 +99,70 @@ export async function GET(request: NextRequest) {
     const result = await db.execute(query, params);
     const tasks = result.rows.map(mapRowToTask);
 
-    // Get subtask counts for all tasks (for filtering purposes)
-    const tasksWithSubtaskCounts = await Promise.all(
-      tasks.map(async (task) => {
-        // Only check subtask count for parent tasks (tasks without parent_task_id)
-        if (task.parent_task_id) {
-          return { ...task, subtask_count: 0 };
+    // Get parent task IDs (tasks without parent_task_id)
+    const parentTaskIds = tasks.filter((task) => !task.parent_task_id).map((task) => task.id);
+
+    // Optimize: Fetch all subtask counts in a single query using aggregation
+    let subtaskCountsMap = new Map<string, number>();
+    if (parentTaskIds.length > 0) {
+      const placeholders = parentTaskIds.map(() => "?").join(",");
+      const subtaskCountsResult = await db.execute(
+        `SELECT parent_task_id, COUNT(*) as count 
+         FROM tasks 
+         WHERE parent_task_id IN (${placeholders}) 
+         GROUP BY parent_task_id`,
+        parentTaskIds
+      );
+
+      for (const row of subtaskCountsResult.rows) {
+        subtaskCountsMap.set(row.parent_task_id as string, Number(row.count));
+      }
+    }
+
+    // Optionally include full subtask details - fetch all in a single batch query
+    let subtasksMap = new Map<string, Task[]>();
+    if (include_subtasks === "true" && parentTaskIds.length > 0) {
+      const placeholders = parentTaskIds.map(() => "?").join(",");
+      const allSubtasksResult = await db.execute(
+        `SELECT * FROM tasks 
+         WHERE parent_task_id IN (${placeholders}) 
+         ORDER BY parent_task_id, priority ASC, created_at ASC`,
+        parentTaskIds
+      );
+
+      const allSubtasks = allSubtasksResult.rows.map(mapRowToTask);
+
+      // Group subtasks by parent_task_id
+      for (const subtask of allSubtasks) {
+        if (subtask.parent_task_id) {
+          const existing = subtasksMap.get(subtask.parent_task_id) || [];
+          existing.push(subtask);
+          subtasksMap.set(subtask.parent_task_id, existing);
         }
+      }
+    }
 
-        const subtaskCountResult = await db.execute(
-          `SELECT COUNT(*) as count FROM tasks WHERE parent_task_id = ?`,
-          [task.id]
-        );
-        const subtaskCount = subtaskCountResult.rows[0]?.count || 0;
+    // Build the final tasks array with subtask counts and optionally subtasks
+    const tasksWithSubtaskCounts = tasks.map((task) => {
+      // Only add subtask_count for parent tasks (tasks without parent_task_id)
+      if (task.parent_task_id) {
+        return { ...task, subtask_count: 0 };
+      }
 
-        // Optionally include full subtask details
-        if (include_subtasks === "true") {
-          const subtasksResult = await db.execute(
-            `SELECT * FROM tasks WHERE parent_task_id = ? ORDER BY priority ASC, created_at ASC`,
-            [task.id]
-          );
-          return {
-            ...task,
-            subtasks: subtasksResult.rows.map(mapRowToTask),
-            subtask_count: Number(subtaskCount),
-            completed_subtask_count: subtasksResult.rows.filter((r) => r.status === "completed")
-              .length,
-          };
-        }
+      const subtaskCount = subtaskCountsMap.get(task.id) || 0;
 
-        return { ...task, subtask_count: Number(subtaskCount) };
-      })
-    );
+      if (include_subtasks === "true") {
+        const subtasks = subtasksMap.get(task.id) || [];
+        return {
+          ...task,
+          subtasks,
+          subtask_count: subtaskCount,
+          completed_subtask_count: subtasks.filter((st) => st.status === "completed").length,
+        };
+      }
+
+      return { ...task, subtask_count: subtaskCount };
+    });
 
     return NextResponse.json({ tasks: tasksWithSubtaskCounts });
   } catch (error) {

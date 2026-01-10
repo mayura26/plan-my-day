@@ -7,10 +7,25 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
+// Helper function to get server version
+async function getServerVersion(): Promise<string> {
+  try {
+    const response = await fetch("/api/version");
+    if (response.ok) {
+      const data = await response.json();
+      return data.version || "1";
+    }
+  } catch (error) {
+    console.error("Error fetching server version:", error);
+  }
+  return "1";
+}
+
 export default function SignIn() {
   const [providers, setProviders] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
+  const [version, setVersion] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchProviders = async () => {
@@ -32,12 +47,24 @@ export default function SignIn() {
     checkSession();
   }, [router]);
 
+  // Fetch version on mount
+  useEffect(() => {
+    const fetchVersion = async () => {
+      const v = await getServerVersion();
+      setVersion(v);
+    };
+    fetchVersion();
+  }, []);
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
           <p className="text-muted-foreground">Loading...</p>
+          {version && (
+            <p className="text-xs text-muted-foreground/70 mt-2">v{version}</p>
+          )}
         </div>
       </div>
     );

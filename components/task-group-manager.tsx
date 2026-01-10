@@ -553,23 +553,6 @@ export function TaskGroupManager({
     }
   }, []);
 
-  const fetchSubtasks = useCallback(async (parentTaskId: string) => {
-    try {
-      const response = await fetch(`/api/tasks/${parentTaskId}/subtasks`);
-      if (response.ok) {
-        const data = await response.json();
-        const subtasks = data.subtasks || [];
-        setSubtasksMap((prev) => {
-          const newMap = new Map(prev);
-          newMap.set(parentTaskId, subtasks);
-          return newMap;
-        });
-      }
-    } catch (error) {
-      console.error("Error fetching subtasks:", error);
-    }
-  }, []);
-
   useEffect(() => {
     // Only fetch once on mount
     if (!hasFetchedRef.current) {
@@ -579,21 +562,24 @@ export function TaskGroupManager({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fetchGroups]); // Empty deps - only run once on mount
 
-  // Clear and refetch subtasks when tasks change (e.g., after refresh)
-  // This ensures we get updated subtask data including scheduling status
+  // Extract subtasks from tasks array when tasks change (e.g., after refresh)
+  // Subtasks are now included in the API response when include_subtasks=true
   useEffect(() => {
-    // Clear the subtasks map to force refetch with fresh data
-    setSubtasksMap(new Map());
+    const newSubtasksMap = new Map<string, Task[]>();
 
-    // Filter tasks to get parent tasks with subtasks
-    const parentTasksWithSubtasks = tasks.filter(
-      (task) => !task.parent_task_id && (task.subtask_count || 0) > 0
-    );
-    // Fetch subtasks for all parent tasks (will use fresh data)
-    parentTasksWithSubtasks.forEach((task) => {
-      fetchSubtasks(task.id);
-    });
-  }, [tasks, fetchSubtasks]);
+    // Extract subtasks from tasks that have them included in the response
+    for (const task of tasks) {
+      // Check if task has subtasks property (included when include_subtasks=true)
+      if (!task.parent_task_id && "subtasks" in task && Array.isArray((task as any).subtasks)) {
+        const subtasks = (task as any).subtasks as Task[];
+        if (subtasks.length > 0) {
+          newSubtasksMap.set(task.id, subtasks);
+        }
+      }
+    }
+
+    setSubtasksMap(newSubtasksMap);
+  }, [tasks]);
 
   // Auto-rotate color when create dialog opens
   useEffect(() => {

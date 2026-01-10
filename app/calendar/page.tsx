@@ -172,13 +172,12 @@ export default function CalendarPage() {
         if (setLoading) {
           setIsLoading(true);
         }
-        const response = await fetch("/api/tasks");
+        const response = await fetch("/api/tasks?include_subtasks=true");
         if (response.ok) {
           const data = await response.json();
           const fetchedTasks = data.tasks || [];
           setTasks(fetchedTasks);
-          // Clear subtasks map when tasks are refreshed to ensure fresh data
-          setSubtasksMap(new Map());
+          // Subtasks map will be rebuilt from tasks array by useEffect
           // Fetch parent task names for subtasks
           await fetchParentTaskNames(fetchedTasks);
         } else {
@@ -213,27 +212,6 @@ export default function CalendarPage() {
       console.error("Error fetching task groups:", error);
     } finally {
       isFetchingGroupsRef.current = false;
-    }
-  }, []);
-
-  const fetchSubtasks = useCallback(async (parentTaskId: string) => {
-    try {
-      const response = await fetch(`/api/tasks/${parentTaskId}/subtasks`);
-      if (response.ok) {
-        const data = await response.json();
-        const subtasks = data.subtasks || [];
-        setSubtasksMap((prev) => {
-          // Only update if we don't already have this data
-          if (prev.has(parentTaskId)) {
-            return prev;
-          }
-          const newMap = new Map(prev);
-          newMap.set(parentTaskId, subtasks);
-          return newMap;
-        });
-      }
-    } catch (error) {
-      console.error("Error fetching subtasks:", error);
     }
   }, []);
 
@@ -664,18 +642,24 @@ export default function CalendarPage() {
     });
   }, [filteredTasks, subtasksMap]);
 
-  // Fetch subtasks for parent tasks that have them
+  // Extract subtasks from tasks array when tasks change
+  // Subtasks are now included in the API response when include_subtasks=true
   useEffect(() => {
-    const parentTasksWithSubtasks = unscheduledTasks.filter(
-      (task) => (task.subtask_count || 0) > 0
-    );
-    parentTasksWithSubtasks.forEach((task) => {
-      // Only fetch if we don't already have subtasks for this task
-      if (!subtasksMap.has(task.id)) {
-        fetchSubtasks(task.id);
+    const newSubtasksMap = new Map<string, Task[]>();
+
+    // Extract subtasks from all tasks that have them included in the response
+    for (const task of tasks) {
+      // Check if task has subtasks property (included when include_subtasks=true)
+      if (!task.parent_task_id && "subtasks" in task && Array.isArray((task as any).subtasks)) {
+        const subtasks = (task as any).subtasks as Task[];
+        if (subtasks.length > 0) {
+          newSubtasksMap.set(task.id, subtasks);
+        }
       }
-    });
-  }, [unscheduledTasks, fetchSubtasks, subtasksMap]);
+    }
+
+    setSubtasksMap(newSubtasksMap);
+  }, [tasks]);
 
   // For display in calendar - only show scheduled tasks
   const calendarTasks = scheduledTasks;

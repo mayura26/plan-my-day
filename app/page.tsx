@@ -3,15 +3,30 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { AuthButton } from "@/components/auth-button";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 
+// Helper function to get server version
+async function getServerVersion(): Promise<string> {
+  try {
+    const response = await fetch("/api/version");
+    if (response.ok) {
+      const data = await response.json();
+      return data.version || "1";
+    }
+  } catch (error) {
+    console.error("Error fetching server version:", error);
+  }
+  return "1";
+}
+
 export default function Home() {
   const { data: session, status } = useSession();
   const router = useRouter();
+  const [version, setVersion] = useState<string | null>(null);
 
   // Redirect authenticated users to calendar (main dashboard)
   useEffect(() => {
@@ -20,6 +35,15 @@ export default function Home() {
     }
   }, [status, router]);
 
+  // Fetch version on mount
+  useEffect(() => {
+    const fetchVersion = async () => {
+      const v = await getServerVersion();
+      setVersion(v);
+    };
+    fetchVersion();
+  }, []);
+
   // Show loading while checking auth or redirecting
   if (status === "loading" || session) {
     return (
@@ -27,6 +51,9 @@ export default function Home() {
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
           <p className="text-muted-foreground">Loading...</p>
+          {version && (
+            <p className="text-xs text-muted-foreground/70 mt-2">v{version}</p>
+          )}
         </div>
       </div>
     );
