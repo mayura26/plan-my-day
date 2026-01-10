@@ -15,7 +15,12 @@ export function Providers({ children }: ProvidersProps) {
   return (
     <SessionProvider>
       <UserTimezoneProvider>
-        <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="system"
+          enableSystem
+          disableTransitionOnChange
+        >
           <ConfirmDialogProvider>
             <ServiceWorkerProvider />
             {children}

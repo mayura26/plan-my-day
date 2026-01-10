@@ -62,9 +62,7 @@ export default function SignIn() {
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
           <p className="text-muted-foreground">Loading...</p>
-          {version && (
-            <p className="text-xs text-muted-foreground/70 mt-2">v{version}</p>
-          )}
+          {version && <p className="text-xs text-muted-foreground/70 mt-2">v{version}</p>}
         </div>
       </div>
     );

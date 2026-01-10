@@ -1,7 +1,7 @@
 "use client";
 
 import { useSession } from "next-auth/react";
-import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
+import { createContext, type ReactNode, useContext, useEffect, useRef, useState } from "react";
 import { getUserTimezone } from "@/lib/timezone-utils";
 
 interface UserTimezoneContextType {
@@ -131,4 +131,3 @@ export function useUserTimezoneContext(): UserTimezoneContextType {
   }
   return context;
 }
-

@@ -90,9 +90,7 @@ export function Navigation() {
               <span className="font-bold text-xl bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text text-transparent">
                 Plan My Day
                 {version && (
-                  <span className="ml-2 text-xs text-muted-foreground font-normal">
-                    v{version}
-                  </span>
+                  <span className="ml-2 text-xs text-muted-foreground font-normal">v{version}</span>
                 )}
               </span>
             </Link>

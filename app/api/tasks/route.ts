@@ -103,7 +103,7 @@ export async function GET(request: NextRequest) {
     const parentTaskIds = tasks.filter((task) => !task.parent_task_id).map((task) => task.id);
 
     // Optimize: Fetch all subtask counts in a single query using aggregation
-    let subtaskCountsMap = new Map<string, number>();
+    const subtaskCountsMap = new Map<string, number>();
     if (parentTaskIds.length > 0) {
       const placeholders = parentTaskIds.map(() => "?").join(",");
       const subtaskCountsResult = await db.execute(
@@ -120,7 +120,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Optionally include full subtask details - fetch all in a single batch query
-    let subtasksMap = new Map<string, Task[]>();
+    const subtasksMap = new Map<string, Task[]>();
     if (include_subtasks === "true" && parentTaskIds.length > 0) {
       const placeholders = parentTaskIds.map(() => "?").join(",");
       const allSubtasksResult = await db.execute(
