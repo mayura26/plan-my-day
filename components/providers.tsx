@@ -5,6 +5,7 @@ import { Toaster } from "sonner";
 import { ServiceWorkerProvider } from "@/components/service-worker-provider";
 import { ThemeProvider } from "@/components/theme-provider";
 import { ConfirmDialogProvider } from "@/components/ui/confirm-dialog";
+import { UserTimezoneProvider } from "@/contexts/user-timezone-context";
 
 interface ProvidersProps {
   children: React.ReactNode;
@@ -13,13 +14,15 @@ interface ProvidersProps {
 export function Providers({ children }: ProvidersProps) {
   return (
     <SessionProvider>
-      <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
-        <ConfirmDialogProvider>
-          <ServiceWorkerProvider />
-          {children}
-          <Toaster theme="system" />
-        </ConfirmDialogProvider>
-      </ThemeProvider>
+      <UserTimezoneProvider>
+        <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+          <ConfirmDialogProvider>
+            <ServiceWorkerProvider />
+            {children}
+            <Toaster theme="system" />
+          </ConfirmDialogProvider>
+        </ThemeProvider>
+      </UserTimezoneProvider>
     </SessionProvider>
   );
 }
