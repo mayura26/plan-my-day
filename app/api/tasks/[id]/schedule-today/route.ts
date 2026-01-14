@@ -34,7 +34,7 @@ function mapRowToTask(row: any): Task {
   };
 }
 
-// POST /api/tasks/[id]/schedule-now - Auto-schedule a task to the nearest available slot
+// POST /api/tasks/[id]/schedule-today - Schedule a task today
 export async function POST(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const session = await auth();
@@ -123,9 +123,9 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
     ]);
     const allTasks = allTasksResult.rows.map(mapRowToTask);
 
-    // Use unified scheduler with "now" mode
+    // Use unified scheduler with "today" mode
     const result = scheduleTaskUnified({
-      mode: "now",
+      mode: "today",
       task,
       allTasks,
       taskGroup,
@@ -136,7 +136,7 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
     if (!result.slot) {
       return NextResponse.json(
         {
-          error: result.error || "Unable to schedule task. No available time slot found.",
+          error: result.error || "Unable to schedule task today. Please try another mode.",
           feedback: result.feedback,
         },
         { status: 422 }
@@ -166,11 +166,12 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
 
     return NextResponse.json({
       task: updatedTask,
-      message: "Task scheduled successfully",
+      message: "Task scheduled for today",
       feedback: result.feedback,
     });
   } catch (error) {
-    console.error("Error scheduling task:", error);
+    console.error("Error scheduling task for today:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
+

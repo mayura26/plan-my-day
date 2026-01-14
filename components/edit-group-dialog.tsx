@@ -45,6 +45,7 @@ export function EditGroupDialog({
   const [autoScheduleEnabled, setAutoScheduleEnabled] = useState(false);
   const [autoScheduleHours, setAutoScheduleHours] = useState<GroupScheduleHours>({});
   const [isAutoScheduleExpanded, setIsAutoScheduleExpanded] = useState(false);
+  const [priority, setPriority] = useState<number>(5);
 
   // Initialize form when group changes
   useEffect(() => {
@@ -54,6 +55,7 @@ export function EditGroupDialog({
       setNewParentGroupId(group.parent_group_id || null);
       setAutoScheduleEnabled(group.auto_schedule_enabled ?? false);
       setAutoScheduleHours(group.auto_schedule_hours || {});
+      setPriority(group.priority ?? 5);
     }
   }, [group]);
 
@@ -66,6 +68,7 @@ export function EditGroupDialog({
       setAutoScheduleEnabled(false);
       setAutoScheduleHours({});
       setIsAutoScheduleExpanded(false);
+      setPriority(5);
     }
   }, [open]);
 
@@ -104,6 +107,7 @@ export function EditGroupDialog({
           parent_group_id: newParentGroupId || null,
           auto_schedule_enabled: autoScheduleEnabled,
           auto_schedule_hours: autoScheduleEnabled ? autoScheduleHours : null,
+          priority,
         }),
       });
 
@@ -216,6 +220,29 @@ export function EditGroupDialog({
               </button>
               {isAutoScheduleExpanded && (
                 <div className="p-4 space-y-4">
+                  <div>
+                    <label htmlFor="priority-select-edit" className="text-sm font-medium">
+                      Priority
+                    </label>
+                    <div className="text-xs text-muted-foreground mb-1">
+                      1 = Highest priority, 10 = Lowest priority (used as tie-breaker in scheduling)
+                    </div>
+                    <Select
+                      value={priority.toString()}
+                      onValueChange={(value) => setPriority(parseInt(value, 10))}
+                    >
+                      <SelectTrigger id="priority-select-edit" className="mt-1 w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {Array.from({ length: 10 }, (_, i) => i + 1).map((p) => (
+                          <SelectItem key={p} value={p.toString()}>
+                            {p} {p === 1 ? "(Highest)" : p === 10 ? "(Lowest)" : ""}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                   <div className="flex items-center justify-between">
                     <label htmlFor="auto-schedule-enabled" className="text-sm font-medium">
                       Enable Auto-Scheduling

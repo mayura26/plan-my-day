@@ -1,9 +1,15 @@
 "use client";
 
-import { Calendar, Clock, Zap } from "lucide-react";
+import { Calendar, CalendarClock, ChevronDown, Clock, Zap } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { DependencySelector } from "@/components/dependency-selector";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -61,7 +67,8 @@ export function TaskForm({
     scheduled_end: formatDateTimeLocalForTimezone(initialData?.scheduled_end, timezone),
     due_date: formatDateTimeLocalForTimezone(initialData?.due_date, timezone),
     auto_schedule: initialData?.auto_schedule || false,
-  });
+    schedule_mode: (initialData as any)?.schedule_mode || "now",
+  } as CreateTaskRequest & { schedule_mode?: string });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [showDescription, setShowDescription] = useState(!!initialData?.description);
@@ -225,6 +232,10 @@ export function TaskForm({
       // Remove energy_level_required for todos (not used)
       if (submissionData.task_type === "todo") {
         submissionData.energy_level_required = undefined;
+      }
+      // Only include schedule_mode if auto_schedule is enabled
+      if (!submissionData.auto_schedule) {
+        (submissionData as any).schedule_mode = undefined;
       }
       if (submissionData.scheduled_start) {
         submissionData.scheduled_start = parseDateTimeLocalToUTC(
@@ -597,32 +608,95 @@ export function TaskForm({
         <Label className="text-xs text-muted-foreground">
           {isEvent ? "Event Time *" : "Schedule"}
         </Label>
-        {isTask && (
-          <div className="flex items-center gap-2 pb-2">
-            <Switch
-              id="auto_schedule"
-              checked={formData.auto_schedule || false}
-              onCheckedChange={(checked) => handleInputChange("auto_schedule", checked)}
-              disabled={
-                !!(formData.scheduled_start || formData.scheduled_end) ||
-                formData.task_type !== "task"
-              }
-            />
-            <Label
-              htmlFor="auto_schedule"
-              className="text-sm font-normal cursor-pointer flex items-center gap-1.5"
-            >
-              <Calendar className="w-3.5 h-3.5" />
-              <span>Auto-schedule to next available slot today</span>
-            </Label>
+        {(isTask || isTodo) && (
+          <div className="space-y-2 pb-2">
+            <div className="flex items-center gap-2">
+              <Switch
+                id="auto_schedule"
+                checked={formData.auto_schedule || false}
+                onCheckedChange={(checked) => handleInputChange("auto_schedule", checked)}
+                disabled={
+                  !!(formData.scheduled_start || formData.scheduled_end) ||
+                  (formData.task_type !== "task" && formData.task_type !== "todo")
+                }
+              />
+              <Label
+                htmlFor="auto_schedule"
+                className="text-sm font-normal cursor-pointer flex items-center gap-1.5 flex-1"
+              >
+                <Calendar className="w-3.5 h-3.5" />
+                <span>Auto-schedule</span>
+              </Label>
+              {formData.auto_schedule && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-8 text-xs"
+                      disabled={
+                        !!(formData.scheduled_start || formData.scheduled_end) ||
+                        (formData.task_type !== "task" && formData.task_type !== "todo")
+                      }
+                    >
+                      {(() => {
+                        const mode = (formData as any).schedule_mode || "now";
+                        const labels: Record<string, string> = {
+                          now: "Schedule Now",
+                          today: "Schedule Today",
+                          "next-week": "Schedule Next Week",
+                          "next-month": "Schedule Next Month",
+                          asap: "Schedule ASAP",
+                        };
+                        return labels[mode] || "Schedule Now";
+                      })()}
+                      <ChevronDown className="h-3 w-3 ml-1" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start">
+                    <DropdownMenuItem
+                      onClick={() => handleInputChange("schedule_mode", "now")}
+                    >
+                      <Clock className="h-4 w-4 mr-2" />
+                      Schedule Now
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => handleInputChange("schedule_mode", "today")}
+                    >
+                      <CalendarClock className="h-4 w-4 mr-2" />
+                      Schedule Today
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => handleInputChange("schedule_mode", "next-week")}
+                    >
+                      <Calendar className="h-4 w-4 mr-2" />
+                      Schedule Next Week
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => handleInputChange("schedule_mode", "next-month")}
+                    >
+                      <Calendar className="h-4 w-4 mr-2" />
+                      Schedule Next Month
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => handleInputChange("schedule_mode", "asap")}
+                    >
+                      <Zap className="h-4 w-4 mr-2" />
+                      Schedule ASAP
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
+            </div>
           </div>
         )}
-        {isTask && formData.auto_schedule && !formData.duration && (
+        {(isTask || isTodo) && formData.auto_schedule && !formData.duration && (
           <p className="text-xs text-amber-600 dark:text-amber-500">
             Note: Auto-schedule requires a duration to be set.
           </p>
         )}
-        {isTask &&
+        {(isTask || isTodo) &&
           (formData.scheduled_start || formData.scheduled_end) &&
           formData.auto_schedule && (
             <p className="text-xs text-muted-foreground">

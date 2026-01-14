@@ -1,9 +1,9 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { rescheduleTaskWithShuffling } from "@/lib/scheduler-utils";
+import { scheduleTaskUnified } from "@/lib/scheduler-utils";
 import { getUserTimezone } from "@/lib/timezone-utils";
 import { db } from "@/lib/turso";
-import type { Task, TaskStatus, TaskType } from "@/lib/types";
+import type { Task, TaskGroup, TaskStatus, TaskType } from "@/lib/types";
 
 // Helper to map database row to Task object
 function mapRowToTask(row: any): Task {
@@ -64,8 +64,8 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
       );
     }
 
-    // Get user's timezone and working hours
-    const userResult = await db.execute("SELECT timezone, working_hours FROM users WHERE id = ?", [
+    // Get user's timezone and awake hours
+    const userResult = await db.execute("SELECT timezone, awake_hours FROM users WHERE id = ?", [
       session.user.id,
     ]);
     const userTimezone =
@@ -73,13 +73,47 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
         ? getUserTimezone(userResult.rows[0].timezone as string | null)
         : "UTC";
 
-    let workingHours = null;
-    if (userResult.rows.length > 0 && userResult.rows[0].working_hours) {
+    let awakeHours = null;
+    if (userResult.rows.length > 0 && userResult.rows[0].awake_hours) {
       try {
-        workingHours = JSON.parse(userResult.rows[0].working_hours as string);
+        awakeHours = JSON.parse(userResult.rows[0].awake_hours as string);
       } catch (e) {
-        console.error("Error parsing working_hours JSON:", e);
-        workingHours = null;
+        console.error("Error parsing awake_hours JSON:", e);
+        awakeHours = null;
+      }
+    }
+
+    // Get task's group if it has one
+    let taskGroup: TaskGroup | null = null;
+    if (task.group_id) {
+      const groupResult = await db.execute(
+        "SELECT * FROM task_groups WHERE id = ? AND user_id = ?",
+        [task.group_id, session.user.id]
+      );
+      if (groupResult.rows.length > 0) {
+        const row = groupResult.rows[0];
+        let autoScheduleHours = null;
+        if (row.auto_schedule_hours) {
+          try {
+            autoScheduleHours = JSON.parse(row.auto_schedule_hours as string);
+          } catch (e) {
+            console.error("Error parsing auto_schedule_hours JSON:", e);
+          }
+        }
+        taskGroup = {
+          id: row.id as string,
+          user_id: row.user_id as string,
+          name: row.name as string,
+          color: row.color as string,
+          collapsed: Boolean(row.collapsed),
+          parent_group_id: (row.parent_group_id as string) || null,
+          is_parent_group: Boolean(row.is_parent_group),
+          auto_schedule_enabled: Boolean(row.auto_schedule_enabled ?? false),
+          auto_schedule_hours: autoScheduleHours,
+          priority: row.priority ? (row.priority as number) : undefined,
+          created_at: row.created_at as string,
+          updated_at: row.updated_at as string,
+        };
       }
     }
 
@@ -89,21 +123,24 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
     ]);
     const allTasks = allTasksResult.rows.map(mapRowToTask);
 
-    // Use rescheduleTaskWithShuffling to place task at next working hour slot and shuffle conflicts
-    // This should always succeed since it shuffles tasks to make room, but handle errors gracefully
-    let result: {
-      taskSlot: { start: Date; end: Date };
-      shuffledTasks: Array<{ taskId: string; newSlot: { start: Date; end: Date } }>;
-    };
-    try {
-      result = rescheduleTaskWithShuffling(task, allTasks, workingHours, userTimezone);
-    } catch (error) {
-      // If shuffling fails (e.g., all tasks are locked), provide helpful error
-      const errorMessage =
-        error instanceof Error
-          ? error.message
-          : "Unable to schedule task. Could not find an available slot or resolve conflicts.";
-      return NextResponse.json({ error: errorMessage }, { status: 422 });
+    // Use unified scheduler with "asap" mode
+    const result = scheduleTaskUnified({
+      mode: "asap",
+      task,
+      allTasks,
+      taskGroup,
+      awakeHours,
+      timezone: userTimezone,
+    });
+
+    if (!result.slot) {
+      return NextResponse.json(
+        {
+          error: result.error || "Unable to schedule task. Could not find an available slot.",
+          feedback: result.feedback,
+        },
+        { status: 422 }
+      );
     }
 
     // Update the scheduled task
@@ -111,35 +148,37 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
     await db.execute(
       `UPDATE tasks SET scheduled_start = ?, scheduled_end = ?, updated_at = ? WHERE id = ? AND user_id = ?`,
       [
-        result.taskSlot.start.toISOString(),
-        result.taskSlot.end.toISOString(),
+        result.slot.start.toISOString(),
+        result.slot.end.toISOString(),
         updatedAt,
         id,
         session.user.id,
       ]
     );
 
-    // Update all shuffled tasks
+    // Update all shuffled tasks if any
     const shuffledTasks: Task[] = [];
-    for (const shuffled of result.shuffledTasks) {
-      await db.execute(
-        `UPDATE tasks SET scheduled_start = ?, scheduled_end = ?, updated_at = ? WHERE id = ? AND user_id = ?`,
-        [
-          shuffled.newSlot.start.toISOString(),
-          shuffled.newSlot.end.toISOString(),
-          updatedAt,
+    if (result.shuffledTasks) {
+      for (const shuffled of result.shuffledTasks) {
+        await db.execute(
+          `UPDATE tasks SET scheduled_start = ?, scheduled_end = ?, updated_at = ? WHERE id = ? AND user_id = ?`,
+          [
+            shuffled.newSlot.start.toISOString(),
+            shuffled.newSlot.end.toISOString(),
+            updatedAt,
+            shuffled.taskId,
+            session.user.id,
+          ]
+        );
+
+        // Fetch updated shuffled task
+        const shuffledResult = await db.execute("SELECT * FROM tasks WHERE id = ? AND user_id = ?", [
           shuffled.taskId,
           session.user.id,
-        ]
-      );
-
-      // Fetch updated shuffled task
-      const shuffledResult = await db.execute("SELECT * FROM tasks WHERE id = ? AND user_id = ?", [
-        shuffled.taskId,
-        session.user.id,
-      ]);
-      if (shuffledResult.rows.length > 0) {
-        shuffledTasks.push(mapRowToTask(shuffledResult.rows[0]));
+        ]);
+        if (shuffledResult.rows.length > 0) {
+          shuffledTasks.push(mapRowToTask(shuffledResult.rows[0]));
+        }
       }
     }
 
@@ -154,6 +193,7 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
     return NextResponse.json({
       task: updatedTask,
       shuffledTasks,
+      feedback: result.feedback,
       message:
         shuffledTasks.length > 0
           ? `Task scheduled with ${shuffledTasks.length} task(s) shuffled forward.`

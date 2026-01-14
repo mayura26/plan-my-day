@@ -11,7 +11,7 @@ import { PushSubscriptionList } from "@/components/push-subscription-list";
 import { TimezoneSelector } from "@/components/timezone-selector";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { WorkingHoursSelector } from "@/components/working-hours-selector";
+import { AwakeHoursSelector } from "@/components/awake-hours-selector";
 
 export default function SettingsPage() {
   const { data: session, status } = useSession();
@@ -73,20 +73,20 @@ export default function SettingsPage() {
 
         <Separator />
 
-        {/* Working Hours Settings */}
+        {/* Awake Hours Settings */}
         <Card>
           <CardHeader>
             <div className="flex items-center gap-2">
               <Briefcase className="h-5 w-5" />
-              <CardTitle>Working Hours</CardTitle>
+              <CardTitle>Awake Hours</CardTitle>
             </div>
             <CardDescription>
-              Configure your working hours for each day of the week. These hours will be used when
+              Configure the hours you're awake and available for tasks each day. These hours will be used when
               automatically scheduling tasks.
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <WorkingHoursSelector />
+            <AwakeHoursSelector />
           </CardContent>
         </Card>
 

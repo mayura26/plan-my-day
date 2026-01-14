@@ -41,6 +41,7 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
       is_parent_group: Boolean(row.is_parent_group),
       auto_schedule_enabled: Boolean(row.auto_schedule_enabled ?? false),
       auto_schedule_hours: autoScheduleHours,
+      priority: row.priority ? (row.priority as number) : undefined,
       created_at: row.created_at as string,
       updated_at: row.updated_at as string,
     };
@@ -69,6 +70,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       is_parent_group?: boolean;
       auto_schedule_enabled?: boolean;
       auto_schedule_hours?: import("@/lib/types").GroupScheduleHours | null;
+      priority?: number;
     } = await request.json();
 
     // Check if group exists and belongs to user
@@ -97,6 +99,16 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 
     if (body.name !== undefined && body.name.trim().length === 0) {
       return NextResponse.json({ error: "Group name cannot be empty" }, { status: 400 });
+    }
+
+    // Validate priority if provided (1-10, 1 is highest)
+    if (body.priority !== undefined && body.priority !== null) {
+      if (typeof body.priority !== "number" || body.priority < 1 || body.priority > 10) {
+        return NextResponse.json(
+          { error: "Priority must be a number between 1 and 10 (1 is highest priority)" },
+          { status: 400 }
+        );
+      }
     }
 
     // Validate auto_schedule_hours structure if provided
@@ -231,6 +243,10 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       values.push(
         body.auto_schedule_hours === null ? null : JSON.stringify(body.auto_schedule_hours)
       );
+    }
+    if (body.priority !== undefined) {
+      updateFields.push("priority = ?");
+      values.push(body.priority);
     }
 
     updateFields.push("updated_at = ?");

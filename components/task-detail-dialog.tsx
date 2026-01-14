@@ -4,6 +4,7 @@ import { parseISO } from "date-fns";
 import {
   ArrowLeft,
   Calendar,
+  CalendarClock,
   CalendarX,
   CheckCircle2,
   ChevronDown,
@@ -29,6 +30,12 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useConfirmDialog } from "@/components/ui/confirm-dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useUserTimezone } from "@/hooks/use-user-timezone";
 import { ENERGY_LABELS, TASK_TYPE_LABELS } from "@/lib/task-utils";
@@ -71,7 +78,8 @@ export function TaskDetailDialog({
   const [isStartingTask, setIsStartingTask] = useState(false);
   const [isMarkingComplete, setIsMarkingComplete] = useState(false);
   const [isScheduling, setIsScheduling] = useState(false);
-  const [isSchedulingAsap, setIsSchedulingAsap] = useState(false);
+  const [schedulingMode, setSchedulingMode] = useState<string | null>(null);
+  const [schedulingFeedback, setSchedulingFeedback] = useState<string[]>([]);
   const [isLoadingParent, setIsLoadingParent] = useState(false);
   const [dependencies, setDependencies] = useState<DependencyInfo[]>([]);
   const [blockedBy, setBlockedBy] = useState<Task[]>([]);
@@ -341,68 +349,90 @@ export function TaskDetailDialog({
     }
   };
 
-  const handleScheduleNow = async () => {
+  const handleSchedule = async (mode: "now" | "today" | "next-week" | "next-month" | "asap") => {
     if (!task) return;
 
     setIsScheduling(true);
+    setSchedulingMode(mode);
     try {
-      const response = await fetch(`/api/tasks/${task.id}/schedule-now`, {
+      const endpointMap = {
+        now: "schedule-now",
+        today: "schedule-today",
+        "next-week": "schedule-next-week",
+        "next-month": "schedule-next-month",
+        asap: "schedule-asap",
+      };
+
+      const response = await fetch(`/api/tasks/${task.id}/${endpointMap[mode]}`, {
         method: "POST",
       });
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to schedule task");
-      }
-
-      const data = await response.json();
-      const updatedTask = data.task;
-      onTaskRefresh?.(updatedTask);
-      setHasChanges(true);
-      toast.success("Task scheduled successfully");
-    } catch (error) {
-      console.error("Error scheduling task:", error);
-      toast.error(error instanceof Error ? error.message : "Failed to schedule task");
-    } finally {
-      setIsScheduling(false);
-    }
-  };
-
-  const handleScheduleAsap = async () => {
-    if (!task) return;
-
-    setIsSchedulingAsap(true);
-    try {
-      const response = await fetch(`/api/tasks/${task.id}/schedule-asap`, {
-        method: "POST",
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Failed to schedule task ASAP");
+        // Store feedback from error response if available
+        if (errorData.feedback && Array.isArray(errorData.feedback)) {
+          setSchedulingFeedback(errorData.feedback);
+          // Show feedback messages
+          errorData.feedback.slice(-3).forEach((msg: string, index: number) => {
+            setTimeout(() => {
+              toast.info(msg, { duration: 3000 });
+            }, index * 500);
+          });
+        }
+        throw new Error(errorData.error || `Failed to schedule task (${mode})`);
       }
 
       const data = await response.json();
       const updatedTask = data.task;
       const shuffledTasks = data.shuffledTasks || [];
+      const feedback = data.feedback || [];
+
+      // Store feedback for display
+      setSchedulingFeedback(feedback);
 
       onTaskRefresh?.(updatedTask);
       setHasChanges(true);
 
-      // Refresh task list to show shuffled tasks
-      onTaskUpdate?.();
-
-      // Show success message with shuffle count
+      // Refresh task list to show shuffled tasks if any were shuffled
       if (shuffledTasks.length > 0) {
-        toast.success(`Task scheduled ASAP. ${shuffledTasks.length} task(s) shuffled forward.`);
+        onTaskUpdate?.();
+      }
+
+      // Show success message
+      const modeLabels = {
+        now: "Schedule Now",
+        today: "Schedule Today",
+        "next-week": "Schedule Next Week",
+        "next-month": "Schedule Next Month",
+        asap: "Schedule ASAP",
+      };
+
+      // Show feedback messages as toasts
+      if (feedback.length > 0) {
+        // Show the last few feedback messages
+        const recentFeedback = feedback.slice(-3);
+        recentFeedback.forEach((msg: string, index: number) => {
+          setTimeout(() => {
+            toast.info(msg, { duration: 3000 });
+          }, index * 500);
+        });
+      }
+
+      if (shuffledTasks.length > 0) {
+        toast.success(
+          `${modeLabels[mode]} completed. ${shuffledTasks.length} task(s) shuffled forward.`
+        );
       } else {
-        toast.success("Task scheduled ASAP successfully");
+        toast.success(`${modeLabels[mode]} completed successfully`);
       }
     } catch (error) {
-      console.error("Error scheduling task ASAP:", error);
-      toast.error(error instanceof Error ? error.message : "Failed to schedule task ASAP");
+      console.error(`Error scheduling task (${mode}):`, error);
+      toast.error(error instanceof Error ? error.message : `Failed to schedule task (${mode})`);
     } finally {
-      setIsSchedulingAsap(false);
+      setIsScheduling(false);
+      setSchedulingMode(null);
+      // Clear feedback after a delay
+      setTimeout(() => setSchedulingFeedback([]), 5000);
     }
   };
 
@@ -671,7 +701,7 @@ export function TaskDetailDialog({
           {/* Schedule Information */}
           {(task.scheduled_start ||
             task.scheduled_end ||
-            (task.task_type === "task" && task.duration)) && (
+            ((task.task_type === "task" || task.task_type === "todo") && task.duration)) && (
             <Card className="py-2 overflow-x-hidden">
               <CardContent className="pt-0 pb-0 px-3 sm:px-6 overflow-x-hidden">
                 <div className="flex flex-col gap-2 mb-2 sm:mb-3">
@@ -680,29 +710,51 @@ export function TaskDetailDialog({
                     Schedule
                   </h3>
                   <div className="flex gap-2 flex-wrap">
-                    {task.task_type === "task" && task.duration && task.duration > 0 && (
-                      <>
+                    {(task.task_type === "task" || task.task_type === "todo") && task.duration && task.duration > 0 && (
+                      <div className="flex items-center">
                         <Button
                           size="sm"
                           variant="default"
-                          onClick={handleScheduleNow}
-                          loading={isScheduling}
-                          className="text-xs sm:text-sm flex-1 min-w-[140px]"
+                          disabled={isScheduling}
+                          onClick={() => handleSchedule("now")}
+                          className="text-xs sm:text-sm flex-1 min-w-[140px] rounded-r-none"
                         >
                           <Clock className="h-4 w-4 mr-2" />
-                          {isScheduling ? "Scheduling..." : "Schedule Now"}
+                          {isScheduling
+                            ? `Scheduling${schedulingMode ? ` (${schedulingMode})` : ""}...`
+                            : "Schedule Now"}
                         </Button>
-                        <Button
-                          size="sm"
-                          variant="secondary"
-                          onClick={handleScheduleAsap}
-                          loading={isSchedulingAsap}
-                          className="text-xs sm:text-sm flex-1 min-w-[140px]"
-                        >
-                          <Zap className="h-4 w-4 mr-2" />
-                          {isSchedulingAsap ? "Scheduling..." : "Schedule ASAP"}
-                        </Button>
-                      </>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              size="sm"
+                              variant="default"
+                              disabled={isScheduling}
+                              className="px-2 rounded-l-none border-l border-l-white/20"
+                            >
+                              <ChevronDown className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="start">
+                            <DropdownMenuItem onClick={() => handleSchedule("today")}>
+                              <CalendarClock className="h-4 w-4 mr-2" />
+                              Schedule Today
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleSchedule("next-week")}>
+                              <Calendar className="h-4 w-4 mr-2" />
+                              Schedule Next Week
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleSchedule("next-month")}>
+                              <Calendar className="h-4 w-4 mr-2" />
+                              Schedule Next Month
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleSchedule("asap")}>
+                              <Zap className="h-4 w-4 mr-2" />
+                              Schedule ASAP
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
                     )}
                     {onUnschedule && (task.scheduled_start || task.scheduled_end) && (
                       <Button
@@ -750,11 +802,11 @@ export function TaskDetailDialog({
                   )}
                   {!task.scheduled_start &&
                     !task.scheduled_end &&
-                    task.task_type === "task" &&
+                    (task.task_type === "task" || task.task_type === "todo") &&
                     task.duration &&
                     task.duration > 0 && (
                       <div className="text-sm text-muted-foreground pt-2">
-                        This task is not yet scheduled. Click "Schedule Now" to automatically
+                        This {task.task_type === "todo" ? "todo" : "task"} is not yet scheduled. Click "Schedule Now" to automatically
                         schedule it to the next available slot today.
                       </div>
                     )}

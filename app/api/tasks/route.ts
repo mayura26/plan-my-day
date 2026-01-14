@@ -1,10 +1,10 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { scheduleTask } from "@/lib/scheduler-utils";
+import { scheduleTaskUnified } from "@/lib/scheduler-utils";
 import { generateDependencyId, generateTaskId, validateTaskData } from "@/lib/task-utils";
 import { getUserTimezone } from "@/lib/timezone-utils";
 import { db } from "@/lib/turso";
-import type { CreateTaskRequest, Task, TaskStatus, TaskType } from "@/lib/types";
+import type { CreateTaskRequest, Task, TaskGroup, TaskStatus, TaskType } from "@/lib/types";
 
 // Helper to map database row to Task object
 function mapRowToTask(row: any): Task {
@@ -330,16 +330,16 @@ export async function POST(request: NextRequest) {
     // Handle auto-schedule if enabled
     if (
       body.auto_schedule &&
-      task.task_type === "task" &&
+      (task.task_type === "task" || task.task_type === "todo") &&
       task.duration &&
       task.duration > 0 &&
       !task.scheduled_start &&
       !task.scheduled_end
     ) {
       try {
-        // Get user's timezone and working hours
+        // Get user's timezone and awake hours
         const userResult = await db.execute(
-          "SELECT timezone, working_hours FROM users WHERE id = ?",
+          "SELECT timezone, awake_hours FROM users WHERE id = ?",
           [session.user.id]
         );
         const userTimezone =
@@ -347,13 +347,47 @@ export async function POST(request: NextRequest) {
             ? getUserTimezone(userResult.rows[0].timezone as string | null)
             : "UTC";
 
-        let workingHours = null;
-        if (userResult.rows.length > 0 && userResult.rows[0].working_hours) {
+        let awakeHours = null;
+        if (userResult.rows.length > 0 && userResult.rows[0].awake_hours) {
           try {
-            workingHours = JSON.parse(userResult.rows[0].working_hours as string);
+            awakeHours = JSON.parse(userResult.rows[0].awake_hours as string);
           } catch (e) {
-            console.error("Error parsing working_hours JSON:", e);
-            workingHours = null;
+            console.error("Error parsing awake_hours JSON:", e);
+            awakeHours = null;
+          }
+        }
+
+        // Get task's group if it has one
+        let taskGroup: TaskGroup | null = null;
+        if (task.group_id) {
+          const groupResult = await db.execute(
+            "SELECT * FROM task_groups WHERE id = ? AND user_id = ?",
+            [task.group_id, session.user.id]
+          );
+          if (groupResult.rows.length > 0) {
+            const row = groupResult.rows[0];
+            let autoScheduleHours = null;
+            if (row.auto_schedule_hours) {
+              try {
+                autoScheduleHours = JSON.parse(row.auto_schedule_hours as string);
+              } catch (e) {
+                console.error("Error parsing auto_schedule_hours JSON:", e);
+              }
+            }
+            taskGroup = {
+              id: row.id as string,
+              user_id: row.user_id as string,
+              name: row.name as string,
+              color: row.color as string,
+              collapsed: Boolean(row.collapsed),
+              parent_group_id: (row.parent_group_id as string) || null,
+              is_parent_group: Boolean(row.is_parent_group),
+              auto_schedule_enabled: Boolean(row.auto_schedule_enabled ?? false),
+              auto_schedule_hours: autoScheduleHours,
+              priority: row.priority ? (row.priority as number) : undefined,
+              created_at: row.created_at as string,
+              updated_at: row.updated_at as string,
+            };
           }
         }
 
@@ -390,21 +424,33 @@ export async function POST(request: NextRequest) {
           } as Task;
         });
 
-        // Auto-schedule: Use ASAP strategy to schedule immediately (same as "Schedule Now")
-        const slot = scheduleTask(task, allTasks, workingHours, userTimezone, {
-          strategy: "asap",
+        // Use unified scheduler with the selected mode (default to "now" if not specified)
+        const scheduleMode = body.schedule_mode || "now";
+        const result = scheduleTaskUnified({
+          mode: scheduleMode as "now" | "today" | "next-week" | "next-month" | "asap",
+          task,
+          allTasks,
+          taskGroup,
+          awakeHours,
+          timezone: userTimezone,
         });
 
-        if (slot) {
+        if (result.slot) {
           // Update task with the scheduled times
           const updatedAt = new Date().toISOString();
           await db.execute(
             `UPDATE tasks SET scheduled_start = ?, scheduled_end = ?, updated_at = ? WHERE id = ? AND user_id = ?`,
-            [slot.start.toISOString(), slot.end.toISOString(), updatedAt, task.id, session.user.id]
+            [
+              result.slot.start.toISOString(),
+              result.slot.end.toISOString(),
+              updatedAt,
+              task.id,
+              session.user.id,
+            ]
           );
 
-          task.scheduled_start = slot.start.toISOString();
-          task.scheduled_end = slot.end.toISOString();
+          task.scheduled_start = result.slot.start.toISOString();
+          task.scheduled_end = result.slot.end.toISOString();
           task.updated_at = updatedAt;
         }
       } catch (error) {

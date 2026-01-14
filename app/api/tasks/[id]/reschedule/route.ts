@@ -79,7 +79,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     }
 
     // Get user's timezone and working hours
-    const userResult = await db.execute("SELECT timezone, working_hours FROM users WHERE id = ?", [
+    const userResult = await db.execute("SELECT timezone, awake_hours FROM users WHERE id = ?", [
       session.user.id,
     ]);
     const userTimezone =
@@ -88,11 +88,11 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         : "UTC";
 
     let workingHours = null;
-    if (userResult.rows.length > 0 && userResult.rows[0].working_hours) {
+    if (userResult.rows.length > 0 && userResult.rows[0].awake_hours) {
       try {
-        workingHours = JSON.parse(userResult.rows[0].working_hours as string);
+        workingHours = JSON.parse(userResult.rows[0].awake_hours as string);
       } catch (e) {
-        console.error("Error parsing working_hours JSON:", e);
+        console.error("Error parsing awake_hours JSON:", e);
         workingHours = null;
       }
     }

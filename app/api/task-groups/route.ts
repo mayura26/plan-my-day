@@ -38,6 +38,7 @@ export async function GET(_request: NextRequest) {
         is_parent_group: Boolean(row.is_parent_group),
         auto_schedule_enabled: Boolean(row.auto_schedule_enabled ?? false),
         auto_schedule_hours: autoScheduleHours,
+        priority: row.priority ? (row.priority as number) : undefined,
         created_at: row.created_at as string,
         updated_at: row.updated_at as string,
       };
@@ -85,6 +86,16 @@ export async function POST(request: NextRequest) {
       if (parentGroup.rows.length === 0) {
         return NextResponse.json(
           { error: "Parent group not found or does not belong to user" },
+          { status: 400 }
+        );
+      }
+    }
+
+    // Validate priority if provided (1-10, 1 is highest)
+    if (body.priority !== undefined && body.priority !== null) {
+      if (typeof body.priority !== "number" || body.priority < 1 || body.priority > 10) {
+        return NextResponse.json(
+          { error: "Priority must be a number between 1 and 10 (1 is highest priority)" },
           { status: 400 }
         );
       }
@@ -170,6 +181,8 @@ export async function POST(request: NextRequest) {
         ? null
         : JSON.stringify(body.auto_schedule_hours);
 
+    const priority = body.priority !== undefined && body.priority !== null ? body.priority : 5;
+
     const group: TaskGroup = {
       id: groupId,
       user_id: session.user.id,
@@ -180,14 +193,15 @@ export async function POST(request: NextRequest) {
       is_parent_group: body.is_parent_group || false,
       auto_schedule_enabled: autoScheduleEnabled,
       auto_schedule_hours: body.auto_schedule_hours ?? null,
+      priority,
       created_at: now,
       updated_at: now,
     };
 
     await db.execute(
       `
-      INSERT INTO task_groups (id, user_id, name, color, collapsed, parent_group_id, is_parent_group, auto_schedule_enabled, auto_schedule_hours, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO task_groups (id, user_id, name, color, collapsed, parent_group_id, is_parent_group, auto_schedule_enabled, auto_schedule_hours, priority, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `,
       [
         group.id,
@@ -199,6 +213,7 @@ export async function POST(request: NextRequest) {
         group.is_parent_group ?? false,
         autoScheduleEnabled,
         autoScheduleHoursJson,
+        priority,
         group.created_at,
         group.updated_at,
       ]

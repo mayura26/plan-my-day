@@ -379,12 +379,12 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 
     const task = mapRowToTask(result.rows[0]);
 
-    // Handle auto-schedule if enabled (only for regular tasks with duration)
+    // Handle auto-schedule if enabled (for tasks and todos with duration)
     // Only auto-schedule if explicitly requested via auto_schedule field
     // Don't auto-schedule if scheduled times are being set in this update
     if (
       body.auto_schedule === true &&
-      task.task_type === "task" &&
+      (task.task_type === "task" || task.task_type === "todo") &&
       task.duration &&
       task.duration > 0 &&
       !task.scheduled_start &&
@@ -395,7 +395,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       try {
         // Get user's timezone and working hours
         const userResult = await db.execute(
-          "SELECT timezone, working_hours FROM users WHERE id = ?",
+          "SELECT timezone, awake_hours FROM users WHERE id = ?",
           [session.user.id]
         );
         const userTimezone =
@@ -404,11 +404,11 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
             : "UTC";
 
         let workingHours = null;
-        if (userResult.rows.length > 0 && userResult.rows[0].working_hours) {
+        if (userResult.rows.length > 0 && userResult.rows[0].awake_hours) {
           try {
-            workingHours = JSON.parse(userResult.rows[0].working_hours as string);
+            workingHours = JSON.parse(userResult.rows[0].awake_hours as string);
           } catch (e) {
-            console.error("Error parsing working_hours JSON:", e);
+            console.error("Error parsing awake_hours JSON:", e);
             workingHours = null;
           }
         }

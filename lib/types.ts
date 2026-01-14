@@ -6,7 +6,7 @@ export interface User {
   email?: string | null;
   image?: string | null;
   timezone?: string | null;
-  working_hours?: GroupScheduleHours | null;
+  awake_hours?: GroupScheduleHours | null;
   created_at: string;
   updated_at: string;
 }
@@ -82,6 +82,7 @@ export interface TaskGroup {
   is_parent_group?: boolean;
   auto_schedule_enabled?: boolean;
   auto_schedule_hours?: GroupScheduleHours | null;
+  priority?: number; // 1-10 scale (1 = highest priority, 10 = lowest priority)
   created_at: string;
   updated_at: string;
 }
@@ -176,6 +177,7 @@ export interface CreateTaskRequest {
   scheduled_end?: string;
   due_date?: string; // when task must be completed by
   auto_schedule?: boolean; // If true, automatically schedule to next available slot for today
+  schedule_mode?: "now" | "today" | "next-week" | "next-month" | "asap"; // Scheduling mode when auto_schedule is enabled
 }
 
 export interface UpdateTaskRequest extends Partial<CreateTaskRequest> {
@@ -233,6 +235,7 @@ export interface CreateTaskGroupRequest {
   is_parent_group?: boolean;
   auto_schedule_enabled?: boolean;
   auto_schedule_hours?: GroupScheduleHours | null;
+  priority?: number; // 1-10 scale (1 = highest priority, 10 = lowest priority)
 }
 
 export interface CreateTaskTemplateRequest {

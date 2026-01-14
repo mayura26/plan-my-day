@@ -13,6 +13,7 @@
     "db:migrate:timezone": "node scripts/add-timezone.mjs",
     "db:migrate:overdue": "node scripts/migrate-add-overdue-features.mjs",
     "db:migrate:push": "node scripts/migrate-add-push-subscriptions.mjs",
+    "db:backup": "node scripts/backup-db-cron.mjs",
     "pwa:generate-keys": "node scripts/generate-vapid-keys.mjs"
   },
   "dependencies": {
