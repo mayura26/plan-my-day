@@ -1,3 +1,4 @@
+import { createDateInTimezone } from "@/lib/timezone-utils";
 import type { GroupScheduleHours, Task, TaskGroup } from "@/lib/types";
 
 interface TimeSlot {
@@ -949,98 +950,74 @@ export interface UnifiedSchedulingOptions {
 
 /**
  * Get the start of next week in user's timezone
+ * Returns a UTC Date that represents midnight on next Monday in the user's timezone
  */
 function getStartOfNextWeek(currentDate: Date, timezone: string): Date {
   const tzTime = getTimeInTimezone(currentDate, timezone);
   
-  // Get current date in timezone
-  const currentTzDate = new Date(
-    Date.UTC(tzTime.year, tzTime.month, tzTime.day, 0, 0, 0, 0)
-  );
+  // Calculate what day of week it is in the user's timezone
+  const formatter = new Intl.DateTimeFormat("en-US", {
+    timeZone: timezone,
+    weekday: "long",
+  });
+  const weekday = formatter.format(currentDate).toLowerCase();
   
-  // Find next Monday
-  const dayOfWeek = currentTzDate.getUTCDay(); // 0 = Sunday, 1 = Monday, etc.
+  // Map weekday to day number (0 = Sunday, 1 = Monday, etc.)
+  const weekdayMap: Record<string, number> = {
+    sunday: 0,
+    monday: 1,
+    tuesday: 2,
+    wednesday: 3,
+    thursday: 4,
+    friday: 5,
+    saturday: 6,
+  };
+  const dayOfWeek = weekdayMap[weekday] ?? 1;
+  
+  // Calculate days until next Monday
   const daysUntilMonday = dayOfWeek === 0 ? 1 : 8 - dayOfWeek;
   
-  const nextMonday = new Date(currentTzDate);
-  nextMonday.setUTCDate(nextMonday.getUTCDate() + daysUntilMonday);
+  // Create a date string in ISO format for next Monday in the user's timezone
+  // We'll create it as if it's in UTC, then createDateInTimezone will handle the conversion
+  const nextMondayLocal = new Date(Date.UTC(tzTime.year, tzTime.month, tzTime.day + daysUntilMonday, 12, 0, 0, 0));
   
-  // Convert back to UTC time that represents midnight Monday in timezone
-  for (let offsetHours = -12; offsetHours <= 12; offsetHours++) {
-    const candidate = new Date(nextMonday.getTime() + offsetHours * 60 * 60 * 1000);
-    const candidateTz = getTimeInTimezone(candidate, timezone);
-    if (
-      candidateTz.year === tzTime.year + (daysUntilMonday >= 7 ? 1 : 0) &&
-      candidateTz.month === tzTime.month &&
-      candidateTz.day === tzTime.day + daysUntilMonday &&
-      candidateTz.hour === 0 &&
-      candidateTz.minute === 0
-    ) {
-      return candidate;
-    }
-  }
-  
-  // Fallback: add days until Monday
-  nextMonday.setUTCDate(currentTzDate.getUTCDate() + daysUntilMonday);
-  return nextMonday;
+  // Use createDateInTimezone to get the UTC Date that represents midnight on next Monday in the user's timezone
+  // createDateInTimezone will extract the date components in the target timezone from the Date object
+  return createDateInTimezone(nextMondayLocal, 0, 0, timezone);
 }
 
 /**
  * Get the start of next month in user's timezone
+ * Returns a UTC Date that represents midnight on the first day of next month in the user's timezone
  */
 function getStartOfNextMonth(currentDate: Date, timezone: string): Date {
   const tzTime = getTimeInTimezone(currentDate, timezone);
   
-  // Get first day of next month
+  // Calculate first day of next month in the user's timezone
   const nextMonth = tzTime.month === 11 ? 0 : tzTime.month + 1;
   const nextYear = tzTime.month === 11 ? tzTime.year + 1 : tzTime.year;
   
-  // Create date for first day of next month at midnight in timezone
-  const firstOfNextMonth = new Date(Date.UTC(nextYear, nextMonth, 1, 0, 0, 0, 0));
+  // Create a Date object at noon UTC for the first of next month
+  // createDateInTimezone will extract what date this represents in the target timezone
+  const firstOfNextMonthDate = new Date(Date.UTC(nextYear, nextMonth, 1, 12, 0, 0, 0));
   
-  // Find UTC time that represents midnight on first of next month in timezone
-  for (let offsetHours = -12; offsetHours <= 12; offsetHours++) {
-    const candidate = new Date(firstOfNextMonth.getTime() + offsetHours * 60 * 60 * 1000);
-    const candidateTz = getTimeInTimezone(candidate, timezone);
-    if (
-      candidateTz.year === nextYear &&
-      candidateTz.month === nextMonth &&
-      candidateTz.day === 1 &&
-      candidateTz.hour === 0 &&
-      candidateTz.minute === 0
-    ) {
-      return candidate;
-    }
-  }
-  
-  return firstOfNextMonth;
+  // Use createDateInTimezone to get the UTC Date that represents midnight on the first of next month in the user's timezone
+  return createDateInTimezone(firstOfNextMonthDate, 0, 0, timezone);
 }
 
 /**
  * Get the end of today in user's timezone
+ * Returns a UTC Date that represents 23:59:59 on today in the user's timezone
  */
 function getEndOfToday(currentDate: Date, timezone: string): Date {
   const tzTime = getTimeInTimezone(currentDate, timezone);
   
-  // Get end of today (23:59:59) in timezone
-  const endOfToday = new Date(Date.UTC(tzTime.year, tzTime.month, tzTime.day, 23, 59, 59, 999));
+  // Create a Date object at noon UTC for today
+  // createDateInTimezone will extract what date this represents in the target timezone
+  const todayDate = new Date(Date.UTC(tzTime.year, tzTime.month, tzTime.day, 12, 0, 0, 0));
   
-  // Find UTC time that represents end of today in timezone
-  for (let offsetHours = -12; offsetHours <= 12; offsetHours++) {
-    const candidate = new Date(endOfToday.getTime() + offsetHours * 60 * 60 * 1000);
-    const candidateTz = getTimeInTimezone(candidate, timezone);
-    if (
-      candidateTz.year === tzTime.year &&
-      candidateTz.month === tzTime.month &&
-      candidateTz.day === tzTime.day &&
-      candidateTz.hour === 23 &&
-      candidateTz.minute === 59
-    ) {
-      return candidate;
-    }
-  }
-  
-  return endOfToday;
+  // Use createDateInTimezone to get the UTC Date that represents 23:59:59 today in the user's timezone
+  return createDateInTimezone(todayDate, 23, 59, timezone);
 }
 
 /**

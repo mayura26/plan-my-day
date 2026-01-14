@@ -1,4 +1,3 @@
-- [ ] Create schedule ASAP which will shuffle stuff down
 - [ ] Auto shuffle tasks when they clash
 
 ### ⏳ Pending
