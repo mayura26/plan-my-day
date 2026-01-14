@@ -251,6 +251,7 @@ export function MonthCalendar({
                     const isEvent = task.task_type === "event";
                     const isCompleted = task.status === "completed";
                     const _isOverdue = !isCompleted && isTaskOverdue(task);
+                    const isInProgress = task.status === "in_progress" && !isCompleted;
 
                     return (
                       // biome-ignore lint/a11y/useSemanticElements: Task item requires div for complex styling and layout
@@ -263,11 +264,12 @@ export function MonthCalendar({
                           "flex items-center gap-0.5 md:gap-1 relative",
                           groupColor && "text-white"
                         )}
-                        style={
-                          groupColor
+                        style={{
+                          ...(groupColor
                             ? { backgroundColor: groupColor }
-                            : { backgroundColor: "rgb(107 114 128 / 0.4)" }
-                        }
+                            : { backgroundColor: "rgb(107 114 128 / 0.4)" }),
+                          ...(isInProgress && { borderLeft: "3px solid #86efac" }),
+                        }}
                         onClick={(e) => {
                           e.stopPropagation();
                           onTaskClick?.(task.id);

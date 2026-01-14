@@ -146,6 +146,7 @@ export function ResizableTask({
   const isRescheduled = task.status === "rescheduled";
   const isOverdue = !isCompleted && !isRescheduled && isTaskOverdue(task);
   const isPastEvent = task.task_type === "event" && isTaskTimeExpired(task);
+  const isInProgress = task.status === "in_progress" && !isCompleted;
 
   // Check if task is very short (15 minutes or less)
   const isShortTask = task.duration && task.duration <= 15;
@@ -183,10 +184,14 @@ export function ResizableTask({
               : 1,
     transition: isDragging || isTaskResizing ? "none" : "all 0.2s ease-in-out",
     zIndex: isActiveDrag ? 50 : 10,
-    ...(groupColor && {
-      backgroundColor: hexToRgba(groupColor, 0.4),
-      borderColor: groupColor,
-    }),
+    ...(groupColor
+      ? {
+          backgroundColor: hexToRgba(groupColor, 0.4),
+          borderColor: isInProgress ? "#86efac" : groupColor, // Soft green for in-progress, group color otherwise
+        }
+      : isInProgress
+        ? { borderColor: "#86efac" } // Soft green for in-progress even without group color
+        : {}),
   };
 
   // Handle click on the task content (not the drag area)
