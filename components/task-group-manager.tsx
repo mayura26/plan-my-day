@@ -46,8 +46,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import type { CreateTaskGroupRequest, Task, TaskGroup, TaskType } from "@/lib/types";
 import { TASK_TYPE_LABELS } from "@/lib/task-utils";
+import type { CreateTaskGroupRequest, Task, TaskGroup, TaskType } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { EditGroupDialog } from "./edit-group-dialog";
 

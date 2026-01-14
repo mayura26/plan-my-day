@@ -16,26 +16,28 @@ async function migrate() {
     try {
       await turso.execute("SELECT awake_hours FROM users LIMIT 1");
       console.log("✅ Column awake_hours already exists");
-      
+
       // Check if working_hours still exists
       try {
         await turso.execute("SELECT working_hours FROM users LIMIT 1");
         console.log("⚠️  Both columns exist. Migrating data from working_hours to awake_hours...");
-        
+
         // Copy data from working_hours to awake_hours where awake_hours is null
         await turso.execute(`
           UPDATE users 
           SET awake_hours = working_hours 
           WHERE working_hours IS NOT NULL AND awake_hours IS NULL
         `);
-        
+
         console.log("✅ Data migrated from working_hours to awake_hours");
-        console.log("⚠️  Note: working_hours column still exists. You may want to drop it manually after verifying the migration.");
-      } catch (e) {
+        console.log(
+          "⚠️  Note: working_hours column still exists. You may want to drop it manually after verifying the migration."
+        );
+      } catch (_e) {
         console.log("✅ working_hours column does not exist, migration complete");
       }
       return;
-    } catch (e) {
+    } catch (_e) {
       // awake_hours doesn't exist, continue with migration
     }
 
@@ -46,20 +48,20 @@ async function migrate() {
     // 4. Rename new table
 
     // Check if working_hours exists
-    let hasWorkingHours = false;
+    let _hasWorkingHours = false;
     try {
       await turso.execute("SELECT working_hours FROM users LIMIT 1");
-      hasWorkingHours = true;
-    } catch (e) {
+      _hasWorkingHours = true;
+    } catch (_e) {
       console.log("⚠️  working_hours column does not exist, nothing to migrate");
       return;
     }
 
     console.log("Creating new users table with awake_hours...");
-    
+
     // Get table structure
-    const tableInfo = await turso.execute("PRAGMA table_info(users)");
-    
+    const _tableInfo = await turso.execute("PRAGMA table_info(users)");
+
     // Create new table with awake_hours instead of working_hours
     await turso.execute(`
       CREATE TABLE users_new (
@@ -106,4 +108,3 @@ migrate()
     console.error("Migration failed:", error);
     process.exit(1);
   });
-

@@ -40,7 +40,7 @@ import {
   formatDateTimeLocalForTimezone,
   getDateInTimezone,
 } from "@/lib/timezone-utils";
-import type { CreateTaskRequest, DayNote, Task, TaskGroup } from "@/lib/types";
+import type { CreateTaskRequest, DayNote, Task, TaskGroup, TaskType } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 type ViewMode = "day" | "week" | "month";
@@ -1194,10 +1194,10 @@ export default function CalendarPage() {
                     showAllTasks={showAllTasks}
                     onShowAllTasksChange={setShowAllTasks}
                     onHiddenGroupsChange={setHiddenGroups}
-                    onQuickAddTask={(groupId, taskType) => {
-                      setQuickAddInitialData({ 
+                    onQuickAddTask={(groupId: string | null, taskType?: TaskType) => {
+                      setQuickAddInitialData({
                         group_id: groupId || undefined,
-                        task_type: taskType || undefined
+                        task_type: taskType,
                       });
                       setShowCreateForm(true);
                     }}

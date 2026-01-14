@@ -1,7 +1,7 @@
+import * as fs from "node:fs";
+import * as path from "node:path";
 import { createClient } from "@libsql/client";
 import dotenv from "dotenv";
-import * as fs from "fs";
-import * as path from "path";
 
 dotenv.config({ path: ".env.local" });
 
@@ -24,12 +24,12 @@ async function restoreFullDatabase() {
     const backup = JSON.parse(fs.readFileSync(backupPath, "utf8"));
 
     // Restore in order: users, groups, then tasks (parent tasks first, then subtasks)
-    
+
     // 1. Restore users (but skip if they already exist)
     console.log("\n1. Restoring users...");
     const currentUsers = await turso.execute("SELECT id FROM users");
     const existingUserIds = new Set(currentUsers.rows.map((r) => r.id));
-    
+
     const users = backup.tables.users || [];
     let usersRestored = 0;
     for (const user of users) {
@@ -63,7 +63,7 @@ async function restoreFullDatabase() {
     console.log("\n2. Restoring task groups...");
     const currentGroups = await turso.execute("SELECT id FROM task_groups");
     const existingGroupIds = new Set(currentGroups.rows.map((r) => r.id));
-    
+
     const groups = backup.tables.task_groups || [];
     let groupsRestored = 0;
     for (const group of groups) {
@@ -75,12 +75,12 @@ async function restoreFullDatabase() {
         if (group.auto_schedule_hours) {
           try {
             autoScheduleHours = JSON.parse(group.auto_schedule_hours);
-          } catch (e) {
+          } catch (_e) {
             // Already an object
             autoScheduleHours = group.auto_schedule_hours;
           }
         }
-        
+
         await turso.execute(
           `INSERT INTO task_groups (
             id, user_id, name, color, collapsed, parent_group_id, is_parent_group,
@@ -113,10 +113,10 @@ async function restoreFullDatabase() {
     const tasks = backup.tables.tasks || [];
     const parentTasks = tasks.filter((t) => !t.parent_task_id);
     const subtasks = tasks.filter((t) => t.parent_task_id);
-    
+
     console.log(`  - ${parentTasks.length} parent tasks`);
     console.log(`  - ${subtasks.length} subtasks`);
-    
+
     let tasksRestored = 0;
     let taskErrors = 0;
 
@@ -163,7 +163,7 @@ async function restoreFullDatabase() {
         taskErrors++;
       }
     }
-    
+
     // Then restore subtasks
     for (const task of subtasks) {
       try {
@@ -229,4 +229,3 @@ restoreFullDatabase()
     console.error("Restore failed:", error);
     process.exit(1);
   });
-

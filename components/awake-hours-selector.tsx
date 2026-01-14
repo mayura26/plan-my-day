@@ -121,12 +121,6 @@ export function AwakeHoursSelector() {
           ].map((day) => {
             const daySchedule = awakeHours[day.key as keyof GroupScheduleHours];
             const isEnabled = daySchedule !== null && daySchedule !== undefined;
-            const startHour = isEnabled
-              ? awakeHours[day.key as keyof GroupScheduleHours]?.end ?? 17
-              : 9;
-            const endHour = isEnabled
-              ? awakeHours[day.key as keyof GroupScheduleHours]?.start ?? 9
-              : 17;
 
             return (
               <div key={day.key} className="flex items-center gap-4">
@@ -160,9 +154,7 @@ export function AwakeHoursSelector() {
                 {isEnabled && (
                   <div className="flex items-center gap-2 flex-1">
                     <Select
-                      value={String(
-                        awakeHours[day.key as keyof GroupScheduleHours]?.start ?? 9
-                      )}
+                      value={String(awakeHours[day.key as keyof GroupScheduleHours]?.start ?? 9)}
                       onValueChange={(value) => {
                         setAwakeHours((prev) => ({
                           ...prev,
@@ -178,7 +170,7 @@ export function AwakeHoursSelector() {
                       </SelectTrigger>
                       <SelectContent>
                         {Array.from({ length: 24 }, (_, i) => (
-                          <SelectItem key={i} value={String(i)}>
+                          <SelectItem key={String(i)} value={String(i)}>
                             {i.toString().padStart(2, "0")}:00
                           </SelectItem>
                         ))}
@@ -186,9 +178,7 @@ export function AwakeHoursSelector() {
                     </Select>
                     <span className="text-sm text-muted-foreground">to</span>
                     <Select
-                      value={String(
-                        awakeHours[day.key as keyof GroupScheduleHours]?.end ?? 17
-                      )}
+                      value={String(awakeHours[day.key as keyof GroupScheduleHours]?.end ?? 17)}
                       onValueChange={(value) => {
                         setAwakeHours((prev) => ({
                           ...prev,
@@ -204,7 +194,7 @@ export function AwakeHoursSelector() {
                       </SelectTrigger>
                       <SelectContent>
                         {Array.from({ length: 24 }, (_, i) => (
-                          <SelectItem key={i} value={String(i)}>
+                          <SelectItem key={String(i)} value={String(i)}>
                             {i.toString().padStart(2, "0")}:00
                           </SelectItem>
                         ))}
@@ -226,4 +216,3 @@ export function AwakeHoursSelector() {
     </div>
   );
 }
-

@@ -17,7 +17,7 @@ async function migrate() {
       await turso.execute("SELECT priority FROM task_groups LIMIT 1");
       console.log("✅ Column priority already exists");
       return;
-    } catch (e) {
+    } catch (_e) {
       // Column doesn't exist, continue with migration
     }
 
@@ -42,4 +42,3 @@ migrate()
     console.error("Migration failed:", error);
     process.exit(1);
   });
-

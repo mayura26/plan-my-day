@@ -30,13 +30,13 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useConfirmDialog } from "@/components/ui/confirm-dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useUserTimezone } from "@/hooks/use-user-timezone";
 import { ENERGY_LABELS, TASK_TYPE_LABELS } from "@/lib/task-utils";
 import { formatDateTimeFull } from "@/lib/timezone-utils";
@@ -79,7 +79,7 @@ export function TaskDetailDialog({
   const [isMarkingComplete, setIsMarkingComplete] = useState(false);
   const [isScheduling, setIsScheduling] = useState(false);
   const [schedulingMode, setSchedulingMode] = useState<string | null>(null);
-  const [schedulingFeedback, setSchedulingFeedback] = useState<string[]>([]);
+  const [_schedulingFeedback, setSchedulingFeedback] = useState<string[]>([]);
   const [isLoadingParent, setIsLoadingParent] = useState(false);
   const [dependencies, setDependencies] = useState<DependencyInfo[]>([]);
   const [blockedBy, setBlockedBy] = useState<Task[]>([]);
@@ -710,52 +710,54 @@ export function TaskDetailDialog({
                     Schedule
                   </h3>
                   <div className="flex gap-2 flex-wrap">
-                    {(task.task_type === "task" || task.task_type === "todo") && task.duration && task.duration > 0 && (
-                      <div className="flex items-center">
-                        <Button
-                          size="sm"
-                          variant="default"
-                          disabled={isScheduling}
-                          onClick={() => handleSchedule("now")}
-                          className="text-xs sm:text-sm flex-1 min-w-[140px] rounded-r-none"
-                        >
-                          <Clock className="h-4 w-4 mr-2" />
-                          {isScheduling
-                            ? `Scheduling${schedulingMode ? ` (${schedulingMode})` : ""}...`
-                            : "Schedule Now"}
-                        </Button>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button
-                              size="sm"
-                              variant="default"
-                              disabled={isScheduling}
-                              className="px-2 rounded-l-none border-l border-l-white/20"
-                            >
-                              <ChevronDown className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="start">
-                            <DropdownMenuItem onClick={() => handleSchedule("today")}>
-                              <CalendarClock className="h-4 w-4 mr-2" />
-                              Schedule Today
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleSchedule("next-week")}>
-                              <Calendar className="h-4 w-4 mr-2" />
-                              Schedule Next Week
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleSchedule("next-month")}>
-                              <Calendar className="h-4 w-4 mr-2" />
-                              Schedule Next Month
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleSchedule("asap")}>
-                              <Zap className="h-4 w-4 mr-2" />
-                              Schedule ASAP
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </div>
-                    )}
+                    {(task.task_type === "task" || task.task_type === "todo") &&
+                      task.duration &&
+                      task.duration > 0 && (
+                        <div className="flex items-center">
+                          <Button
+                            size="sm"
+                            variant="default"
+                            disabled={isScheduling}
+                            onClick={() => handleSchedule("now")}
+                            className="text-xs sm:text-sm flex-1 min-w-[140px] rounded-r-none"
+                          >
+                            <Clock className="h-4 w-4 mr-2" />
+                            {isScheduling
+                              ? `Scheduling${schedulingMode ? ` (${schedulingMode})` : ""}...`
+                              : "Schedule Now"}
+                          </Button>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button
+                                size="sm"
+                                variant="default"
+                                disabled={isScheduling}
+                                className="px-2 rounded-l-none border-l border-l-white/20"
+                              >
+                                <ChevronDown className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="start">
+                              <DropdownMenuItem onClick={() => handleSchedule("today")}>
+                                <CalendarClock className="h-4 w-4 mr-2" />
+                                Schedule Today
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleSchedule("next-week")}>
+                                <Calendar className="h-4 w-4 mr-2" />
+                                Schedule Next Week
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleSchedule("next-month")}>
+                                <Calendar className="h-4 w-4 mr-2" />
+                                Schedule Next Month
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleSchedule("asap")}>
+                                <Zap className="h-4 w-4 mr-2" />
+                                Schedule ASAP
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
+                      )}
                     {onUnschedule && (task.scheduled_start || task.scheduled_end) && (
                       <Button
                         size="sm"
@@ -806,8 +808,9 @@ export function TaskDetailDialog({
                     task.duration &&
                     task.duration > 0 && (
                       <div className="text-sm text-muted-foreground pt-2">
-                        This {task.task_type === "todo" ? "todo" : "task"} is not yet scheduled. Click "Schedule Now" to automatically
-                        schedule it to the next available slot today.
+                        This {task.task_type === "todo" ? "todo" : "task"} is not yet scheduled.
+                        Click "Schedule Now" to automatically schedule it to the next available slot
+                        today.
                       </div>
                     )}
                 </div>

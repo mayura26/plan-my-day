@@ -5,13 +5,13 @@ import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { useEffect } from "react";
 import { APIKeyManager } from "@/components/api-key-manager";
+import { AwakeHoursSelector } from "@/components/awake-hours-selector";
 import { ForceUpdateButton } from "@/components/force-update-button";
 import { PushNotificationManager } from "@/components/push-notification-manager";
 import { PushSubscriptionList } from "@/components/push-subscription-list";
 import { TimezoneSelector } from "@/components/timezone-selector";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { AwakeHoursSelector } from "@/components/awake-hours-selector";
 
 export default function SettingsPage() {
   const { data: session, status } = useSession();
@@ -81,8 +81,8 @@ export default function SettingsPage() {
               <CardTitle>Awake Hours</CardTitle>
             </div>
             <CardDescription>
-              Configure the hours you're awake and available for tasks each day. These hours will be used when
-              automatically scheduling tasks.
+              Configure the hours you're awake and available for tasks each day. These hours will be
+              used when automatically scheduling tasks.
             </CardDescription>
           </CardHeader>
           <CardContent>

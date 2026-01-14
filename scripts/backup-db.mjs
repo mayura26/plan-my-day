@@ -1,7 +1,7 @@
+import * as fs from "node:fs";
+import * as path from "node:path";
 import { createClient } from "@libsql/client";
 import dotenv from "dotenv";
-import * as fs from "fs";
-import * as path from "path";
 
 dotenv.config({ path: ".env.local" });
 
@@ -85,4 +85,3 @@ backupDatabase()
     console.error("Backup failed:", error);
     process.exit(1);
   });
-

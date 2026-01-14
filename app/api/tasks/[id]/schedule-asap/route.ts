@@ -172,10 +172,10 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
         );
 
         // Fetch updated shuffled task
-        const shuffledResult = await db.execute("SELECT * FROM tasks WHERE id = ? AND user_id = ?", [
-          shuffled.taskId,
-          session.user.id,
-        ]);
+        const shuffledResult = await db.execute(
+          "SELECT * FROM tasks WHERE id = ? AND user_id = ?",
+          [shuffled.taskId, session.user.id]
+        );
         if (shuffledResult.rows.length > 0) {
           shuffledTasks.push(mapRowToTask(shuffledResult.rows[0]));
         }

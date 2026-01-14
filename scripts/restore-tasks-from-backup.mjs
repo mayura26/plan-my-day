@@ -1,7 +1,7 @@
+import * as fs from "node:fs";
+import * as path from "node:path";
 import { createClient } from "@libsql/client";
 import dotenv from "dotenv";
-import * as fs from "fs";
-import * as path from "path";
 
 dotenv.config({ path: ".env.local" });
 
@@ -44,14 +44,14 @@ async function restoreTasks() {
     // Restore tasks in order: parent tasks first, then subtasks
     // This ensures foreign key constraints are satisfied
     console.log("Restoring tasks...");
-    
+
     // Separate parent tasks and subtasks
     const parentTasks = tasks.filter((t) => !t.parent_task_id);
     const subtasks = tasks.filter((t) => t.parent_task_id);
-    
+
     console.log(`  - ${parentTasks.length} parent tasks`);
     console.log(`  - ${subtasks.length} subtasks`);
-    
+
     let restored = 0;
     let errors = 0;
 
@@ -98,7 +98,7 @@ async function restoreTasks() {
         errors++;
       }
     }
-    
+
     // Then restore subtasks
     for (const task of subtasks) {
       try {
@@ -162,4 +162,3 @@ restoreTasks()
     console.error("Restore failed:", error);
     process.exit(1);
   });
-

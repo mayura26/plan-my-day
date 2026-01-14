@@ -954,14 +954,14 @@ export interface UnifiedSchedulingOptions {
  */
 function getStartOfNextWeek(currentDate: Date, timezone: string): Date {
   const tzTime = getTimeInTimezone(currentDate, timezone);
-  
+
   // Calculate what day of week it is in the user's timezone
   const formatter = new Intl.DateTimeFormat("en-US", {
     timeZone: timezone,
     weekday: "long",
   });
   const weekday = formatter.format(currentDate).toLowerCase();
-  
+
   // Map weekday to day number (0 = Sunday, 1 = Monday, etc.)
   const weekdayMap: Record<string, number> = {
     sunday: 0,
@@ -973,14 +973,16 @@ function getStartOfNextWeek(currentDate: Date, timezone: string): Date {
     saturday: 6,
   };
   const dayOfWeek = weekdayMap[weekday] ?? 1;
-  
+
   // Calculate days until next Monday
   const daysUntilMonday = dayOfWeek === 0 ? 1 : 8 - dayOfWeek;
-  
+
   // Create a date string in ISO format for next Monday in the user's timezone
   // We'll create it as if it's in UTC, then createDateInTimezone will handle the conversion
-  const nextMondayLocal = new Date(Date.UTC(tzTime.year, tzTime.month, tzTime.day + daysUntilMonday, 12, 0, 0, 0));
-  
+  const nextMondayLocal = new Date(
+    Date.UTC(tzTime.year, tzTime.month, tzTime.day + daysUntilMonday, 12, 0, 0, 0)
+  );
+
   // Use createDateInTimezone to get the UTC Date that represents midnight on next Monday in the user's timezone
   // createDateInTimezone will extract the date components in the target timezone from the Date object
   return createDateInTimezone(nextMondayLocal, 0, 0, timezone);
@@ -992,15 +994,15 @@ function getStartOfNextWeek(currentDate: Date, timezone: string): Date {
  */
 function getStartOfNextMonth(currentDate: Date, timezone: string): Date {
   const tzTime = getTimeInTimezone(currentDate, timezone);
-  
+
   // Calculate first day of next month in the user's timezone
   const nextMonth = tzTime.month === 11 ? 0 : tzTime.month + 1;
   const nextYear = tzTime.month === 11 ? tzTime.year + 1 : tzTime.year;
-  
+
   // Create a Date object at noon UTC for the first of next month
   // createDateInTimezone will extract what date this represents in the target timezone
   const firstOfNextMonthDate = new Date(Date.UTC(nextYear, nextMonth, 1, 12, 0, 0, 0));
-  
+
   // Use createDateInTimezone to get the UTC Date that represents midnight on the first of next month in the user's timezone
   return createDateInTimezone(firstOfNextMonthDate, 0, 0, timezone);
 }
@@ -1011,11 +1013,11 @@ function getStartOfNextMonth(currentDate: Date, timezone: string): Date {
  */
 function getEndOfToday(currentDate: Date, timezone: string): Date {
   const tzTime = getTimeInTimezone(currentDate, timezone);
-  
+
   // Create a Date object at noon UTC for today
   // createDateInTimezone will extract what date this represents in the target timezone
   const todayDate = new Date(Date.UTC(tzTime.year, tzTime.month, tzTime.day, 12, 0, 0, 0));
-  
+
   // Use createDateInTimezone to get the UTC Date that represents 23:59:59 today in the user's timezone
   return createDateInTimezone(todayDate, 23, 59, timezone);
 }
@@ -1024,9 +1026,7 @@ function getEndOfToday(currentDate: Date, timezone: string): Date {
  * Unified scheduling function that handles all scheduling modes
  * This is the main entry point for all scheduling operations
  */
-export function scheduleTaskUnified(
-  options: UnifiedSchedulingOptions
-): SchedulingResult {
+export function scheduleTaskUnified(options: UnifiedSchedulingOptions): SchedulingResult {
   const {
     mode,
     task,
@@ -1059,11 +1059,8 @@ export function scheduleTaskUnified(
   const durationMs = task.duration * 60 * 1000;
 
   // Determine which hours to use (group rules or awake hours)
-  const useGroupRules =
-    taskGroup?.auto_schedule_enabled && taskGroup?.auto_schedule_hours;
-  const scheduleHours = useGroupRules
-    ? taskGroup.auto_schedule_hours
-    : awakeHours;
+  const useGroupRules = taskGroup?.auto_schedule_enabled && taskGroup?.auto_schedule_hours;
+  const scheduleHours = useGroupRules ? taskGroup.auto_schedule_hours : awakeHours;
 
   if (useGroupRules) {
     reportProgress(`Using group schedule rules for "${taskGroup.name}"`);
@@ -1086,7 +1083,9 @@ export function scheduleTaskUnified(
       break;
 
     case "today":
-      reportProgress("Mode: Schedule Today - Preferring group rules but allowing outside if needed");
+      reportProgress(
+        "Mode: Schedule Today - Preferring group rules but allowing outside if needed"
+      );
       startFrom = nowUTC;
       maxSearchTime = getEndOfToday(nowUTC, timezone);
       mustBeToday = true;
@@ -1117,7 +1116,7 @@ export function scheduleTaskUnified(
         task,
         allTasks,
         taskGroup,
-        scheduleHours,
+        scheduleHours ?? null,
         awakeHours,
         timezone,
         reportProgress,
@@ -1171,7 +1170,7 @@ export function scheduleTaskUnified(
 
   // Start searching
   let currentTimeUTC = new Date(Math.max(startFrom.getTime(), nowUTC.getTime()));
-  
+
   // Round to next 15-minute interval
   const currentMinutes = currentTimeUTC.getUTCMinutes();
   const roundedMinutes = Math.ceil(currentMinutes / 15) * 15;
@@ -1295,11 +1294,7 @@ export function scheduleTaskUnified(
       }
       if (currentTimeUTC.getTime() <= slotStartUTC.getTime()) {
         currentTimeUTC = new Date(slotStartUTC.getTime() + 24 * 60 * 60 * 1000);
-        currentTimeUTC.setUTCMinutes(
-          Math.floor(currentTimeUTC.getUTCMinutes() / 15) * 15,
-          0,
-          0
-        );
+        currentTimeUTC.setUTCMinutes(Math.floor(currentTimeUTC.getUTCMinutes() / 15) * 15, 0, 0);
       }
       continue;
     }
@@ -1318,8 +1313,7 @@ export function scheduleTaskUnified(
         if (awakeDayHours && awakeDayHours !== null) {
           const awakeStart = awakeDayHours.start * 60;
           const awakeEnd = awakeDayHours.end * 60;
-          const isInAwakeHours =
-            slotTimeInMinutes >= awakeStart && slotTimeInMinutes < awakeEnd;
+          const isInAwakeHours = slotTimeInMinutes >= awakeStart && slotTimeInMinutes < awakeEnd;
 
           if (isInAwakeHours) {
             // Check conflicts
@@ -1412,11 +1406,7 @@ export function scheduleTaskUnified(
         }
         if (currentTimeUTC.getTime() <= slotStartUTC.getTime()) {
           currentTimeUTC = new Date(slotStartUTC.getTime() + 24 * 60 * 60 * 1000);
-          currentTimeUTC.setUTCMinutes(
-            Math.floor(currentTimeUTC.getUTCMinutes() / 15) * 15,
-            0,
-            0
-          );
+          currentTimeUTC.setUTCMinutes(Math.floor(currentTimeUTC.getUTCMinutes() / 15) * 15, 0, 0);
         }
         continue;
       } else if (!isToday || slotTimeInMinutes >= 23 * 60) {
@@ -1438,11 +1428,7 @@ export function scheduleTaskUnified(
         }
         if (currentTimeUTC.getTime() <= slotStartUTC.getTime()) {
           currentTimeUTC = new Date(slotStartUTC.getTime() + 24 * 60 * 60 * 1000);
-          currentTimeUTC.setUTCMinutes(
-            Math.floor(currentTimeUTC.getUTCMinutes() / 15) * 15,
-            0,
-            0
-          );
+          currentTimeUTC.setUTCMinutes(Math.floor(currentTimeUTC.getUTCMinutes() / 15) * 15, 0, 0);
         }
         continue;
       }
@@ -1469,21 +1455,13 @@ export function scheduleTaskUnified(
         const candidateTz = getTimeInTimezone(candidate, timezone);
         if (candidateTz.hour === dayHours.start && candidateTz.minute === 0) {
           currentTimeUTC = candidate;
-          currentTimeUTC.setUTCMinutes(
-            Math.floor(currentTimeUTC.getUTCMinutes() / 15) * 15,
-            0,
-            0
-          );
+          currentTimeUTC.setUTCMinutes(Math.floor(currentTimeUTC.getUTCMinutes() / 15) * 15, 0, 0);
           break;
         }
       }
       if (currentTimeUTC.getTime() <= slotStartUTC.getTime()) {
         currentTimeUTC = new Date(slotStartUTC.getTime() + 24 * 60 * 60 * 1000);
-        currentTimeUTC.setUTCMinutes(
-          Math.floor(currentTimeUTC.getUTCMinutes() / 15) * 15,
-          0,
-          0
-        );
+        currentTimeUTC.setUTCMinutes(Math.floor(currentTimeUTC.getUTCMinutes() / 15) * 15, 0, 0);
       }
       continue;
     }
@@ -1510,11 +1488,7 @@ export function scheduleTaskUnified(
       // Optimize: jump to end of conflict
       reportProgress(`Conflict detected, jumping to ${new Date(latestConflictEnd).toISOString()}`);
       currentTimeUTC = new Date(latestConflictEnd);
-      currentTimeUTC.setUTCMinutes(
-        Math.ceil(currentTimeUTC.getUTCMinutes() / 15) * 15,
-        0,
-        0
-      );
+      currentTimeUTC.setUTCMinutes(Math.ceil(currentTimeUTC.getUTCMinutes() / 15) * 15, 0, 0);
       if (currentTimeUTC.getUTCMinutes() >= 60) {
         currentTimeUTC.setUTCHours(currentTimeUTC.getUTCHours() + 1, 0, 0, 0);
         currentTimeUTC.setUTCMinutes(0, 0, 0);
@@ -1538,7 +1512,8 @@ export function scheduleTaskUnified(
   return {
     slot: null,
     feedback,
-    error: "Unable to find an available time slot. Please try adjusting your constraints or use Schedule ASAP to shuffle tasks.",
+    error:
+      "Unable to find an available time slot. Please try adjusting your constraints or use Schedule ASAP to shuffle tasks.",
   };
 }
 
@@ -1548,7 +1523,7 @@ export function scheduleTaskUnified(
 function scheduleTaskASAPWithShuffling(
   task: Task,
   allTasks: Task[],
-  taskGroup: TaskGroup | null | undefined,
+  _taskGroup: TaskGroup | null | undefined,
   scheduleHours: GroupScheduleHours | null,
   awakeHours: GroupScheduleHours | null,
   timezone: string,
@@ -1558,6 +1533,13 @@ function scheduleTaskASAPWithShuffling(
   reportProgress("Finding next available slot for task...");
 
   const startTime = Date.now();
+  if (!task.duration || task.duration <= 0) {
+    return {
+      slot: null,
+      feedback: [],
+      error: "Task must have a duration to be scheduled",
+    };
+  }
   const durationMs = task.duration * 60 * 1000;
   const nowUTC = new Date();
 
@@ -1591,7 +1573,7 @@ function scheduleTaskASAPWithShuffling(
   const maxRecursionDepth = 100;
 
   // Helper to get group for a task (simplified - in real implementation, pass groups map)
-  const getTaskGroupHours = (t: Task): GroupScheduleHours | null => {
+  const getTaskGroupHours = (_t: Task): GroupScheduleHours | null => {
     // This is a simplified version - in the real implementation,
     // you'd look up the task's group from a groups map
     // For now, we'll use awake hours as fallback

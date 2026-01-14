@@ -181,7 +181,7 @@ export function TaskForm({
     }
 
     // Handle todo due date requirement with smart auto-fill
-    let autoSetDueDate: string | undefined = undefined;
+    let autoSetDueDate: string | undefined;
     if (formData.task_type === "todo") {
       if (!formData.due_date) {
         if (hasTriedSubmitWithoutDueDate) {
@@ -189,14 +189,14 @@ export function TaskForm({
           const now = new Date();
           const nowInTimezone = getDateInTimezone(now, timezone);
           const currentHour = nowInTimezone.getHours();
-          
+
           let targetDate = nowInTimezone;
           if (currentHour >= 17) {
             // After 5pm, set to tomorrow
             targetDate = new Date(nowInTimezone);
             targetDate.setDate(targetDate.getDate() + 1);
           }
-          
+
           const dateAt5pm = createDateInTimezone(targetDate, 17, 0, timezone);
           autoSetDueDate = formatDateTimeLocalForTimezone(dateAt5pm.toISOString(), timezone);
           // Update form data for UI
@@ -576,9 +576,7 @@ export function TaskForm({
             className={`h-10 ${errors.due_date ? "border-red-500" : ""}`}
             placeholder={isTodo ? "Required for todos" : undefined}
           />
-          {errors.due_date && (
-            <p className="text-xs text-red-500">{errors.due_date}</p>
-          )}
+          {errors.due_date && <p className="text-xs text-red-500">{errors.due_date}</p>}
           {isTodo && !formData.due_date && !errors.due_date && (
             <p className="text-xs text-muted-foreground">Due date is required for todos</p>
           )}
@@ -655,15 +653,11 @@ export function TaskForm({
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="start">
-                    <DropdownMenuItem
-                      onClick={() => handleInputChange("schedule_mode", "now")}
-                    >
+                    <DropdownMenuItem onClick={() => handleInputChange("schedule_mode", "now")}>
                       <Clock className="h-4 w-4 mr-2" />
                       Schedule Now
                     </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onClick={() => handleInputChange("schedule_mode", "today")}
-                    >
+                    <DropdownMenuItem onClick={() => handleInputChange("schedule_mode", "today")}>
                       <CalendarClock className="h-4 w-4 mr-2" />
                       Schedule Today
                     </DropdownMenuItem>
@@ -679,9 +673,7 @@ export function TaskForm({
                       <Calendar className="h-4 w-4 mr-2" />
                       Schedule Next Month
                     </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onClick={() => handleInputChange("schedule_mode", "asap")}
-                    >
+                    <DropdownMenuItem onClick={() => handleInputChange("schedule_mode", "asap")}>
                       <Zap className="h-4 w-4 mr-2" />
                       Schedule ASAP
                     </DropdownMenuItem>

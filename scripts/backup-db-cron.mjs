@@ -2,21 +2,21 @@
 
 /**
  * Database Backup Script for Cron
- * 
+ *
  * This script backs up the database to a local backups directory.
  * Designed to be run via cron job.
- * 
+ *
  * Usage:
  *   node scripts/backup-db-cron.mjs
- * 
+ *
  * Cron example (daily at 2 AM):
  *   0 2 * * * cd /path/to/plan-my-day && node scripts/backup-db-cron.mjs >> /var/log/plan-my-day-backup.log 2>&1
  */
 
+import * as fs from "node:fs";
+import * as path from "node:path";
 import { createClient } from "@libsql/client";
 import dotenv from "dotenv";
-import * as fs from "fs";
-import * as path from "path";
 
 // Load environment variables
 dotenv.config({ path: ".env.local" });
@@ -29,7 +29,7 @@ const turso = createClient({
 // Configuration
 const BACKUPS_DIR = process.env.BACKUPS_DIR || path.join(process.cwd(), "backups");
 const MAX_BACKUPS = parseInt(process.env.MAX_BACKUPS || "30", 10); // Keep last 30 backups by default
-const COMPRESS_BACKUPS = process.env.COMPRESS_BACKUPS === "true"; // Optional: compress old backups
+const _COMPRESS_BACKUPS = process.env.COMPRESS_BACKUPS === "true"; // Optional: compress old backups
 
 async function backupDatabase() {
   const startTime = Date.now();
@@ -174,7 +174,7 @@ async function cleanupOldBackups() {
 
 // Main execution
 backupDatabase()
-  .then((result) => {
+  .then((_result) => {
     console.log(`[${new Date().toISOString()}] Backup completed successfully`);
     process.exit(0);
   })
@@ -182,4 +182,3 @@ backupDatabase()
     console.error(`[${new Date().toISOString()}] Backup failed:`, error);
     process.exit(1);
   });
-
