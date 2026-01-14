@@ -1,7 +1,7 @@
 "use client";
 
 import { Calendar, Clock, Zap } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { DependencySelector } from "@/components/dependency-selector";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -45,12 +45,13 @@ export function TaskForm({
   // Use prop groups if provided, otherwise fall back to empty array for backward compatibility
   const taskGroups = propTaskGroups ?? [];
 
+  const initialTaskType = initialData?.task_type || "task";
   const [formData, setFormData] = useState<CreateTaskRequest>({
     title: initialData?.title || "",
     description: initialData?.description || "",
     priority: initialData?.priority || 3,
-    duration: initialData?.duration || undefined,
-    task_type: initialData?.task_type || "task",
+    duration: initialData?.duration || (initialTaskType === "todo" ? 30 : undefined),
+    task_type: initialTaskType,
     energy_level_required: initialData?.energy_level_required || 3,
     group_id: initialData?.group_id || undefined,
     template_id: initialData?.template_id || undefined,
@@ -67,6 +68,8 @@ export function TaskForm({
   const [showDependencies, setShowDependencies] = useState(
     (initialData?.dependency_ids?.length ?? 0) > 0
   );
+  const [hasTriedSubmitWithoutDueDate, setHasTriedSubmitWithoutDueDate] = useState(false);
+  const titleInputRef = useRef<HTMLInputElement>(null);
 
   // Fetch existing dependencies when editing a task
   useEffect(() => {
@@ -90,16 +93,28 @@ export function TaskForm({
     fetchDependencies();
   }, [initialData?.id]);
 
+  // Focus title input when form is first rendered (for new tasks)
+  useEffect(() => {
+    if (!initialData?.id && titleInputRef.current) {
+      // Small delay to ensure dialog animation completes
+      const timer = setTimeout(() => {
+        titleInputRef.current?.focus();
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [initialData?.id]);
+
   // Update form data when initialData or timezone changes (for edit mode)
   useEffect(() => {
     if (initialData?.title) {
+      const taskType = initialData.task_type || "task";
       setFormData((prev) => ({
         ...prev,
         title: initialData.title || "",
         description: initialData.description || "",
         priority: initialData.priority || 3,
-        duration: initialData.duration || undefined,
-        task_type: initialData.task_type || "task",
+        duration: initialData.duration || (taskType === "todo" ? 30 : undefined),
+        task_type: taskType,
         energy_level_required: initialData.energy_level_required || 3,
         group_id: initialData.group_id || undefined,
         template_id: initialData.template_id || undefined,
@@ -113,6 +128,17 @@ export function TaskForm({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialData, timezone]);
+
+  // Focus title input when form is first rendered (for new tasks)
+  useEffect(() => {
+    if (!initialData?.id && titleInputRef.current) {
+      // Small delay to ensure dialog animation completes
+      const timer = setTimeout(() => {
+        titleInputRef.current?.focus();
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [initialData?.id]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -147,6 +173,44 @@ export function TaskForm({
       }
     }
 
+    // Handle todo due date requirement with smart auto-fill
+    let autoSetDueDate: string | undefined = undefined;
+    if (formData.task_type === "todo") {
+      if (!formData.due_date) {
+        if (hasTriedSubmitWithoutDueDate) {
+          // Second attempt: auto-set due date to today at 5pm (or tomorrow if after 5pm)
+          const now = new Date();
+          const nowInTimezone = getDateInTimezone(now, timezone);
+          const currentHour = nowInTimezone.getHours();
+          
+          let targetDate = nowInTimezone;
+          if (currentHour >= 17) {
+            // After 5pm, set to tomorrow
+            targetDate = new Date(nowInTimezone);
+            targetDate.setDate(targetDate.getDate() + 1);
+          }
+          
+          const dateAt5pm = createDateInTimezone(targetDate, 17, 0, timezone);
+          autoSetDueDate = formatDateTimeLocalForTimezone(dateAt5pm.toISOString(), timezone);
+          // Update form data for UI
+          setFormData((prev) => ({ ...prev, due_date: autoSetDueDate }));
+          // Clear the error and flag
+          setHasTriedSubmitWithoutDueDate(false);
+          setErrors((prev) => ({ ...prev, due_date: "" }));
+        } else {
+          // First attempt: show error message
+          newErrors.due_date = "Due date is required for todos";
+          setHasTriedSubmitWithoutDueDate(true);
+        }
+      } else {
+        // Due date is set, reset the flag
+        setHasTriedSubmitWithoutDueDate(false);
+      }
+      if (formData.duration && formData.duration < 0) {
+        newErrors.duration = "Duration must be positive";
+      }
+    }
+
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
       return;
@@ -154,6 +218,14 @@ export function TaskForm({
 
     try {
       const submissionData = { ...formData };
+      // Use auto-set due date if it was calculated
+      if (autoSetDueDate) {
+        submissionData.due_date = autoSetDueDate;
+      }
+      // Remove energy_level_required for todos (not used)
+      if (submissionData.task_type === "todo") {
+        submissionData.energy_level_required = undefined;
+      }
       if (submissionData.scheduled_start) {
         submissionData.scheduled_start = parseDateTimeLocalToUTC(
           submissionData.scheduled_start,
@@ -212,6 +284,10 @@ export function TaskForm({
         } else if (value === "todo") {
           updated.energy_level_required = undefined;
           if (!updated.priority) updated.priority = 3;
+          // Set default duration to 30 minutes for todos if not already set
+          if (!updated.duration) updated.duration = 30;
+          // Reset the flag when switching to todo type
+          setHasTriedSubmitWithoutDueDate(false);
         } else {
           if (!updated.priority) updated.priority = 3;
           if (!updated.energy_level_required) updated.energy_level_required = 3;
@@ -331,6 +407,7 @@ export function TaskForm({
       {/* Title - Full width, prominent */}
       <div className="space-y-1.5">
         <Input
+          ref={titleInputRef}
           id="title"
           value={formData.title}
           onChange={(e) => handleInputChange("title", e.target.value)}
@@ -477,6 +554,7 @@ export function TaskForm({
           <Label className="text-xs text-muted-foreground flex items-center gap-1">
             <Calendar className="w-3 h-3" />
             Due Date
+            {isTodo && <span className="text-red-500 ml-1">*</span>}
           </Label>
           <Input
             id="due_date"
@@ -484,8 +562,15 @@ export function TaskForm({
             value={formData.due_date || ""}
             onChange={(e) => handleInputChange("due_date", e.target.value)}
             onFocus={handleDueDateFocus}
-            className="h-10"
+            className={`h-10 ${errors.due_date ? "border-red-500" : ""}`}
+            placeholder={isTodo ? "Required for todos" : undefined}
           />
+          {errors.due_date && (
+            <p className="text-xs text-red-500">{errors.due_date}</p>
+          )}
+          {isTodo && !formData.due_date && !errors.due_date && (
+            <p className="text-xs text-muted-foreground">Due date is required for todos</p>
+          )}
         </div>
       )}
 

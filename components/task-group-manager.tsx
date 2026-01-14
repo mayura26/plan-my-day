@@ -3,6 +3,8 @@
 import {
   AlertCircle,
   AlertTriangle,
+  Calendar,
+  CheckSquare,
   ChevronDown,
   ChevronRight,
   ChevronsDown,
@@ -11,6 +13,7 @@ import {
   Eye,
   EyeOff,
   Folder,
+  ListTodo,
   Plus,
   Trash2,
 } from "lucide-react";
@@ -29,6 +32,12 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -37,7 +46,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import type { CreateTaskGroupRequest, Task, TaskGroup } from "@/lib/types";
+import type { CreateTaskGroupRequest, Task, TaskGroup, TaskType } from "@/lib/types";
+import { TASK_TYPE_LABELS } from "@/lib/task-utils";
 import { cn } from "@/lib/utils";
 import { EditGroupDialog } from "./edit-group-dialog";
 
@@ -198,7 +208,7 @@ interface GroupCardProps {
   onTaskClick?: (taskId: string) => void;
   onEdit?: () => void;
   onDelete?: () => void;
-  onQuickAddTask?: (groupId: string | null) => void;
+  onQuickAddTask?: (groupId: string | null, taskType?: TaskType) => void;
   groupId?: string | null;
   isUngrouped?: boolean;
   isParent?: boolean;
@@ -364,18 +374,50 @@ function GroupCard({
       {!isExpanded && (
         <div className="flex items-center gap-1 px-2 py-1 bg-muted/30">
           {onQuickAddTask && (
-            <Button
-              size="sm"
-              variant="ghost"
-              className="h-7 w-7 p-0 flex-shrink-0"
-              onClick={(e) => {
-                e.stopPropagation();
-                onQuickAddTask(isUngrouped ? null : groupId || null);
-              }}
-              title="Quick add task to this group"
-            >
-              <Plus className="h-3.5 w-3.5" />
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-7 w-7 p-0 flex-shrink-0"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                  }}
+                  title="Quick add to this group"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" onClick={(e) => e.stopPropagation()}>
+                <DropdownMenuItem
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onQuickAddTask(isUngrouped ? null : groupId || null, "task");
+                  }}
+                >
+                  <CheckSquare className="h-4 w-4" />
+                  {TASK_TYPE_LABELS.task}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onQuickAddTask(isUngrouped ? null : groupId || null, "event");
+                  }}
+                >
+                  <Calendar className="h-4 w-4" />
+                  {TASK_TYPE_LABELS.event}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onQuickAddTask(isUngrouped ? null : groupId || null, "todo");
+                  }}
+                >
+                  <ListTodo className="h-4 w-4" />
+                  {TASK_TYPE_LABELS.todo}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           )}
           <Button
             size="sm"
@@ -439,18 +481,50 @@ function GroupCard({
           {/* Minimal header when expanded */}
           <div className="flex items-center justify-between py-1">
             {onQuickAddTask && (
-              <Button
-                size="sm"
-                variant="ghost"
-                className="h-6 w-6 p-0"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onQuickAddTask(isUngrouped ? null : groupId || null);
-                }}
-                title="Quick add task to this group"
-              >
-                <Plus className="h-3.5 w-3.5" />
-              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-6 w-6 p-0"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                    }}
+                    title="Quick add to this group"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" onClick={(e) => e.stopPropagation()}>
+                  <DropdownMenuItem
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onQuickAddTask(isUngrouped ? null : groupId || null, "task");
+                    }}
+                  >
+                    <CheckSquare className="h-4 w-4" />
+                    {TASK_TYPE_LABELS.task}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onQuickAddTask(isUngrouped ? null : groupId || null, "event");
+                    }}
+                  >
+                    <Calendar className="h-4 w-4" />
+                    {TASK_TYPE_LABELS.event}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onQuickAddTask(isUngrouped ? null : groupId || null, "todo");
+                    }}
+                  >
+                    <ListTodo className="h-4 w-4" />
+                    {TASK_TYPE_LABELS.todo}
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             )}
             <div className="flex-1" />
             <Button

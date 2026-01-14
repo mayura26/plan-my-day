@@ -1,4 +1,8 @@
 - [ ] Create schedule ASAP which will shuffle stuff down
+- [ ] in progresss tasks need to be marked on calender
+- [ ] On quick add lets have menu so type of thing can be picked
+- [ ] Todo auto have 30m duration, no energy, enforce duedate
+- [ ] Auto shuffle tasks when they clash
 
 ### ⏳ Pending
 - [ ] AI-powered task scheduling engine
