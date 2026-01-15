@@ -1389,8 +1389,9 @@ export default function CalendarPage() {
         onStatusChange={handleStatusChange}
         onUnschedule={handleUnscheduleTask}
         onTaskUpdate={async () => {
-          // Task updates are handled via onTaskRefresh callback
-          // No need to refresh the entire list
+          // Refresh the entire task list when subtasks are scheduled
+          // This ensures the calendar updates to show newly scheduled subtasks
+          await fetchTasks(false);
         }}
         onTaskRefresh={(updatedTask) => {
           // Update the selected task with fresh data
@@ -1415,8 +1416,9 @@ export default function CalendarPage() {
         onStatusChange={handleStatusChange}
         onUnschedule={handleUnscheduleTask}
         onTaskUpdate={async () => {
-          // Task updates are handled via onTaskRefresh callback
-          // No need to refresh the entire list
+          // Refresh the entire task list when subtasks are scheduled
+          // This ensures the calendar updates to show newly scheduled subtasks
+          await fetchTasks(false);
         }}
         onTaskRefresh={(updatedTask) => {
           // Update the completed task dialog with fresh data
