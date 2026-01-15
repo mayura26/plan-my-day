@@ -98,6 +98,90 @@ async function wouldCreateCircularDependency(
   return false;
 }
 
+// Sync subtask dependencies: when Task A depends on Task B,
+// all subtasks of A must depend on all subtasks of B (all-to-all)
+async function syncSubtaskDependencies(
+  taskId: string,
+  dependsOnTaskId: string,
+  userId: string
+): Promise<void> {
+  // Get all subtasks of the task
+  const taskSubtasksResult = await db.execute(
+    `SELECT id FROM tasks WHERE parent_task_id = ? AND user_id = ?`,
+    [taskId, userId]
+  );
+  const taskSubtasks = taskSubtasksResult.rows.map((row) => row.id as string);
+
+  // Get all subtasks of the dependency task
+  const depSubtasksResult = await db.execute(
+    `SELECT id FROM tasks WHERE parent_task_id = ? AND user_id = ?`,
+    [dependsOnTaskId, userId]
+  );
+  const depSubtasks = depSubtasksResult.rows.map((row) => row.id as string);
+
+  // If either task has no subtasks, nothing to sync
+  if (taskSubtasks.length === 0 || depSubtasks.length === 0) {
+    return;
+  }
+
+  // Create all-to-all dependencies: every subtask of taskId depends on every subtask of dependsOnTaskId
+  for (const taskSubtaskId of taskSubtasks) {
+    for (const depSubtaskId of depSubtasks) {
+      // Check if dependency already exists
+      const existingDep = await db.execute(
+        `SELECT id FROM task_dependencies WHERE task_id = ? AND depends_on_task_id = ?`,
+        [taskSubtaskId, depSubtaskId]
+      );
+
+      if (existingDep.rows.length === 0) {
+        // Check for circular dependency before creating
+        const wouldBeCircular = await wouldCreateCircularDependency(
+          taskSubtaskId,
+          depSubtaskId,
+          userId
+        );
+        if (!wouldBeCircular) {
+          await db.execute(
+            `INSERT INTO task_dependencies (id, task_id, depends_on_task_id) VALUES (?, ?, ?)`,
+            [generateDependencyId(), taskSubtaskId, depSubtaskId]
+          );
+        }
+      }
+    }
+  }
+}
+
+// Remove subtask dependencies when parent dependency is removed
+async function removeSubtaskDependencies(
+  taskId: string,
+  dependsOnTaskId: string,
+  userId: string
+): Promise<void> {
+  // Get all subtasks of the task
+  const taskSubtasksResult = await db.execute(
+    `SELECT id FROM tasks WHERE parent_task_id = ? AND user_id = ?`,
+    [taskId, userId]
+  );
+  const taskSubtasks = taskSubtasksResult.rows.map((row) => row.id as string);
+
+  // Get all subtasks of the dependency task
+  const depSubtasksResult = await db.execute(
+    `SELECT id FROM tasks WHERE parent_task_id = ? AND user_id = ?`,
+    [dependsOnTaskId, userId]
+  );
+  const depSubtasks = depSubtasksResult.rows.map((row) => row.id as string);
+
+  // Remove all dependencies between subtasks
+  for (const taskSubtaskId of taskSubtasks) {
+    for (const depSubtaskId of depSubtasks) {
+      await db.execute(
+        `DELETE FROM task_dependencies WHERE task_id = ? AND depends_on_task_id = ?`,
+        [taskSubtaskId, depSubtaskId]
+      );
+    }
+  }
+}
+
 // GET /api/tasks/[id]/dependencies - Get all dependencies for a task
 export async function GET(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -220,8 +304,22 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       }
     }
 
+    // Get old dependencies before deleting them (for subtask cleanup)
+    const oldDepsResult = await db.execute(
+      `SELECT depends_on_task_id FROM task_dependencies WHERE task_id = ?`,
+      [id]
+    );
+    const oldDepIds = oldDepsResult.rows.map((row) => row.depends_on_task_id as string);
+
     // Delete existing dependencies
     await db.execute(`DELETE FROM task_dependencies WHERE task_id = ?`, [id]);
+
+    // Remove old subtask dependencies for dependencies that are being removed
+    for (const oldDepId of oldDepIds) {
+      if (!body.dependency_ids.includes(oldDepId)) {
+        await removeSubtaskDependencies(id, oldDepId, session.user.id);
+      }
+    }
 
     // Insert new dependencies
     for (const depId of body.dependency_ids) {
@@ -229,6 +327,8 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
         `INSERT INTO task_dependencies (id, task_id, depends_on_task_id) VALUES (?, ?, ?)`,
         [generateDependencyId(), id, depId]
       );
+      // Sync subtask dependencies for this new dependency
+      await syncSubtaskDependencies(id, depId, session.user.id);
     }
 
     // Return updated dependencies
@@ -324,6 +424,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       [depId, id, body.depends_on_task_id]
     );
 
+    // Sync subtask dependencies for this new dependency
+    await syncSubtaskDependencies(id, body.depends_on_task_id, session.user.id);
+
     const dependency: TaskDependency = {
       id: depId,
       task_id: id,
@@ -371,18 +474,34 @@ export async function DELETE(
       return NextResponse.json({ error: "Task not found" }, { status: 404 });
     }
 
+    let removedDependsOnTaskId: string | null = null;
+
     if (dependencyId) {
+      // Get the depends_on_task_id before deleting
+      const depResult = await db.execute(
+        `SELECT depends_on_task_id FROM task_dependencies WHERE id = ? AND task_id = ?`,
+        [dependencyId, id]
+      );
+      if (depResult.rows.length > 0) {
+        removedDependsOnTaskId = depResult.rows[0].depends_on_task_id as string;
+      }
       // Delete by dependency ID
       await db.execute(`DELETE FROM task_dependencies WHERE id = ? AND task_id = ?`, [
         dependencyId,
         id,
       ]);
     } else if (dependsOnTaskId) {
+      removedDependsOnTaskId = dependsOnTaskId;
       // Delete by depends_on_task_id
       await db.execute(
         `DELETE FROM task_dependencies WHERE task_id = ? AND depends_on_task_id = ?`,
         [id, dependsOnTaskId]
       );
+    }
+
+    // Remove subtask dependencies if we removed a parent dependency
+    if (removedDependsOnTaskId) {
+      await removeSubtaskDependencies(id, removedDependsOnTaskId, session.user.id);
     }
 
     return NextResponse.json({ message: "Dependency removed successfully" });

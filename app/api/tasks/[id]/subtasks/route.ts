@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { generateTaskId, validateTaskData } from "@/lib/task-utils";
+import { generateDependencyId, generateTaskId, validateTaskData } from "@/lib/task-utils";
 import { db } from "@/lib/turso";
 import type { CreateTaskRequest, Task, TaskStatus, TaskType } from "@/lib/types";
 
@@ -259,6 +259,65 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         `UPDATE tasks SET ${parentUpdates.join(", ")} WHERE id = ?`,
         parentUpdateValues
       );
+    }
+
+    // Sync dependencies for the new subtask
+    // Case 1: If parent task has dependencies, new subtask should depend on all subtasks of dependency tasks
+    const parentDepsResult = await db.execute(
+      `SELECT depends_on_task_id FROM task_dependencies WHERE task_id = ?`,
+      [parentId]
+    );
+    for (const depRow of parentDepsResult.rows) {
+      const depTaskId = depRow.depends_on_task_id as string;
+      // Get all subtasks of the dependency task
+      const depSubtasksResult = await db.execute(
+        `SELECT id FROM tasks WHERE parent_task_id = ? AND user_id = ?`,
+        [depTaskId, session.user.id]
+      );
+      // Create dependencies: new subtask depends on all subtasks of dependency task
+      for (const depSubtaskRow of depSubtasksResult.rows) {
+        const depSubtaskId = depSubtaskRow.id as string;
+        // Check if dependency already exists
+        const existingDep = await db.execute(
+          `SELECT id FROM task_dependencies WHERE task_id = ? AND depends_on_task_id = ?`,
+          [taskId, depSubtaskId]
+        );
+        if (existingDep.rows.length === 0) {
+          await db.execute(
+            `INSERT INTO task_dependencies (id, task_id, depends_on_task_id) VALUES (?, ?, ?)`,
+            [generateDependencyId(), taskId, depSubtaskId]
+          );
+        }
+      }
+    }
+
+    // Case 2: If parent task is a dependency of other tasks, all subtasks of those tasks should depend on new subtask
+    const tasksThatDependOnParentResult = await db.execute(
+      `SELECT task_id FROM task_dependencies WHERE depends_on_task_id = ?`,
+      [parentId]
+    );
+    for (const depRow of tasksThatDependOnParentResult.rows) {
+      const dependentTaskId = depRow.task_id as string;
+      // Get all subtasks of the dependent task
+      const dependentSubtasksResult = await db.execute(
+        `SELECT id FROM tasks WHERE parent_task_id = ? AND user_id = ?`,
+        [dependentTaskId, session.user.id]
+      );
+      // Create dependencies: all subtasks of dependent task depend on new subtask
+      for (const dependentSubtaskRow of dependentSubtasksResult.rows) {
+        const dependentSubtaskId = dependentSubtaskRow.id as string;
+        // Check if dependency already exists
+        const existingDep = await db.execute(
+          `SELECT id FROM task_dependencies WHERE task_id = ? AND depends_on_task_id = ?`,
+          [dependentSubtaskId, taskId]
+        );
+        if (existingDep.rows.length === 0) {
+          await db.execute(
+            `INSERT INTO task_dependencies (id, task_id, depends_on_task_id) VALUES (?, ?, ?)`,
+            [generateDependencyId(), dependentSubtaskId, taskId]
+          );
+        }
+      }
     }
 
     return NextResponse.json({ subtask }, { status: 201 });

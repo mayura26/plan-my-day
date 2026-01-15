@@ -18,6 +18,7 @@ import type { Task } from "@/lib/types";
 
 interface DependencySelectorProps {
   taskId?: string; // Current task ID (to exclude from options)
+  groupId?: string | null; // Current task's group_id (to filter by same group)
   selectedIds: string[];
   onChange: (ids: string[]) => void;
   disabled?: boolean;
@@ -25,6 +26,7 @@ interface DependencySelectorProps {
 
 export function DependencySelector({
   taskId,
+  groupId,
   selectedIds,
   onChange,
   disabled = false,
@@ -36,13 +38,39 @@ export function DependencySelector({
   const fetchTasks = useCallback(async () => {
     setIsLoading(true);
     try {
-      // Fetch all non-completed, non-subtask tasks
-      const response = await fetch("/api/tasks?parent_only=true");
+      // Build query params: exclude completed tasks, filter by group_id, and only parent tasks
+      const params = new URLSearchParams();
+      params.append("parent_only", "true");
+      
+      // Filter by group_id - if current task has a group, only show tasks in that group
+      // If current task has no group (null), only show tasks with no group
+      if (groupId !== undefined) {
+        if (groupId !== null) {
+          params.append("group_id", groupId);
+        } else {
+          // For null group_id, pass empty string to filter for tasks with no group
+          params.append("group_id", "");
+        }
+      }
+      
+      // Exclude completed tasks - we'll filter these out
+      // Note: We'll filter completed tasks client-side since API might not support status != 'completed'
+      
+      const response = await fetch(`/api/tasks?${params.toString()}`);
       if (response.ok) {
         const data = await response.json();
-        // Filter out the current task and subtasks
+        // Filter out: current task, subtasks, and completed tasks
         const availableTasks = (data.tasks || []).filter(
-          (t: Task) => t.id !== taskId && t.task_type !== "subtask" && !t.parent_task_id
+          (t: Task) =>
+            t.id !== taskId &&
+            t.task_type !== "subtask" &&
+            !t.parent_task_id &&
+            t.status !== "completed" &&
+            // Handle group_id filtering: if groupId is null/undefined, show only tasks with no group
+            // If groupId is set, show only tasks with matching group_id
+            (groupId === undefined || groupId === null
+              ? t.group_id === null || t.group_id === undefined
+              : t.group_id === groupId)
         );
         setTasks(availableTasks);
       }
@@ -51,7 +79,7 @@ export function DependencySelector({
     } finally {
       setIsLoading(false);
     }
-  }, [taskId]);
+  }, [taskId, groupId]);
 
   useEffect(() => {
     if (open) {

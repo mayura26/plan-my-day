@@ -596,6 +596,7 @@ export function TaskForm({
         ) : (
           <DependencySelector
             taskId={initialData?.id}
+            groupId={formData.group_id}
             selectedIds={formData.dependency_ids || []}
             onChange={(ids) => handleInputChange("dependency_ids", ids)}
           />

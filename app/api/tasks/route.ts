@@ -75,9 +75,14 @@ export async function GET(request: NextRequest) {
       params.push(task_type);
     }
 
-    if (group_id) {
-      query += ` AND group_id = ?`;
-      params.push(group_id);
+    if (group_id !== null && group_id !== undefined) {
+      if (group_id === "") {
+        // Empty string means filter for tasks with no group
+        query += ` AND group_id IS NULL`;
+      } else {
+        query += ` AND group_id = ?`;
+        params.push(group_id);
+      }
     }
 
     // Filter to only show parent/standalone tasks (no subtasks)
