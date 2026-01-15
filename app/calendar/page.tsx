@@ -1493,6 +1493,7 @@ export default function CalendarPage() {
                 setIsEditing(false);
               }}
               initialData={{
+                id: editingTask.id,
                 title: editingTask.title,
                 description: editingTask.description || undefined,
                 priority: editingTask.priority,

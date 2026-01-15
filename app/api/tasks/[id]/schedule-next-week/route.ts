@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { scheduleTaskUnified } from "@/lib/scheduler-utils";
+import { scheduleTaskUnified, type DependencyMap } from "@/lib/scheduler-utils";
 import { getUserTimezone } from "@/lib/timezone-utils";
 import { db } from "@/lib/turso";
 import type { Task, TaskGroup, TaskStatus, TaskType } from "@/lib/types";
@@ -68,7 +68,7 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
     if (subtasks.length > 0) {
       const feedback: string[] = [];
       const scheduledSubtasks: Task[] = [];
-      const shuffledTasks: Task[] = [];
+      const shuffledTasks: Array<{ taskId: string; newSlot: { start: Date; end: Date } }> = [];
 
       // Get user's timezone and awake hours (needed for scheduling)
       const userResult = await db.execute("SELECT timezone, awake_hours FROM users WHERE id = ?", [
@@ -129,6 +129,21 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
       ]);
       let allTasks = allTasksResult.rows.map(mapRowToTask);
 
+      // Build dependency map from task_dependencies table
+      const dependencyMap = new Map<string, string[]>();
+      const depsResult = await db.execute(
+        "SELECT task_id, depends_on_task_id FROM task_dependencies WHERE task_id IN (SELECT id FROM tasks WHERE user_id = ?)",
+        [session.user.id]
+      );
+      for (const row of depsResult.rows) {
+        const taskId = row.task_id as string;
+        const dependsOnId = row.depends_on_task_id as string;
+        if (!dependencyMap.has(taskId)) {
+          dependencyMap.set(taskId, []);
+        }
+        dependencyMap.get(taskId)!.push(dependsOnId);
+      }
+
       // Schedule each subtask sequentially
       let lastScheduledEnd: Date | null = null;
       for (const subtask of subtasks) {
@@ -154,6 +169,7 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
           awakeHours,
           timezone: userTimezone,
           startFrom: lastScheduledEnd || undefined,
+          dependencyMap,
         });
 
         if (scheduleResult.slot) {
@@ -184,11 +200,30 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
           lastScheduledEnd = scheduleResult.slot.end;
           feedback.push(...(scheduleResult.feedback || []));
           if (scheduleResult.shuffledTasks) {
-            shuffledTasks.push(...scheduleResult.shuffledTasks);
+            for (const shuffled of scheduleResult.shuffledTasks) {
+              shuffledTasks.push(shuffled);
+            }
           }
         } else {
           feedback.push(
             `Failed to schedule "${subtask.title}": ${scheduleResult.error || "No available time slot"}`
+          );
+        }
+      }
+
+      // Update all shuffled tasks if any
+      if (shuffledTasks.length > 0) {
+        const updatedAt = new Date().toISOString();
+        for (const shuffled of shuffledTasks) {
+          await db.execute(
+            `UPDATE tasks SET scheduled_start = ?, scheduled_end = ?, updated_at = ? WHERE id = ? AND user_id = ?`,
+            [
+              shuffled.newSlot.start.toISOString(),
+              shuffled.newSlot.end.toISOString(),
+              updatedAt,
+              shuffled.taskId,
+              session.user.id,
+            ]
           );
         }
       }
@@ -207,10 +242,24 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
       ]);
       const updatedParent = mapRowToTask(updatedParentResult.rows[0]);
 
+      // Fetch updated shuffled tasks for response
+      const updatedShuffledTasks: Task[] = [];
+      if (shuffledTasks.length > 0) {
+        for (const shuffled of shuffledTasks) {
+          const shuffledResult = await db.execute(
+            "SELECT * FROM tasks WHERE id = ? AND user_id = ?",
+            [shuffled.taskId, session.user.id]
+          );
+          if (shuffledResult.rows.length > 0) {
+            updatedShuffledTasks.push(mapRowToTask(shuffledResult.rows[0]));
+          }
+        }
+      }
+
       return NextResponse.json({
         task: updatedParent,
         scheduledSubtasks,
-        shuffledTasks,
+        shuffledTasks: updatedShuffledTasks,
         feedback,
         message: `Scheduled ${scheduledSubtasks.length} of ${subtasks.length} subtasks for next week`,
       });
@@ -283,6 +332,21 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
     ]);
     const allTasks = allTasksResult.rows.map(mapRowToTask);
 
+    // Build dependency map from task_dependencies table
+    const dependencyMap = new Map<string, string[]>();
+    const depsResult = await db.execute(
+      "SELECT task_id, depends_on_task_id FROM task_dependencies WHERE task_id IN (SELECT id FROM tasks WHERE user_id = ?)",
+      [session.user.id]
+    );
+    for (const row of depsResult.rows) {
+      const taskId = row.task_id as string;
+      const dependsOnId = row.depends_on_task_id as string;
+      if (!dependencyMap.has(taskId)) {
+        dependencyMap.set(taskId, []);
+      }
+      dependencyMap.get(taskId)!.push(dependsOnId);
+    }
+
     // Use unified scheduler with "next-week" mode
     const result = scheduleTaskUnified({
       mode: "next-week",
@@ -291,6 +355,7 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
       taskGroup,
       awakeHours,
       timezone: userTimezone,
+      dependencyMap,
     });
 
     if (!result.slot) {

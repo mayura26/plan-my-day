@@ -7,6 +7,104 @@ interface TimeSlot {
 }
 
 /**
+ * Dependency map type: maps task ID to array of dependency task IDs
+ */
+export type DependencyMap = Map<string, string[]>;
+
+/**
+ * Get all dependency task IDs for a task
+ * Checks both depends_on_task_id (legacy) and dependencyMap (from task_dependencies table)
+ *
+ * @param task The task to get dependencies for
+ * @param dependencyMap Map of task_id -> [depends_on_task_id, ...] from task_dependencies table
+ * @returns Array of dependency task IDs
+ */
+export function getTaskDependencies(
+  task: Task,
+  dependencyMap: DependencyMap
+): string[] {
+  const dependencies: string[] = [];
+
+  // Check legacy depends_on_task_id field
+  if (task.depends_on_task_id) {
+    dependencies.push(task.depends_on_task_id);
+  }
+
+  // Check task_dependencies table via dependencyMap
+  const tableDependencies = dependencyMap.get(task.id);
+  if (tableDependencies) {
+    for (const depId of tableDependencies) {
+      if (!dependencies.includes(depId)) {
+        dependencies.push(depId);
+      }
+    }
+  }
+
+  return dependencies;
+}
+
+/**
+ * Get dependency constraint - the latest scheduled_end time from incomplete dependencies
+ * Returns null if no constraints or if any incomplete dependency is not scheduled
+ *
+ * @param task The task to schedule
+ * @param allTasks All tasks (to look up dependency tasks)
+ * @param dependencyMap Map of task_id -> [depends_on_task_id, ...] from task_dependencies table
+ * @returns Latest scheduled_end time from incomplete dependencies, or null
+ */
+export function getDependencyConstraint(
+  task: Task,
+  allTasks: Task[],
+  dependencyMap: DependencyMap
+): Date | null {
+  const dependencyIds = getTaskDependencies(task, dependencyMap);
+  if (dependencyIds.length === 0) {
+    return null;
+  }
+
+  // Create a map of task ID to task for quick lookup
+  const taskMap = new Map<string, Task>();
+  for (const t of allTasks) {
+    taskMap.set(t.id, t);
+  }
+
+  let latestEndTime: Date | null = null;
+  let hasUnscheduledDependency = false;
+
+  for (const depId of dependencyIds) {
+    const depTask = taskMap.get(depId);
+    if (!depTask) {
+      // Dependency task not found - skip it
+      continue;
+    }
+
+    // Only consider incomplete dependencies
+    if (depTask.status === "completed") {
+      continue;
+    }
+
+    // If dependency is not scheduled, we can't determine when it will complete
+    if (!depTask.scheduled_end) {
+      hasUnscheduledDependency = true;
+      continue;
+    }
+
+    // Track the latest scheduled_end time
+    const depEndTime = new Date(depTask.scheduled_end);
+    if (!latestEndTime || depEndTime > latestEndTime) {
+      latestEndTime = depEndTime;
+    }
+  }
+
+  // If any incomplete dependency is unscheduled, return null (can't determine constraint)
+  if (hasUnscheduledDependency) {
+    return null;
+  }
+
+  return latestEndTime;
+}
+
+/**
  * Find the nearest available time slot for a task
  * All date math is done in UTC. Working hours are checked by converting UTC times to user's timezone.
  *
@@ -16,6 +114,8 @@ interface TimeSlot {
  * @param workingHours Per-day working hours configuration (defaults to 9-17 for all days if not provided)
  * @param maxDaysAhead Maximum days to search ahead (default 7)
  * @param timezone User's timezone (used only to check if UTC times fall within working hours)
+ * @param dependencyMap Optional map of task_id -> [depends_on_task_id, ...] for dependency checking
+ * @param allTasks Optional all tasks array (required if dependencyMap is provided)
  * @returns Time slot in UTC or null if no slot found
  */
 export function findNearestAvailableSlot(
@@ -24,17 +124,29 @@ export function findNearestAvailableSlot(
   startFrom: Date = new Date(),
   workingHours: GroupScheduleHours | null = null,
   maxDaysAhead: number = 7,
-  timezone: string = "UTC"
+  timezone: string = "UTC",
+  dependencyMap?: DependencyMap,
+  allTasks?: Task[]
 ): TimeSlot | null {
   if (!task.duration || task.duration <= 0) {
     return null;
+  }
+
+  // Check dependency constraints if dependencyMap is provided
+  let adjustedStartFrom = startFrom;
+  if (dependencyMap && allTasks) {
+    const constraintTime = getDependencyConstraint(task, allTasks, dependencyMap);
+    if (constraintTime) {
+      // Start searching after the latest dependency completion time
+      adjustedStartFrom = new Date(Math.max(startFrom.getTime(), constraintTime.getTime()));
+    }
   }
 
   const durationMs = task.duration * 60 * 1000; // Convert minutes to milliseconds
 
   // All times are in UTC from here on
   const nowUTC = new Date();
-  const maxSearchTime = new Date(startFrom);
+  const maxSearchTime = new Date(adjustedStartFrom);
   maxSearchTime.setUTCDate(maxSearchTime.getUTCDate() + maxDaysAhead);
 
   // Get all scheduled time slots from existing tasks (all UTC)
@@ -113,9 +225,9 @@ export function findNearestAvailableSlot(
     return null;
   };
 
-  // Start searching from startFrom (UTC), but not before now
+  // Start searching from adjustedStartFrom (UTC), but not before now
   // Round to next 15-minute interval in UTC
-  let currentTimeUTC = new Date(Math.max(startFrom.getTime(), nowUTC.getTime()));
+  let currentTimeUTC = new Date(Math.max(adjustedStartFrom.getTime(), nowUTC.getTime()));
   const currentMinutes = currentTimeUTC.getUTCMinutes();
   // Round up to next 15-minute mark
   const roundedMinutes = Math.ceil(currentMinutes / 15) * 15;
@@ -947,6 +1059,7 @@ export interface UnifiedSchedulingOptions {
   onProgress?: (message: string) => void; // Optional progress callback
   maxTimeout?: number; // Max timeout in milliseconds (default: 30000)
   startFrom?: Date; // Optional custom start time (overrides mode's default start time)
+  dependencyMap?: DependencyMap; // Optional dependency map for dependency checking
 }
 
 /**
@@ -1038,6 +1151,7 @@ export function scheduleTaskUnified(options: UnifiedSchedulingOptions): Scheduli
     onProgress,
     maxTimeout = 30000,
     startFrom: customStartFrom,
+    dependencyMap,
   } = options;
 
   const feedback: string[] = [];
@@ -1055,6 +1169,20 @@ export function scheduleTaskUnified(options: UnifiedSchedulingOptions): Scheduli
   }
 
   reportProgress("Initializing scheduler...");
+
+  // Check dependency constraints if dependencyMap is provided
+  let dependencyConstraint: Date | null = null;
+  if (dependencyMap) {
+    dependencyConstraint = getDependencyConstraint(task, allTasks, dependencyMap);
+    if (dependencyConstraint) {
+      const constraintTimeStr = new Date(dependencyConstraint).toLocaleString("en-US", {
+        timeZone: timezone,
+      });
+      reportProgress(
+        `Task has dependencies. Will schedule after dependency completion (${constraintTimeStr})`
+      );
+    }
+  }
 
   const nowUTC = new Date();
   const startTime = Date.now();
@@ -1170,8 +1298,12 @@ export function scheduleTaskUnified(options: UnifiedSchedulingOptions): Scheduli
     return null;
   };
 
-  // Start searching
-  let currentTimeUTC = new Date(Math.max(startFrom.getTime(), nowUTC.getTime()));
+  // Start searching - adjust for dependency constraints
+  let adjustedStartFrom = startFrom;
+  if (dependencyConstraint) {
+    adjustedStartFrom = new Date(Math.max(startFrom.getTime(), dependencyConstraint.getTime()));
+  }
+  let currentTimeUTC = new Date(Math.max(adjustedStartFrom.getTime(), nowUTC.getTime()));
 
   // Round to next 15-minute interval
   const currentMinutes = currentTimeUTC.getUTCMinutes();
@@ -1530,7 +1662,8 @@ function scheduleTaskASAPWithShuffling(
   awakeHours: GroupScheduleHours | null,
   timezone: string,
   reportProgress: (message: string) => void,
-  maxTimeout: number
+  maxTimeout: number,
+  dependencyMap?: DependencyMap
 ): SchedulingResult {
   reportProgress("Finding next available slot for task...");
 
@@ -1545,8 +1678,26 @@ function scheduleTaskASAPWithShuffling(
   const durationMs = task.duration * 60 * 1000;
   const nowUTC = new Date();
 
-  // Find next slot for the task
-  const nextSlotStart = findNextWorkingHoursSlot(nowUTC, scheduleHours || awakeHours, timezone);
+  // Check dependency constraints if dependencyMap is provided
+  let dependencyConstraint: Date | null = null;
+  if (dependencyMap) {
+    dependencyConstraint = getDependencyConstraint(task, allTasks, dependencyMap);
+    if (dependencyConstraint) {
+      const constraintTimeStr = new Date(dependencyConstraint).toLocaleString("en-US", {
+        timeZone: timezone,
+      });
+      reportProgress(
+        `Task has dependencies. Will schedule after dependency completion (${constraintTimeStr})`
+      );
+    }
+  }
+
+  // Find next slot for the task - adjust for dependency constraints
+  let startFromTime = nowUTC;
+  if (dependencyConstraint) {
+    startFromTime = new Date(Math.max(nowUTC.getTime(), dependencyConstraint.getTime()));
+  }
+  const nextSlotStart = findNextWorkingHoursSlot(startFromTime, scheduleHours || awakeHours, timezone);
   const nextSlotEnd = new Date(nextSlotStart.getTime() + durationMs);
   const taskSlot: TimeSlot = {
     start: nextSlotStart,

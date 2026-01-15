@@ -25,6 +25,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import { toast } from "sonner";
 import { NotesManager } from "@/components/notes-manager";
+import { SchedulingErrorDialog } from "@/components/scheduling-error-dialog";
 import { SubtaskManager } from "@/components/subtask-manager";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -80,6 +81,9 @@ export function TaskDetailDialog({
   const [isScheduling, setIsScheduling] = useState(false);
   const [schedulingMode, setSchedulingMode] = useState<string | null>(null);
   const [_schedulingFeedback, setSchedulingFeedback] = useState<string[]>([]);
+  const [errorDialogOpen, setErrorDialogOpen] = useState(false);
+  const [errorDialogError, setErrorDialogError] = useState<string>("");
+  const [errorDialogFeedback, setErrorDialogFeedback] = useState<string[]>([]);
   const [isLoadingParent, setIsLoadingParent] = useState(false);
   const [dependencies, setDependencies] = useState<DependencyInfo[]>([]);
   const [blockedBy, setBlockedBy] = useState<Task[]>([]);
@@ -103,7 +107,11 @@ export function TaskDetailDialog({
       const response = await fetch(`/api/tasks/${taskId}/dependencies`);
       if (response.ok) {
         const data = await response.json();
-        setDependencies(data.dependencies || []);
+        // Filter out the task itself from dependencies
+        const filteredDependencies = (data.dependencies || []).filter(
+          (dep: DependencyInfo) => dep.depends_on_task_id !== taskId
+        );
+        setDependencies(filteredDependencies);
         setBlockedBy(data.blocked_by || []);
         setIsBlocked(data.is_blocked || false);
       }
@@ -157,11 +165,17 @@ export function TaskDetailDialog({
 
   // Track when dialog opens to fetch dependencies only once
   const openedTaskIdRef = useRef<string | null>(null);
+  const lastUpdatedAtRef = useRef<string | null>(null);
   useEffect(() => {
     if (open && task?.id) {
-      // Only fetch dependencies if this is a new dialog open (different task or first open)
-      if (openedTaskIdRef.current !== task.id) {
+      // Fetch dependencies if this is a new dialog open (different task or first open)
+      // OR if the task's updated_at has changed (indicating the task was modified)
+      const isNewTask = openedTaskIdRef.current !== task.id;
+      const taskWasUpdated = task.updated_at && lastUpdatedAtRef.current !== task.updated_at;
+      
+      if (isNewTask || taskWasUpdated) {
         openedTaskIdRef.current = task.id;
+        lastUpdatedAtRef.current = task.updated_at || null;
         fetchDependencies(task.id);
         // Fetch subtasks count for non-subtask tasks
         if (!(task.task_type === "subtask" || !!task.parent_task_id)) {
@@ -176,17 +190,21 @@ export function TaskDetailDialog({
           setParentTaskName(null);
         }
         // Reset change tracking when dialog opens
-        setHasChanges(false);
+        if (isNewTask) {
+          setHasChanges(false);
+        }
       }
     }
     // Reset ref when dialog closes
     if (!open) {
       openedTaskIdRef.current = null;
+      lastUpdatedAtRef.current = null;
       setParentTaskName(null);
     }
   }, [
     open,
     task?.id,
+    task?.updated_at,
     fetchDependencies,
     fetchSubtasksCount,
     fetchNotesCount,
@@ -370,15 +388,14 @@ export function TaskDetailDialog({
       if (!response.ok) {
         const errorData = await response.json();
         // Store feedback from error response if available
-        if (errorData.feedback && Array.isArray(errorData.feedback)) {
-          setSchedulingFeedback(errorData.feedback);
-          // Show feedback messages
-          errorData.feedback.slice(-3).forEach((msg: string, index: number) => {
-            setTimeout(() => {
-              toast.info(msg, { duration: 3000 });
-            }, index * 500);
-          });
-        }
+        const feedback = errorData.feedback && Array.isArray(errorData.feedback) ? errorData.feedback : [];
+        setSchedulingFeedback(feedback);
+        
+        // Show error in dialog instead of toast
+        setErrorDialogError(errorData.error || `Failed to schedule task (${mode})`);
+        setErrorDialogFeedback(feedback);
+        setErrorDialogOpen(true);
+        
         throw new Error(errorData.error || `Failed to schedule task (${mode})`);
       }
 
@@ -436,7 +453,12 @@ export function TaskDetailDialog({
       }
     } catch (error) {
       console.error(`Error scheduling task (${mode}):`, error);
-      toast.error(error instanceof Error ? error.message : `Failed to schedule task (${mode})`);
+      // Only show dialog if it's not already open (to avoid duplicate dialogs)
+      if (!errorDialogOpen) {
+        setErrorDialogError(error instanceof Error ? error.message : `Failed to schedule task (${mode})`);
+        setErrorDialogFeedback([]);
+        setErrorDialogOpen(true);
+      }
     } finally {
       setIsScheduling(false);
       setSchedulingMode(null);
@@ -946,37 +968,6 @@ export function TaskDetailDialog({
             </Card>
           )}
 
-          {/* Dependencies */}
-          {dependencies.length > 0 && (
-            <Card className="py-2 overflow-x-hidden">
-              <CardContent className="pt-0 pb-0 px-3 sm:px-6 overflow-x-hidden">
-                <h3 className="text-sm font-semibold mb-1.5 sm:mb-2 flex items-center gap-2">
-                  <GitBranch className="h-4 w-4" />
-                  Dependencies
-                </h3>
-                <ul className="text-xs sm:text-sm space-y-1">
-                  {dependencies.map((dep) => (
-                    <li key={dep.id} className="flex items-center gap-2 break-words">
-                      {dep.dependency_status === "completed" ? (
-                        <CheckCircle2 className="h-3 w-3 text-green-500 flex-shrink-0" />
-                      ) : (
-                        <Circle className="h-3 w-3 text-muted-foreground flex-shrink-0" />
-                      )}
-                      <span
-                        className={
-                          dep.dependency_status === "completed"
-                            ? "line-through text-muted-foreground"
-                            : ""
-                        }
-                      >
-                        {dep.dependency_title}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              </CardContent>
-            </Card>
-          )}
 
           {/* Task Properties */}
           <Card className="py-2 sm:py-6 overflow-x-hidden">
@@ -1023,6 +1014,12 @@ export function TaskDetailDialog({
           </div>
         </div>
       </DialogContent>
+      <SchedulingErrorDialog
+        open={errorDialogOpen}
+        onOpenChange={setErrorDialogOpen}
+        error={errorDialogError}
+        feedback={errorDialogFeedback}
+      />
     </Dialog>
   );
 }

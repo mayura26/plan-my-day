@@ -10,7 +10,7 @@ import {
 } from "@dnd-kit/core";
 import { SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { CheckCircle2, Circle, Clock, GripVertical, Plus, Trash2, Zap } from "lucide-react";
+import { Calendar, CheckCircle2, Circle, Clock, GripVertical, Plus, Trash2, Zap } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -146,6 +146,9 @@ function SortableSubtaskItem({
           >
             {subtask.title}
           </span>
+          {subtask.scheduled_start && subtask.scheduled_end && (
+            <Calendar className="h-3.5 w-3.5 text-primary flex-shrink-0" title="Scheduled" />
+          )}
         </div>
       </div>
       {editingDurationId === subtask.id ? (

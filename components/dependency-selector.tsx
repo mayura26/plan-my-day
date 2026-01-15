@@ -35,6 +35,17 @@ export function DependencySelector({
   const [tasks, setTasks] = useState<Task[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
+  // Clean up selectedIds to remove current task if present
+  useEffect(() => {
+    if (taskId && selectedIds.includes(taskId)) {
+      const cleanedIds = selectedIds.filter((id) => id !== taskId);
+      if (cleanedIds.length !== selectedIds.length) {
+        onChange(cleanedIds);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [taskId]); // Only depend on taskId to avoid infinite loops
+
   const fetchTasks = useCallback(async () => {
     setIsLoading(true);
     try {
@@ -60,18 +71,35 @@ export function DependencySelector({
       if (response.ok) {
         const data = await response.json();
         // Filter out: current task, subtasks, and completed tasks
-        const availableTasks = (data.tasks || []).filter(
-          (t: Task) =>
-            t.id !== taskId &&
-            t.task_type !== "subtask" &&
-            !t.parent_task_id &&
-            t.status !== "completed" &&
-            // Handle group_id filtering: if groupId is null/undefined, show only tasks with no group
-            // If groupId is set, show only tasks with matching group_id
-            (groupId === undefined || groupId === null
-              ? t.group_id === null || t.group_id === undefined
-              : t.group_id === groupId)
-        );
+        const availableTasks = (data.tasks || []).filter((t: Task) => {
+          // CRITICAL: Always exclude the current task if taskId is provided
+          // This prevents a task from depending on itself
+          if (taskId && t.id === taskId) {
+            return false;
+          }
+          // Exclude subtasks
+          if (t.task_type === "subtask" || t.parent_task_id) {
+            return false;
+          }
+          // Exclude completed tasks
+          if (t.status === "completed") {
+            return false;
+          }
+          // Handle group_id filtering: if groupId is null/undefined, show only tasks with no group
+          // If groupId is set, show only tasks with matching group_id
+          if (groupId !== undefined) {
+            if (groupId === null) {
+              if (t.group_id !== null && t.group_id !== undefined) {
+                return false;
+              }
+            } else {
+              if (t.group_id !== groupId) {
+                return false;
+              }
+            }
+          }
+          return true;
+        });
         setTasks(availableTasks);
       }
     } catch (error) {
@@ -88,6 +116,10 @@ export function DependencySelector({
   }, [open, fetchTasks]);
 
   const handleSelect = (taskIdToToggle: string) => {
+    // Prevent selecting the current task as a dependency
+    if (taskId && taskIdToToggle === taskId) {
+      return;
+    }
     if (selectedIds.includes(taskIdToToggle)) {
       onChange(selectedIds.filter((id) => id !== taskIdToToggle));
     } else {
@@ -99,7 +131,9 @@ export function DependencySelector({
     onChange(selectedIds.filter((id) => id !== taskIdToRemove));
   };
 
-  const selectedTasks = tasks.filter((t) => selectedIds.includes(t.id));
+  // Filter out the current task from selected dependencies
+  const filteredSelectedIds = taskId ? selectedIds.filter((id) => id !== taskId) : selectedIds;
+  const selectedTasks = tasks.filter((t) => filteredSelectedIds.includes(t.id));
 
   return (
     <div className="space-y-2">
@@ -144,8 +178,8 @@ export function DependencySelector({
               disabled={disabled}
             >
               <GitBranch className="h-4 w-4 mr-2" />
-              {selectedIds.length > 0
-                ? `${selectedIds.length} dependenc${selectedIds.length === 1 ? "y" : "ies"} selected`
+              {filteredSelectedIds.length > 0
+                ? `${filteredSelectedIds.length} dependenc${filteredSelectedIds.length === 1 ? "y" : "ies"} selected`
                 : "Add dependencies..."}
             </Button>
           </PopoverTrigger>
@@ -155,8 +189,17 @@ export function DependencySelector({
               <CommandList>
                 <CommandEmpty>{isLoading ? "Loading tasks..." : "No tasks found."}</CommandEmpty>
                 <CommandGroup>
-                  {tasks.map((task) => {
-                    const isSelected = selectedIds.includes(task.id);
+                  {tasks
+                    .filter((task) => {
+                      // Double-check: exclude current task from the list
+                      // If taskId is provided and matches this task, exclude it
+                      if (taskId && task.id === taskId) {
+                        return false;
+                      }
+                      return true;
+                    })
+                    .map((task) => {
+                      const isSelected = filteredSelectedIds.includes(task.id);
                     return (
                       <CommandItem
                         key={task.id}
@@ -195,7 +238,7 @@ export function DependencySelector({
         </Popover>
       )}
 
-      {selectedIds.length === 0 && !disabled && (
+      {filteredSelectedIds.length === 0 && !disabled && (
         <p className="text-xs text-muted-foreground">
           No dependencies. This task can be started anytime.
         </p>

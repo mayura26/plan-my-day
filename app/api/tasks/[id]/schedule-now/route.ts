@@ -68,7 +68,7 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
     if (subtasks.length > 0) {
       const feedback: string[] = [];
       const scheduledSubtasks: Task[] = [];
-      const shuffledTasks: Task[] = [];
+      const shuffledTasks: Array<{ taskId: string; newSlot: { start: Date; end: Date } }> = [];
 
       // Get user's timezone and awake hours (needed for scheduling)
       const userResult = await db.execute("SELECT timezone, awake_hours FROM users WHERE id = ?", [
@@ -129,6 +129,21 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
       ]);
       let allTasks = allTasksResult.rows.map(mapRowToTask);
 
+      // Build dependency map from task_dependencies table
+      const dependencyMap = new Map<string, string[]>();
+      const depsResult = await db.execute(
+        "SELECT task_id, depends_on_task_id FROM task_dependencies WHERE task_id IN (SELECT id FROM tasks WHERE user_id = ?)",
+        [session.user.id]
+      );
+      for (const row of depsResult.rows) {
+        const taskId = row.task_id as string;
+        const dependsOnId = row.depends_on_task_id as string;
+        if (!dependencyMap.has(taskId)) {
+          dependencyMap.set(taskId, []);
+        }
+        dependencyMap.get(taskId)!.push(dependsOnId);
+      }
+
       // Schedule each subtask sequentially
       let lastScheduledEnd: Date | null = null;
       for (const subtask of subtasks) {
@@ -154,6 +169,7 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
           awakeHours,
           timezone: userTimezone,
           startFrom: lastScheduledEnd || undefined,
+          dependencyMap,
         });
 
         if (scheduleResult.slot) {
@@ -184,7 +200,11 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
           lastScheduledEnd = scheduleResult.slot.end;
           feedback.push(...(scheduleResult.feedback || []));
           if (scheduleResult.shuffledTasks) {
-            shuffledTasks.push(...scheduleResult.shuffledTasks);
+            // shuffledTasks contains { taskId, newSlot } objects, not Task objects
+            // We'll handle them separately when updating the database
+            for (const shuffled of scheduleResult.shuffledTasks) {
+              shuffledTasks.push(shuffled);
+            }
           }
         } else {
           feedback.push(
@@ -283,6 +303,21 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
     ]);
     const allTasks = allTasksResult.rows.map(mapRowToTask);
 
+    // Build dependency map from task_dependencies table
+    const dependencyMap = new Map<string, string[]>();
+    const depsResult = await db.execute(
+      "SELECT task_id, depends_on_task_id FROM task_dependencies WHERE task_id IN (SELECT id FROM tasks WHERE user_id = ?)",
+      [session.user.id]
+    );
+    for (const row of depsResult.rows) {
+      const taskId = row.task_id as string;
+      const dependsOnId = row.depends_on_task_id as string;
+      if (!dependencyMap.has(taskId)) {
+        dependencyMap.set(taskId, []);
+      }
+      dependencyMap.get(taskId)!.push(dependsOnId);
+    }
+
     // Use unified scheduler with "now" mode
     const result = scheduleTaskUnified({
       mode: "now",
@@ -291,6 +326,7 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
       taskGroup,
       awakeHours,
       timezone: userTimezone,
+      dependencyMap,
     });
 
     if (!result.slot) {

@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { scheduleTaskUnified } from "@/lib/scheduler-utils";
+import { scheduleTaskUnified, type DependencyMap } from "@/lib/scheduler-utils";
 import { getUserTimezone } from "@/lib/timezone-utils";
 import { db } from "@/lib/turso";
 import type { Task, TaskGroup, TaskStatus, TaskType } from "@/lib/types";
@@ -129,6 +129,21 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
       ]);
       let allTasks = allTasksResult.rows.map(mapRowToTask);
 
+      // Build dependency map from task_dependencies table
+      const dependencyMap = new Map<string, string[]>();
+      const depsResult = await db.execute(
+        "SELECT task_id, depends_on_task_id FROM task_dependencies WHERE task_id IN (SELECT id FROM tasks WHERE user_id = ?)",
+        [session.user.id]
+      );
+      for (const row of depsResult.rows) {
+        const taskId = row.task_id as string;
+        const dependsOnId = row.depends_on_task_id as string;
+        if (!dependencyMap.has(taskId)) {
+          dependencyMap.set(taskId, []);
+        }
+        dependencyMap.get(taskId)!.push(dependsOnId);
+      }
+
       // Schedule each subtask sequentially
       let lastScheduledEnd: Date | null = null;
       for (const subtask of subtasks) {
@@ -155,6 +170,7 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
           awakeHours,
           timezone: userTimezone,
           startFrom: lastScheduledEnd || undefined,
+          dependencyMap,
         });
 
         if (scheduleResult.slot) {
@@ -284,6 +300,21 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
     ]);
     const allTasks = allTasksResult.rows.map(mapRowToTask);
 
+    // Build dependency map from task_dependencies table
+    const dependencyMap = new Map<string, string[]>();
+    const depsResult = await db.execute(
+      "SELECT task_id, depends_on_task_id FROM task_dependencies WHERE task_id IN (SELECT id FROM tasks WHERE user_id = ?)",
+      [session.user.id]
+    );
+    for (const row of depsResult.rows) {
+      const taskId = row.task_id as string;
+      const dependsOnId = row.depends_on_task_id as string;
+      if (!dependencyMap.has(taskId)) {
+        dependencyMap.set(taskId, []);
+      }
+      dependencyMap.get(taskId)!.push(dependsOnId);
+    }
+
     // Use unified scheduler with "today" mode
     const result = scheduleTaskUnified({
       mode: "today",
@@ -292,6 +323,7 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
       taskGroup,
       awakeHours,
       timezone: userTimezone,
+      dependencyMap,
     });
 
     if (!result.slot) {
