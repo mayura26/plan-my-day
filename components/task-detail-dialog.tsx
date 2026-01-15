@@ -85,7 +85,7 @@ export function TaskDetailDialog({
   const [errorDialogError, setErrorDialogError] = useState<string>("");
   const [errorDialogFeedback, setErrorDialogFeedback] = useState<string[]>([]);
   const [isLoadingParent, setIsLoadingParent] = useState(false);
-  const [dependencies, setDependencies] = useState<DependencyInfo[]>([]);
+  const [_dependencies, setDependencies] = useState<DependencyInfo[]>([]);
   const [blockedBy, setBlockedBy] = useState<Task[]>([]);
   const [isBlocked, setIsBlocked] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
@@ -172,7 +172,7 @@ export function TaskDetailDialog({
       // OR if the task's updated_at has changed (indicating the task was modified)
       const isNewTask = openedTaskIdRef.current !== task.id;
       const taskWasUpdated = task.updated_at && lastUpdatedAtRef.current !== task.updated_at;
-      
+
       if (isNewTask || taskWasUpdated) {
         openedTaskIdRef.current = task.id;
         lastUpdatedAtRef.current = task.updated_at || null;
@@ -388,14 +388,15 @@ export function TaskDetailDialog({
       if (!response.ok) {
         const errorData = await response.json();
         // Store feedback from error response if available
-        const feedback = errorData.feedback && Array.isArray(errorData.feedback) ? errorData.feedback : [];
+        const feedback =
+          errorData.feedback && Array.isArray(errorData.feedback) ? errorData.feedback : [];
         setSchedulingFeedback(feedback);
-        
+
         // Show error in dialog instead of toast
         setErrorDialogError(errorData.error || `Failed to schedule task (${mode})`);
         setErrorDialogFeedback(feedback);
         setErrorDialogOpen(true);
-        
+
         throw new Error(errorData.error || `Failed to schedule task (${mode})`);
       }
 
@@ -455,7 +456,9 @@ export function TaskDetailDialog({
       console.error(`Error scheduling task (${mode}):`, error);
       // Only show dialog if it's not already open (to avoid duplicate dialogs)
       if (!errorDialogOpen) {
-        setErrorDialogError(error instanceof Error ? error.message : `Failed to schedule task (${mode})`);
+        setErrorDialogError(
+          error instanceof Error ? error.message : `Failed to schedule task (${mode})`
+        );
         setErrorDialogFeedback([]);
         setErrorDialogOpen(true);
       }
@@ -967,7 +970,6 @@ export function TaskDetailDialog({
               </CardContent>
             </Card>
           )}
-
 
           {/* Task Properties */}
           <Card className="py-2 sm:py-6 overflow-x-hidden">

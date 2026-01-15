@@ -29,7 +29,8 @@ function mapRowToTask(row: any): Task {
     energy_level_required: row.energy_level_required as number,
     parent_task_id: row.parent_task_id as string | null,
     continued_from_task_id: row.continued_from_task_id as string | null,
-    step_order: row.step_order !== null && row.step_order !== undefined ? Number(row.step_order) : null,
+    step_order:
+      row.step_order !== null && row.step_order !== undefined ? Number(row.step_order) : null,
     ignored: Boolean(row.ignored ?? false),
     created_at: row.created_at as string,
     updated_at: row.updated_at as string,

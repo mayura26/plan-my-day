@@ -1,5 +1,6 @@
 "use client";
 
+import { AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -9,7 +10,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { AlertCircle } from "lucide-react";
 
 interface SchedulingErrorDialogProps {
   open: boolean;
@@ -38,8 +38,8 @@ export function SchedulingErrorDialog({
           <div className="py-4">
             <h4 className="text-sm font-medium mb-2">Details:</h4>
             <ul className="list-disc list-inside space-y-1 text-sm text-muted-foreground">
-              {feedback.map((msg, index) => (
-                <li key={index}>{msg}</li>
+              {feedback.map((msg) => (
+                <li key={msg}>{msg}</li>
               ))}
             </ul>
           </div>
@@ -51,4 +51,3 @@ export function SchedulingErrorDialog({
     </Dialog>
   );
 }
-

@@ -28,7 +28,8 @@ function mapRowToTask(row: any): Task {
     energy_level_required: row.energy_level_required as number,
     parent_task_id: row.parent_task_id as string | null,
     continued_from_task_id: row.continued_from_task_id as string | null,
-    step_order: row.step_order !== null && row.step_order !== undefined ? Number(row.step_order) : null,
+    step_order:
+      row.step_order !== null && row.step_order !== undefined ? Number(row.step_order) : null,
     ignored: Boolean(row.ignored ?? false),
     created_at: row.created_at as string,
     updated_at: row.updated_at as string,
@@ -141,7 +142,10 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
         if (!dependencyMap.has(taskId)) {
           dependencyMap.set(taskId, []);
         }
-        dependencyMap.get(taskId)!.push(dependsOnId);
+        const deps = dependencyMap.get(taskId);
+        if (deps) {
+          deps.push(dependsOnId);
+        }
       }
 
       // Schedule each subtask sequentially
@@ -221,10 +225,10 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
       );
 
       // Fetch updated parent task
-      const updatedParentResult = await db.execute("SELECT * FROM tasks WHERE id = ? AND user_id = ?", [
-        id,
-        session.user.id,
-      ]);
+      const updatedParentResult = await db.execute(
+        "SELECT * FROM tasks WHERE id = ? AND user_id = ?",
+        [id, session.user.id]
+      );
       const updatedParent = mapRowToTask(updatedParentResult.rows[0]);
 
       return NextResponse.json({
@@ -315,7 +319,10 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
       if (!dependencyMap.has(taskId)) {
         dependencyMap.set(taskId, []);
       }
-      dependencyMap.get(taskId)!.push(dependsOnId);
+      const deps = dependencyMap.get(taskId);
+      if (deps) {
+        deps.push(dependsOnId);
+      }
     }
 
     // Use unified scheduler with "now" mode

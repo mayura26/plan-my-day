@@ -10,7 +10,16 @@ import {
 } from "@dnd-kit/core";
 import { SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { Calendar, CheckCircle2, Circle, Clock, GripVertical, Plus, Trash2, Zap } from "lucide-react";
+import {
+  Calendar,
+  CheckCircle2,
+  Circle,
+  Clock,
+  GripVertical,
+  Plus,
+  Trash2,
+  Zap,
+} from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -74,7 +83,7 @@ function SortableSubtaskItem({
   editingDurationValue,
   isUpdatingDuration,
   deletingSubtaskId,
-  activeDragId,
+  activeDragId: _activeDragId,
   isReordering,
   onToggle,
   onStartEditingDuration,
@@ -83,14 +92,10 @@ function SortableSubtaskItem({
   onEditingDurationValueChange,
   onDelete,
 }: SortableSubtaskItemProps) {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id: subtask.id, disabled: readOnly || isReordering });
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: subtask.id,
+    disabled: readOnly || isReordering,
+  });
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -147,7 +152,7 @@ function SortableSubtaskItem({
             {subtask.title}
           </span>
           {subtask.scheduled_start && subtask.scheduled_end && (
-            <Calendar className="h-3.5 w-3.5 text-primary flex-shrink-0" title="Scheduled" />
+            <Calendar className="h-3.5 w-3.5 text-primary flex-shrink-0" />
           )}
         </div>
       </div>
@@ -676,12 +681,11 @@ export function SubtaskManager({
         )}
         {/* Subtask List */}
         {subtasks.length > 0 && (
-          <DndContext
-            sensors={sensors}
-            onDragStart={handleDragStart}
-            onDragEnd={handleDragEnd}
-          >
-            <SortableContext items={subtasks.map((st) => st.id)} strategy={verticalListSortingStrategy}>
+          <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+            <SortableContext
+              items={subtasks.map((st) => st.id)}
+              strategy={verticalListSortingStrategy}
+            >
               <div className="space-y-2 overflow-x-hidden">
                 {subtasks.map((subtask, index) => (
                   <SortableSubtaskItem

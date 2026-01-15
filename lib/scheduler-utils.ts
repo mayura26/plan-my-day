@@ -19,10 +19,7 @@ export type DependencyMap = Map<string, string[]>;
  * @param dependencyMap Map of task_id -> [depends_on_task_id, ...] from task_dependencies table
  * @returns Array of dependency task IDs
  */
-export function getTaskDependencies(
-  task: Task,
-  dependencyMap: DependencyMap
-): string[] {
+export function getTaskDependencies(task: Task, dependencyMap: DependencyMap): string[] {
   const dependencies: string[] = [];
 
   // Check legacy depends_on_task_id field
@@ -1697,7 +1694,11 @@ function scheduleTaskASAPWithShuffling(
   if (dependencyConstraint) {
     startFromTime = new Date(Math.max(nowUTC.getTime(), dependencyConstraint.getTime()));
   }
-  const nextSlotStart = findNextWorkingHoursSlot(startFromTime, scheduleHours || awakeHours, timezone);
+  const nextSlotStart = findNextWorkingHoursSlot(
+    startFromTime,
+    scheduleHours || awakeHours,
+    timezone
+  );
   const nextSlotEnd = new Date(nextSlotStart.getTime() + durationMs);
   const taskSlot: TimeSlot = {
     start: nextSlotStart,

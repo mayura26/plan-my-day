@@ -43,8 +43,7 @@ export function DependencySelector({
         onChange(cleanedIds);
       }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [taskId]); // Only depend on taskId to avoid infinite loops
+  }, [taskId, selectedIds, onChange]);
 
   const fetchTasks = useCallback(async () => {
     setIsLoading(true);
@@ -52,7 +51,7 @@ export function DependencySelector({
       // Build query params: exclude completed tasks, filter by group_id, and only parent tasks
       const params = new URLSearchParams();
       params.append("parent_only", "true");
-      
+
       // Filter by group_id - if current task has a group, only show tasks in that group
       // If current task has no group (null), only show tasks with no group
       if (groupId !== undefined) {
@@ -63,10 +62,10 @@ export function DependencySelector({
           params.append("group_id", "");
         }
       }
-      
+
       // Exclude completed tasks - we'll filter these out
       // Note: We'll filter completed tasks client-side since API might not support status != 'completed'
-      
+
       const response = await fetch(`/api/tasks?${params.toString()}`);
       if (response.ok) {
         const data = await response.json();
@@ -200,37 +199,37 @@ export function DependencySelector({
                     })
                     .map((task) => {
                       const isSelected = filteredSelectedIds.includes(task.id);
-                    return (
-                      <CommandItem
-                        key={task.id}
-                        value={task.title}
-                        onSelect={() => handleSelect(task.id)}
-                        className="flex items-center gap-2"
-                      >
-                        <div
-                          className={`flex h-4 w-4 items-center justify-center rounded-sm border ${
-                            isSelected
-                              ? "bg-primary border-primary text-primary-foreground"
-                              : "border-muted-foreground"
-                          }`}
+                      return (
+                        <CommandItem
+                          key={task.id}
+                          value={task.title}
+                          onSelect={() => handleSelect(task.id)}
+                          className="flex items-center gap-2"
                         >
-                          {isSelected && <CheckCircle2 className="h-3 w-3" />}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="truncate">{task.title}</div>
-                          <div className="text-xs text-muted-foreground">
-                            {task.status === "completed" ? (
-                              <span className="text-green-500">Completed</span>
-                            ) : task.status === "in_progress" ? (
-                              <span className="text-blue-500">In Progress</span>
-                            ) : (
-                              <span>Pending</span>
-                            )}
+                          <div
+                            className={`flex h-4 w-4 items-center justify-center rounded-sm border ${
+                              isSelected
+                                ? "bg-primary border-primary text-primary-foreground"
+                                : "border-muted-foreground"
+                            }`}
+                          >
+                            {isSelected && <CheckCircle2 className="h-3 w-3" />}
                           </div>
-                        </div>
-                      </CommandItem>
-                    );
-                  })}
+                          <div className="flex-1 min-w-0">
+                            <div className="truncate">{task.title}</div>
+                            <div className="text-xs text-muted-foreground">
+                              {task.status === "completed" ? (
+                                <span className="text-green-500">Completed</span>
+                              ) : task.status === "in_progress" ? (
+                                <span className="text-blue-500">In Progress</span>
+                              ) : (
+                                <span>Pending</span>
+                              )}
+                            </div>
+                          </div>
+                        </CommandItem>
+                      );
+                    })}
                 </CommandGroup>
               </CommandList>
             </Command>

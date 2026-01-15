@@ -49,12 +49,12 @@ async function migrateAddStepOrder() {
 
       // Update step_order for each group
       let updatedCount = 0;
-      for (const [parentId, subtaskIds] of subtasksByParent.entries()) {
+      for (const [_parentId, subtaskIds] of subtasksByParent.entries()) {
         for (let i = 0; i < subtaskIds.length; i++) {
-          await turso.execute(
-            `UPDATE tasks SET step_order = ? WHERE id = ?`,
-            [i + 1, subtaskIds[i]]
-          );
+          await turso.execute(`UPDATE tasks SET step_order = ? WHERE id = ?`, [
+            i + 1,
+            subtaskIds[i],
+          ]);
           updatedCount++;
         }
       }
@@ -82,4 +82,3 @@ async function migrateAddStepOrder() {
 }
 
 migrateAddStepOrder();
-
