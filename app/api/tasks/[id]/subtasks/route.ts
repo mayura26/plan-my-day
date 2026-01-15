@@ -27,6 +27,7 @@ function mapRowToTask(row: any): Task {
     energy_level_required: row.energy_level_required as number,
     parent_task_id: row.parent_task_id as string | null,
     continued_from_task_id: row.continued_from_task_id as string | null,
+    step_order: row.step_order !== null && row.step_order !== undefined ? Number(row.step_order) : null,
     ignored: Boolean(row.ignored ?? false),
     created_at: row.created_at as string,
     updated_at: row.updated_at as string,
@@ -55,7 +56,7 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
 
     // Get all subtasks
     const result = await db.execute(
-      `SELECT * FROM tasks WHERE parent_task_id = ? ORDER BY priority ASC, created_at ASC`,
+      `SELECT * FROM tasks WHERE parent_task_id = ? ORDER BY step_order ASC, created_at ASC`,
       [id]
     );
 
@@ -156,6 +157,16 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       }
     }
 
+    // Get the maximum step_order for existing subtasks to determine the next step_order
+    const maxStepOrderResult = await db.execute(
+      `SELECT MAX(step_order) as max_order FROM tasks WHERE parent_task_id = ? AND user_id = ?`,
+      [parentId, session.user.id]
+    );
+    const maxStepOrder = maxStepOrderResult.rows[0]?.max_order
+      ? Number(maxStepOrderResult.rows[0].max_order)
+      : 0;
+    const nextStepOrder = maxStepOrder + 1;
+
     const taskId = generateTaskId();
     const now = new Date().toISOString();
 
@@ -180,6 +191,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       energy_level_required: body.energy_level_required || parentTask.energy_level_required || 3,
       parent_task_id: parentId,
       continued_from_task_id: null,
+      step_order: nextStepOrder,
       ignored: false,
       created_at: now,
       updated_at: now,
@@ -192,8 +204,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         scheduled_start, scheduled_end, due_date, locked, group_id, template_id,
         task_type, google_calendar_event_id, notification_sent,
         depends_on_task_id, energy_level_required, parent_task_id, continued_from_task_id,
-        ignored, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        step_order, ignored, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `,
       [
         subtask.id,
@@ -216,6 +228,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         subtask.energy_level_required,
         subtask.parent_task_id ?? null,
         subtask.continued_from_task_id ?? null,
+        subtask.step_order ?? null,
         subtask.ignored,
         subtask.created_at,
         subtask.updated_at,

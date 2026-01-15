@@ -32,6 +32,7 @@ export interface Task {
   energy_level_required: number; // 1-5 scale (1 = low energy, 5 = high energy)
   parent_task_id?: string | null; // For subtasks - links to parent task
   continued_from_task_id?: string | null; // For carryover tasks - links to original task
+  step_order?: number | null; // For subtasks - order within parent task (1, 2, 3, etc.)
   subtask_count?: number; // Number of subtasks (for filtering - parent tasks with subtasks should be hidden in unscheduled view)
   ignored: boolean; // Whether this task has been ignored in overdue processing
   created_at: string;

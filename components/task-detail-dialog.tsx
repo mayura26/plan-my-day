@@ -385,6 +385,7 @@ export function TaskDetailDialog({
       const data = await response.json();
       const updatedTask = data.task;
       const shuffledTasks = data.shuffledTasks || [];
+      const scheduledSubtasks = data.scheduledSubtasks || [];
       const feedback = data.feedback || [];
 
       // Store feedback for display
@@ -394,8 +395,12 @@ export function TaskDetailDialog({
       setHasChanges(true);
 
       // Refresh task list to show shuffled tasks if any were shuffled
-      if (shuffledTasks.length > 0) {
+      if (shuffledTasks.length > 0 || scheduledSubtasks.length > 0) {
         onTaskUpdate?.();
+        // Also trigger subtask change to refresh SubtaskManager component
+        if (scheduledSubtasks.length > 0) {
+          handleSubtaskChange();
+        }
       }
 
       // Show success message
@@ -418,7 +423,11 @@ export function TaskDetailDialog({
         });
       }
 
-      if (shuffledTasks.length > 0) {
+      if (scheduledSubtasks.length > 0) {
+        toast.success(
+          `${modeLabels[mode]} completed. Scheduled ${scheduledSubtasks.length} subtask(s).`
+        );
+      } else if (shuffledTasks.length > 0) {
         toast.success(
           `${modeLabels[mode]} completed. ${shuffledTasks.length} task(s) shuffled forward.`
         );
@@ -847,6 +856,7 @@ export function TaskDetailDialog({
                 {subtasksExpanded && (
                   <div className="border-t py-2 px-3 sm:py-4 sm:px-6 overflow-x-hidden">
                     <SubtaskManager
+                      key={`${task.id}-${task.updated_at}`}
                       parentTaskId={task.id}
                       onSubtaskChange={handleSubtaskChange}
                       readOnly={

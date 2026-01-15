@@ -1,4 +1,6 @@
 - [ ] Auto shuffle tasks when they clash
+- [ ] Add AI task create function
+- [ ] Add voice support
 
 ### ⏳ Pending
 - [ ] AI-powered task scheduling engine

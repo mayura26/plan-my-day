@@ -1,6 +1,16 @@
 "use client";
 
-import { CheckCircle2, Circle, Clock, Plus, Trash2, Zap } from "lucide-react";
+import {
+  DndContext,
+  type DragEndEvent,
+  type DragStartEvent,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
+import { SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import { CheckCircle2, Circle, Clock, GripVertical, Plus, Trash2, Zap } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -34,6 +44,169 @@ interface SubtaskFormData {
   energy_level_required: number;
 }
 
+interface SortableSubtaskItemProps {
+  subtask: Task;
+  index: number;
+  total: number;
+  readOnly: boolean;
+  togglingSubtaskId: string | null;
+  editingDurationId: string | null;
+  editingDurationValue: string;
+  isUpdatingDuration: boolean;
+  deletingSubtaskId: string | null;
+  activeDragId: string | null;
+  isReordering: boolean;
+  onToggle: (subtask: Task) => void;
+  onStartEditingDuration: (subtask: Task) => void;
+  onSaveDuration: (subtaskId: string) => void;
+  onCancelEditingDuration: () => void;
+  onEditingDurationValueChange: (value: string) => void;
+  onDelete: (subtaskId: string) => void;
+}
+
+function SortableSubtaskItem({
+  subtask,
+  index,
+  total,
+  readOnly,
+  togglingSubtaskId,
+  editingDurationId,
+  editingDurationValue,
+  isUpdatingDuration,
+  deletingSubtaskId,
+  activeDragId,
+  isReordering,
+  onToggle,
+  onStartEditingDuration,
+  onSaveDuration,
+  onCancelEditingDuration,
+  onEditingDurationValueChange,
+  onDelete,
+}: SortableSubtaskItemProps) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: subtask.id, disabled: readOnly || isReordering });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={cn(
+        "flex items-center gap-2 p-2.5 rounded-md border-l-2 border-l-primary/30 bg-muted/30 rounded-r-md",
+        subtask.status === "completed" ? "opacity-75" : "",
+        isDragging && "shadow-lg z-50"
+      )}
+    >
+      {!readOnly && (
+        <button
+          type="button"
+          {...attributes}
+          {...listeners}
+          className="flex-shrink-0 text-muted-foreground hover:text-foreground cursor-grab active:cursor-grabbing touch-none"
+          aria-label="Drag to reorder"
+        >
+          <GripVertical className="h-4 w-4" />
+        </button>
+      )}
+      <button
+        type="button"
+        onClick={() => !readOnly && onToggle(subtask)}
+        disabled={readOnly || togglingSubtaskId === subtask.id}
+        className="flex-shrink-0 hover:opacity-70 disabled:cursor-not-allowed relative"
+      >
+        {togglingSubtaskId === subtask.id ? (
+          <LoadingSpinner size="sm" className="h-5 w-5" />
+        ) : subtask.status === "completed" ? (
+          <CheckCircle2 className="h-5 w-5 text-green-500" />
+        ) : (
+          <Circle className="h-5 w-5 text-muted-foreground" />
+        )}
+      </button>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-xs text-muted-foreground font-medium">
+            Step {index + 1} of {total}
+          </span>
+          <span
+            className={cn(
+              "text-sm",
+              subtask.status === "completed" ? "line-through text-muted-foreground" : ""
+            )}
+          >
+            {subtask.title}
+          </span>
+        </div>
+      </div>
+      {editingDurationId === subtask.id ? (
+        <div className="flex items-center gap-1">
+          <Input
+            type="number"
+            value={editingDurationValue}
+            onChange={(e) => onEditingDurationValueChange(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                onSaveDuration(subtask.id);
+              } else if (e.key === "Escape") {
+                onCancelEditingDuration();
+              }
+            }}
+            onBlur={() => onSaveDuration(subtask.id)}
+            placeholder="mins"
+            min="0"
+            className="h-7 w-16 text-xs px-2"
+            autoFocus
+            disabled={isUpdatingDuration}
+          />
+          {isUpdatingDuration && <LoadingSpinner size="sm" className="h-3 w-3" />}
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={() => !readOnly && onStartEditingDuration(subtask)}
+          disabled={readOnly}
+          className={cn(
+            "text-xs flex items-center gap-1 transition-colors flex-shrink-0",
+            subtask.duration
+              ? "text-muted-foreground hover:text-foreground"
+              : "text-muted-foreground/60 hover:text-muted-foreground",
+            readOnly && "cursor-default hover:text-muted-foreground"
+          )}
+          title={readOnly ? undefined : "Click to edit duration"}
+        >
+          {!subtask.duration && <Clock className="h-3 w-3" />}
+          {subtask.duration ? formatDuration(subtask.duration) : <span className="italic">—</span>}
+        </button>
+      )}
+      {!readOnly && (
+        <button
+          type="button"
+          onClick={() => onDelete(subtask.id)}
+          disabled={deletingSubtaskId === subtask.id}
+          className="flex-shrink-0 text-muted-foreground hover:text-destructive disabled:opacity-50"
+        >
+          {deletingSubtaskId === subtask.id ? (
+            <LoadingSpinner size="sm" className="h-4 w-4" />
+          ) : (
+            <Trash2 className="h-4 w-4" />
+          )}
+        </button>
+      )}
+    </div>
+  );
+}
+
 export function SubtaskManager({
   parentTaskId,
   onSubtaskChange,
@@ -51,12 +224,23 @@ export function SubtaskManager({
   const [editingDurationId, setEditingDurationId] = useState<string | null>(null);
   const [editingDurationValue, setEditingDurationValue] = useState<string>("");
   const [isUpdatingDuration, setIsUpdatingDuration] = useState(false);
+  const [activeDragId, setActiveDragId] = useState<string | null>(null);
+  const [isReordering, setIsReordering] = useState(false);
   const [formData, setFormData] = useState<SubtaskFormData>({
     title: "",
     duration: undefined,
     priority: 3,
     energy_level_required: 3,
   });
+
+  // Configure drag sensors
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8, // Require 8px movement before drag starts
+      },
+    })
+  );
 
   const fetchParentTask = useCallback(async () => {
     try {
@@ -272,6 +456,60 @@ export function SubtaskManager({
     return handleUpdateDuration(subtaskId, newDuration);
   };
 
+  const handleDragStart = (event: DragStartEvent) => {
+    setActiveDragId(event.active.id as string);
+  };
+
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event;
+    setActiveDragId(null);
+
+    if (!over || active.id === over.id) {
+      return;
+    }
+
+    const oldIndex = subtasks.findIndex((st) => st.id === active.id);
+    const newIndex = subtasks.findIndex((st) => st.id === over.id);
+
+    if (oldIndex === -1 || newIndex === -1) {
+      return;
+    }
+
+    // Optimistically update the order
+    const newSubtasks = [...subtasks];
+    const [removed] = newSubtasks.splice(oldIndex, 1);
+    newSubtasks.splice(newIndex, 0, removed);
+    setSubtasks(newSubtasks);
+
+    // Call API to persist the new order
+    setIsReordering(true);
+    try {
+      const subtaskIds = newSubtasks.map((st) => st.id);
+      const response = await fetch(`/api/tasks/${parentTaskId}/subtasks/reorder`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ subtaskIds }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setSubtasks(data.subtasks || []);
+        onSubtaskChange?.();
+      } else {
+        // Revert on error
+        await fetchSubtasks();
+        toast.error("Failed to reorder subtasks");
+      }
+    } catch (error) {
+      console.error("Error reordering subtasks:", error);
+      // Revert on error
+      await fetchSubtasks();
+      toast.error("Failed to reorder subtasks");
+    } finally {
+      setIsReordering(false);
+    }
+  };
+
   const handleUpdateDuration = async (subtaskId: string, newDuration: number | undefined) => {
     // Find the subtask being edited
     const subtask = subtasks.find((st) => st.id === subtaskId);
@@ -435,106 +673,38 @@ export function SubtaskManager({
         )}
         {/* Subtask List */}
         {subtasks.length > 0 && (
-          <div className="space-y-2 overflow-x-hidden">
-            {subtasks.map((subtask, index) => (
-              <div
-                key={subtask.id}
-                className={cn(
-                  "flex items-center gap-2 p-2.5 rounded-md border-l-2 border-l-primary/30 bg-muted/30 rounded-r-md",
-                  subtask.status === "completed" ? "opacity-75" : ""
-                )}
-              >
-                <button
-                  type="button"
-                  onClick={() => !readOnly && handleToggleSubtask(subtask)}
-                  disabled={readOnly || togglingSubtaskId === subtask.id}
-                  className="flex-shrink-0 hover:opacity-70 disabled:cursor-not-allowed relative"
-                >
-                  {togglingSubtaskId === subtask.id ? (
-                    <LoadingSpinner size="sm" className="h-5 w-5" />
-                  ) : subtask.status === "completed" ? (
-                    <CheckCircle2 className="h-5 w-5 text-green-500" />
-                  ) : (
-                    <Circle className="h-5 w-5 text-muted-foreground" />
-                  )}
-                </button>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-xs text-muted-foreground font-medium">
-                      Step {index + 1} of {subtasks.length}
-                    </span>
-                    <span
-                      className={cn(
-                        "text-sm",
-                        subtask.status === "completed" ? "line-through text-muted-foreground" : ""
-                      )}
-                    >
-                      {subtask.title}
-                    </span>
-                  </div>
-                </div>
-                {editingDurationId === subtask.id ? (
-                  <div className="flex items-center gap-1">
-                    <Input
-                      type="number"
-                      value={editingDurationValue}
-                      onChange={(e) => setEditingDurationValue(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") {
-                          e.preventDefault();
-                          handleSaveDuration(subtask.id);
-                        } else if (e.key === "Escape") {
-                          handleCancelEditingDuration();
-                        }
-                      }}
-                      onBlur={() => handleSaveDuration(subtask.id)}
-                      placeholder="mins"
-                      min="0"
-                      className="h-7 w-16 text-xs px-2"
-                      autoFocus
-                      disabled={isUpdatingDuration}
-                    />
-                    {isUpdatingDuration && <LoadingSpinner size="sm" className="h-3 w-3" />}
-                  </div>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => !readOnly && handleStartEditingDuration(subtask)}
-                    disabled={readOnly}
-                    className={cn(
-                      "text-xs flex items-center gap-1 transition-colors flex-shrink-0",
-                      subtask.duration
-                        ? "text-muted-foreground hover:text-foreground"
-                        : "text-muted-foreground/60 hover:text-muted-foreground",
-                      readOnly && "cursor-default hover:text-muted-foreground"
-                    )}
-                    title={readOnly ? undefined : "Click to edit duration"}
-                  >
-                    {!subtask.duration && <Clock className="h-3 w-3" />}
-                    {subtask.duration ? (
-                      formatDuration(subtask.duration)
-                    ) : (
-                      <span className="italic">—</span>
-                    )}
-                  </button>
-                )}
-                {!readOnly && (
-                  <button
-                    type="button"
-                    onClick={() => handleDeleteSubtask(subtask.id)}
-                    disabled={deletingSubtaskId === subtask.id}
-                    className="flex-shrink-0 text-muted-foreground hover:text-destructive disabled:opacity-50"
-                  >
-                    {deletingSubtaskId === subtask.id ? (
-                      <LoadingSpinner size="sm" className="h-4 w-4" />
-                    ) : (
-                      <Trash2 className="h-4 w-4" />
-                    )}
-                  </button>
-                )}
+          <DndContext
+            sensors={sensors}
+            onDragStart={handleDragStart}
+            onDragEnd={handleDragEnd}
+          >
+            <SortableContext items={subtasks.map((st) => st.id)} strategy={verticalListSortingStrategy}>
+              <div className="space-y-2 overflow-x-hidden">
+                {subtasks.map((subtask, index) => (
+                  <SortableSubtaskItem
+                    key={subtask.id}
+                    subtask={subtask}
+                    index={index}
+                    total={subtasks.length}
+                    readOnly={readOnly}
+                    togglingSubtaskId={togglingSubtaskId}
+                    editingDurationId={editingDurationId}
+                    editingDurationValue={editingDurationValue}
+                    isUpdatingDuration={isUpdatingDuration}
+                    deletingSubtaskId={deletingSubtaskId}
+                    activeDragId={activeDragId}
+                    isReordering={isReordering}
+                    onToggle={handleToggleSubtask}
+                    onStartEditingDuration={handleStartEditingDuration}
+                    onSaveDuration={handleSaveDuration}
+                    onCancelEditingDuration={handleCancelEditingDuration}
+                    onEditingDurationValueChange={setEditingDurationValue}
+                    onDelete={handleDeleteSubtask}
+                  />
+                ))}
               </div>
-            ))}
-          </div>
+            </SortableContext>
+          </DndContext>
         )}
 
         {/* Add Subtask Form */}

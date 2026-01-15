@@ -28,6 +28,7 @@ function mapRowToTask(row: any): Task {
     energy_level_required: row.energy_level_required as number,
     parent_task_id: row.parent_task_id as string | null,
     continued_from_task_id: row.continued_from_task_id as string | null,
+    step_order: row.step_order !== null && row.step_order !== undefined ? Number(row.step_order) : null,
     ignored: Boolean(row.ignored ?? false),
     created_at: row.created_at as string,
     updated_at: row.updated_at as string,
@@ -116,7 +117,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     // Optionally include subtasks
     if (includeSubtasks) {
       const subtasksResult = await db.execute(
-        `SELECT * FROM tasks WHERE parent_task_id = ? ORDER BY priority ASC, created_at ASC`,
+        `SELECT * FROM tasks WHERE parent_task_id = ? ORDER BY step_order ASC, created_at ASC`,
         [task.id]
       );
       return NextResponse.json({

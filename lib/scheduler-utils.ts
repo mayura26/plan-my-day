@@ -946,6 +946,7 @@ export interface UnifiedSchedulingOptions {
   timezone: string;
   onProgress?: (message: string) => void; // Optional progress callback
   maxTimeout?: number; // Max timeout in milliseconds (default: 30000)
+  startFrom?: Date; // Optional custom start time (overrides mode's default start time)
 }
 
 /**
@@ -1036,6 +1037,7 @@ export function scheduleTaskUnified(options: UnifiedSchedulingOptions): Scheduli
     timezone,
     onProgress,
     maxTimeout = 30000,
+    startFrom: customStartFrom,
   } = options;
 
   const feedback: string[] = [];
@@ -1077,8 +1079,8 @@ export function scheduleTaskUnified(options: UnifiedSchedulingOptions): Scheduli
   switch (mode) {
     case "now":
       reportProgress("Mode: Schedule Now - Finding next available slot following group rules");
-      startFrom = nowUTC;
-      maxSearchTime = new Date(nowUTC);
+      startFrom = customStartFrom || nowUTC;
+      maxSearchTime = new Date(startFrom);
       maxSearchTime.setUTCDate(maxSearchTime.getUTCDate() + 30); // Search up to 30 days
       break;
 

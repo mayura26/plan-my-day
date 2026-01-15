@@ -28,6 +28,7 @@ function mapRowToTask(row: any): Task {
     energy_level_required: row.energy_level_required as number,
     parent_task_id: row.parent_task_id as string | null,
     continued_from_task_id: row.continued_from_task_id as string | null,
+    step_order: row.step_order !== null && row.step_order !== undefined ? Number(row.step_order) : null,
     ignored: Boolean(row.ignored ?? false),
     created_at: row.created_at as string,
     updated_at: row.updated_at as string,
@@ -55,6 +56,187 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
     }
 
     const task = mapRowToTask(taskResult.rows[0]);
+
+    // Check if task has subtasks
+    const subtasksResult = await db.execute(
+      `SELECT * FROM tasks WHERE parent_task_id = ? AND user_id = ? ORDER BY step_order ASC, created_at ASC`,
+      [id, session.user.id]
+    );
+    const subtasks = subtasksResult.rows.map(mapRowToTask);
+
+    // If task has subtasks, schedule each subtask in order
+    if (subtasks.length > 0) {
+      const feedback: string[] = [];
+      const scheduledSubtasks: Task[] = [];
+      const shuffledTasks: Task[] = [];
+
+      // Get user's timezone and awake hours (needed for scheduling)
+      const userResult = await db.execute("SELECT timezone, awake_hours FROM users WHERE id = ?", [
+        session.user.id,
+      ]);
+      const userTimezone =
+        userResult.rows.length > 0
+          ? getUserTimezone(userResult.rows[0].timezone as string | null)
+          : "UTC";
+
+      let awakeHours = null;
+      if (userResult.rows.length > 0 && userResult.rows[0].awake_hours) {
+        try {
+          awakeHours = JSON.parse(userResult.rows[0].awake_hours as string);
+        } catch (e) {
+          console.error("Error parsing awake_hours JSON:", e);
+          awakeHours = null;
+        }
+      }
+
+      // Get task's group if it has one
+      let taskGroup: TaskGroup | null = null;
+      if (task.group_id) {
+        const groupResult = await db.execute(
+          "SELECT * FROM task_groups WHERE id = ? AND user_id = ?",
+          [task.group_id, session.user.id]
+        );
+        if (groupResult.rows.length > 0) {
+          const row = groupResult.rows[0];
+          let autoScheduleHours = null;
+          if (row.auto_schedule_hours) {
+            try {
+              autoScheduleHours = JSON.parse(row.auto_schedule_hours as string);
+            } catch (e) {
+              console.error("Error parsing auto_schedule_hours JSON:", e);
+            }
+          }
+          taskGroup = {
+            id: row.id as string,
+            user_id: row.user_id as string,
+            name: row.name as string,
+            color: row.color as string,
+            collapsed: Boolean(row.collapsed),
+            parent_group_id: (row.parent_group_id as string) || null,
+            is_parent_group: Boolean(row.is_parent_group),
+            auto_schedule_enabled: Boolean(row.auto_schedule_enabled ?? false),
+            auto_schedule_hours: autoScheduleHours,
+            priority: row.priority ? (row.priority as number) : undefined,
+            created_at: row.created_at as string,
+            updated_at: row.updated_at as string,
+          };
+        }
+      }
+
+      // Get all tasks for conflict checking
+      const allTasksResult = await db.execute("SELECT * FROM tasks WHERE user_id = ?", [
+        session.user.id,
+      ]);
+      let allTasks = allTasksResult.rows.map(mapRowToTask);
+
+      // Schedule each subtask sequentially
+      let lastScheduledEnd: Date | null = null;
+      for (const subtask of subtasks) {
+        // Skip completed subtasks
+        if (subtask.status === "completed") {
+          feedback.push(`Skipped "${subtask.title}" (already completed)`);
+          continue;
+        }
+
+        // Subtask must have a duration to be scheduled
+        if (!subtask.duration || subtask.duration <= 0) {
+          feedback.push(`Skipped "${subtask.title}" (no duration set)`);
+          continue;
+        }
+
+        // Use unified scheduler, starting from lastScheduledEnd if available
+        // This ensures we respect working hours and group rules while scheduling sequentially
+        const scheduleResult = scheduleTaskUnified({
+          mode: "asap",
+          task: subtask,
+          allTasks,
+          taskGroup,
+          awakeHours,
+          timezone: userTimezone,
+          startFrom: lastScheduledEnd || undefined,
+        });
+
+        if (scheduleResult.slot) {
+          // Update subtask with scheduled times
+          const updatedAt = new Date().toISOString();
+          await db.execute(
+            `UPDATE tasks SET scheduled_start = ?, scheduled_end = ?, updated_at = ? WHERE id = ? AND user_id = ?`,
+            [
+              scheduleResult.slot.start.toISOString(),
+              scheduleResult.slot.end.toISOString(),
+              updatedAt,
+              subtask.id,
+              session.user.id,
+            ]
+          );
+
+          // Fetch updated subtask
+          const updatedSubtaskResult = await db.execute(
+            "SELECT * FROM tasks WHERE id = ? AND user_id = ?",
+            [subtask.id, session.user.id]
+          );
+          const updatedSubtask = mapRowToTask(updatedSubtaskResult.rows[0]);
+          scheduledSubtasks.push(updatedSubtask);
+
+          // Update allTasks to include the newly scheduled subtask for conflict checking
+          allTasks = allTasks.map((t) => (t.id === subtask.id ? updatedSubtask : t));
+
+          lastScheduledEnd = scheduleResult.slot.end;
+          feedback.push(...(scheduleResult.feedback || []));
+          if (scheduleResult.shuffledTasks) {
+            shuffledTasks.push(...scheduleResult.shuffledTasks);
+          }
+        } else {
+          feedback.push(
+            `Failed to schedule "${subtask.title}": ${scheduleResult.error || "No available time slot"}`
+          );
+        }
+      }
+
+      // Update all shuffled tasks if any
+      if (shuffledTasks.length > 0) {
+        const updatedAt = new Date().toISOString();
+        for (const shuffled of shuffledTasks) {
+          if (shuffled.scheduled_start && shuffled.scheduled_end) {
+            await db.execute(
+              `UPDATE tasks SET scheduled_start = ?, scheduled_end = ?, updated_at = ? WHERE id = ? AND user_id = ?`,
+              [
+                shuffled.scheduled_start,
+                shuffled.scheduled_end,
+                updatedAt,
+                shuffled.id,
+                session.user.id,
+              ]
+            );
+          }
+        }
+      }
+
+      // Unschedule parent task if it was scheduled (only subtasks should be scheduled)
+      const updatedAt = new Date().toISOString();
+      await db.execute(
+        `UPDATE tasks SET scheduled_start = NULL, scheduled_end = NULL, updated_at = ? WHERE id = ? AND user_id = ?`,
+        [updatedAt, id, session.user.id]
+      );
+
+      // Fetch updated parent task
+      const updatedParentResult = await db.execute("SELECT * FROM tasks WHERE id = ? AND user_id = ?", [
+        id,
+        session.user.id,
+      ]);
+      const updatedParent = mapRowToTask(updatedParentResult.rows[0]);
+
+      return NextResponse.json({
+        task: updatedParent,
+        scheduledSubtasks,
+        shuffledTasks,
+        feedback,
+        message:
+          shuffledTasks.length > 0
+            ? `Scheduled ${scheduledSubtasks.length} of ${subtasks.length} subtasks with ${shuffledTasks.length} task(s) shuffled forward.`
+            : `Scheduled ${scheduledSubtasks.length} of ${subtasks.length} subtasks.`,
+      });
+    }
 
     // Task must have a duration to be scheduled
     if (!task.duration || task.duration <= 0) {
