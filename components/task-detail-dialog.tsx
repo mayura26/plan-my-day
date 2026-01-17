@@ -368,7 +368,19 @@ export function TaskDetailDialog({
   };
 
   const handleSchedule = async (mode: "now" | "today" | "next-week" | "next-month" | "asap") => {
-    if (!task) return;
+    if (!task) {
+      console.error("[Schedule Debug] No task provided");
+      return;
+    }
+
+    console.log("[Schedule Debug] Starting schedule request", {
+      mode,
+      taskId: task.id,
+      taskTitle: task.title,
+      taskDuration: task.duration,
+      taskStatus: task.status,
+      taskGroupId: task.group_id,
+    });
 
     setIsScheduling(true);
     setSchedulingMode(mode);
@@ -381,12 +393,37 @@ export function TaskDetailDialog({
         asap: "schedule-asap",
       };
 
-      const response = await fetch(`/api/tasks/${task.id}/${endpointMap[mode]}`, {
+      const endpoint = `/api/tasks/${task.id}/${endpointMap[mode]}`;
+      console.log("[Schedule Debug] Making request to:", endpoint);
+
+      const response = await fetch(endpoint, {
         method: "POST",
       });
 
+      console.log("[Schedule Debug] Response received", {
+        status: response.status,
+        statusText: response.statusText,
+        ok: response.ok,
+      });
+
       if (!response.ok) {
-        const errorData = await response.json();
+        let errorData;
+        try {
+          errorData = await response.json();
+        } catch (parseError) {
+          console.error("[Schedule Debug] Failed to parse error response:", parseError);
+          const text = await response.text();
+          console.error("[Schedule Debug] Raw error response:", text);
+          errorData = { error: `HTTP ${response.status}: ${response.statusText}` };
+        }
+
+        console.error("[Schedule Debug] Schedule request failed", {
+          status: response.status,
+          error: errorData.error,
+          feedback: errorData.feedback,
+          fullErrorData: errorData,
+        });
+
         // Store feedback from error response if available
         const feedback =
           errorData.feedback && Array.isArray(errorData.feedback) ? errorData.feedback : [];
@@ -400,11 +437,34 @@ export function TaskDetailDialog({
         throw new Error(errorData.error || `Failed to schedule task (${mode})`);
       }
 
-      const data = await response.json();
+      let data;
+      try {
+        data = await response.json();
+        console.log("[Schedule Debug] Success response received", {
+          hasTask: !!data.task,
+          shuffledTasksCount: data.shuffledTasks?.length || 0,
+          scheduledSubtasksCount: data.scheduledSubtasks?.length || 0,
+          feedbackCount: data.feedback?.length || 0,
+          feedback: data.feedback,
+        });
+      } catch (parseError) {
+        console.error("[Schedule Debug] Failed to parse success response:", parseError);
+        const text = await response.text();
+        console.error("[Schedule Debug] Raw success response:", text);
+        throw new Error("Failed to parse server response");
+      }
+
       const updatedTask = data.task;
       const shuffledTasks = data.shuffledTasks || [];
       const scheduledSubtasks = data.scheduledSubtasks || [];
       const feedback = data.feedback || [];
+
+      console.log("[Schedule Debug] Processing successful schedule", {
+        updatedTaskScheduledStart: updatedTask?.scheduled_start,
+        updatedTaskScheduledEnd: updatedTask?.scheduled_end,
+        shuffledTasksCount: shuffledTasks.length,
+        scheduledSubtasksCount: scheduledSubtasks.length,
+      });
 
       // Store feedback for display
       setSchedulingFeedback(feedback);
@@ -453,7 +513,14 @@ export function TaskDetailDialog({
         toast.success(`${modeLabels[mode]} completed successfully`);
       }
     } catch (error) {
-      console.error(`Error scheduling task (${mode}):`, error);
+      console.error(`[Schedule Debug] Error scheduling task (${mode}):`, error);
+      console.error("[Schedule Debug] Error details", {
+        errorType: error instanceof Error ? error.constructor.name : typeof error,
+        errorMessage: error instanceof Error ? error.message : String(error),
+        errorStack: error instanceof Error ? error.stack : undefined,
+        taskId: task?.id,
+        mode,
+      });
       // Only show dialog if it's not already open (to avoid duplicate dialogs)
       if (!errorDialogOpen) {
         setErrorDialogError(
@@ -463,6 +530,7 @@ export function TaskDetailDialog({
         setErrorDialogOpen(true);
       }
     } finally {
+      console.log("[Schedule Debug] Schedule request completed", { mode, taskId: task?.id });
       setIsScheduling(false);
       setSchedulingMode(null);
       // Clear feedback after a delay

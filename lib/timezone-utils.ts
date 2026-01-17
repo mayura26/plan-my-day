@@ -286,14 +286,18 @@ export function createDateInTimezone(
     hour12: false,
   });
 
-  // Search for midnight in the target timezone for this date
-  // We need to find the UTC timestamp that represents 00:00 on this date in the target timezone
-  // Search in a wider range to handle all timezones (UTC-12 to UTC+14)
+  // Search for the exact time in the target timezone
+  // Timezones can be from UTC-12 to UTC+14, so we need to search a wide range
+  // Start searching from 36 hours before the target date (to catch UTC+12 and beyond)
+  // to 12 hours after (to catch UTC-12)
   const baseUTC = new Date(Date.UTC(year, month, date, 12, 0, 0, 0)); // Start at noon UTC on the target date
+  const searchStart = new Date(baseUTC.getTime() - 36 * 60 * 60 * 1000); // 36 hours before
+  const searchEnd = new Date(baseUTC.getTime() + 12 * 60 * 60 * 1000); // 12 hours after
+  const totalHours = Math.ceil((searchEnd.getTime() - searchStart.getTime()) / (60 * 60 * 1000));
 
-  // First, try a quick search around the expected time
-  for (let offsetHours = -14; offsetHours <= 14; offsetHours++) {
-    const testTime = new Date(baseUTC.getTime() + offsetHours * 60 * 60 * 1000);
+  // Search hour by hour for the exact time in the target timezone
+  for (let i = 0; i < totalHours; i++) {
+    const testTime = new Date(searchStart.getTime() + i * 60 * 60 * 1000);
     const parts = timeFormatter.formatToParts(testTime);
     const tzYear = parseInt(parts.find((p) => p.type === "year")?.value || "0", 10);
     const tzMonth = parseInt(parts.find((p) => p.type === "month")?.value || "0", 10) - 1;
@@ -301,82 +305,64 @@ export function createDateInTimezone(
     const tzHour = parseInt(parts.find((p) => p.type === "hour")?.value || "0", 10);
     const tzMinute = parseInt(parts.find((p) => p.type === "minute")?.value || "0", 10);
 
-    // Check if this is midnight (00:00) on our target date in the timezone
-    if (tzYear === year && tzMonth === month && tzDate === date && tzHour === 0 && tzMinute === 0) {
-      // Found midnight! Now add the hours and minutes
-      const result = new Date(testTime.getTime() + hours * 60 * 60000 + minutes * 60000);
-
-      // Verify the result is correct
-      const verifyParts = timeFormatter.formatToParts(result);
-      const vTzYear = parseInt(verifyParts.find((p) => p.type === "year")?.value || "0", 10);
-      const vTzMonth = parseInt(verifyParts.find((p) => p.type === "month")?.value || "0", 10) - 1;
-      const vTzDate = parseInt(verifyParts.find((p) => p.type === "day")?.value || "0", 10);
-      const vTzHour = parseInt(verifyParts.find((p) => p.type === "hour")?.value || "0", 10);
-      const vTzMinute = parseInt(verifyParts.find((p) => p.type === "minute")?.value || "0", 10);
-
-      if (
-        vTzYear === year &&
-        vTzMonth === month &&
-        vTzDate === date &&
-        vTzHour === hours &&
-        vTzMinute === minutes
-      ) {
-        if (isFutureDate) {
-          console.log("createDateInTimezone - found match (quick search):", {
-            resultUTC: result.toISOString(),
-            resultLocal: result.toString(),
-            verifiedTzTime: `${vTzHour}:${vTzMinute.toString().padStart(2, "0")}`,
-            expectedTzTime: `${hours}:${minutes.toString().padStart(2, "0")}`,
-          });
-        }
-        return result;
+    // Check if this matches our target date and time exactly
+    if (
+      tzYear === year &&
+      tzMonth === month &&
+      tzDate === date &&
+      tzHour === hours &&
+      tzMinute === minutes
+    ) {
+      if (isFutureDate) {
+        console.log("createDateInTimezone - found match:", {
+          resultUTC: testTime.toISOString(),
+          resultLocal: testTime.toString(),
+          verifiedTzTime: `${tzHour}:${tzMinute.toString().padStart(2, "0")}`,
+          expectedTzTime: `${hours}:${minutes.toString().padStart(2, "0")}`,
+        });
       }
+      return testTime;
     }
   }
 
-  // If we didn't find midnight with the quick search, do a more thorough hour-by-hour search
-  // Search from 24 hours before to 24 hours after the base time
-  let searchStart = new Date(baseUTC.getTime() - 24 * 60 * 60 * 1000);
-  for (let i = 0; i < 48; i++) {
-    const parts = timeFormatter.formatToParts(searchStart);
+  // If we still didn't find it, try a more granular search (every 15 minutes)
+  // This handles edge cases where DST transitions might cause issues
+  const totalMinutes = totalHours * 4; // 15-minute intervals
+  for (let i = 0; i < totalMinutes; i++) {
+    const testTime = new Date(searchStart.getTime() + i * 15 * 60 * 1000);
+    const parts = timeFormatter.formatToParts(testTime);
     const tzYear = parseInt(parts.find((p) => p.type === "year")?.value || "0", 10);
     const tzMonth = parseInt(parts.find((p) => p.type === "month")?.value || "0", 10) - 1;
     const tzDate = parseInt(parts.find((p) => p.type === "day")?.value || "0", 10);
     const tzHour = parseInt(parts.find((p) => p.type === "hour")?.value || "0", 10);
     const tzMinute = parseInt(parts.find((p) => p.type === "minute")?.value || "0", 10);
 
-    if (tzYear === year && tzMonth === month && tzDate === date && tzHour === 0 && tzMinute === 0) {
-      // Found midnight! Now add the hours and minutes
-      const result = new Date(searchStart.getTime() + hours * 60 * 60000 + minutes * 60000);
-
-      // Verify the result
-      const verifyParts = timeFormatter.formatToParts(result);
-      const vTzYear = parseInt(verifyParts.find((p) => p.type === "year")?.value || "0", 10);
-      const vTzMonth = parseInt(verifyParts.find((p) => p.type === "month")?.value || "0", 10) - 1;
-      const vTzDate = parseInt(verifyParts.find((p) => p.type === "day")?.value || "0", 10);
-      const vTzHour = parseInt(verifyParts.find((p) => p.type === "hour")?.value || "0", 10);
-      const vTzMinute = parseInt(verifyParts.find((p) => p.type === "minute")?.value || "0", 10);
-
-      if (
-        vTzYear === year &&
-        vTzMonth === month &&
-        vTzDate === date &&
-        vTzHour === hours &&
-        vTzMinute === minutes
-      ) {
-        return result;
-      }
+    if (
+      tzYear === year &&
+      tzMonth === month &&
+      tzDate === date &&
+      tzHour === hours &&
+      tzMinute === minutes
+    ) {
+      return testTime;
     }
-
-    searchStart = new Date(searchStart.getTime() + 60 * 60000); // Try next hour
   }
 
-  // Last resort fallback: use a simple UTC calculation
-  // This won't be timezone-aware but should at least not be wildly wrong
+  // Final fallback: this should rarely happen, but log a warning
   console.warn(
     `Could not find exact timezone match for ${year}-${month + 1}-${date} ${hours}:${minutes} in ${timezone}, using fallback`
   );
-  return new Date(Date.UTC(year, month, date, hours, minutes, 0, 0));
+  // Don't use Date.UTC directly - it's wrong. Instead, try to estimate based on a known date
+  // Use the current date as a reference to estimate the offset
+  const referenceDate = new Date();
+  const refInTz = timeFormatter.formatToParts(referenceDate);
+  const refTzHour = parseInt(refInTz.find((p) => p.type === "hour")?.value || "0", 10);
+  const refUTCHour = referenceDate.getUTCHours();
+  const estimatedTzOffset = refTzHour - refUTCHour;
+  
+  // Apply estimated offset (this is a last resort and may be slightly off)
+  const fallbackUTC = new Date(Date.UTC(year, month, date, hours - estimatedTzOffset, minutes, 0, 0));
+  return fallbackUTC;
 }
 
 /**
