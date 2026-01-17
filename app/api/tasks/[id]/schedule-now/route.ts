@@ -38,18 +38,13 @@ function mapRowToTask(row: any): Task {
 
 // POST /api/tasks/[id]/schedule-now - Auto-schedule a task to the nearest available slot
 export async function POST(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const startTime = Date.now();
   try {
-    console.log("[Schedule Now API] Starting schedule-now request");
-    
     const session = await auth();
     if (!session?.user?.id) {
-      console.error("[Schedule Now API] Unauthorized - no session or user ID");
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const { id } = await params;
-    console.log("[Schedule Now API] Processing task", { taskId: id, userId: session.user.id });
 
     // Verify task exists and belongs to user
     const taskResult = await db.execute("SELECT * FROM tasks WHERE id = ? AND user_id = ?", [
@@ -58,22 +53,10 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
     ]);
 
     if (taskResult.rows.length === 0) {
-      console.error("[Schedule Now API] Task not found", { taskId: id, userId: session.user.id });
       return NextResponse.json({ error: "Task not found" }, { status: 404 });
     }
 
     const task = mapRowToTask(taskResult.rows[0]);
-    console.log("[Schedule Now API] Task found", {
-      taskId: task.id,
-      title: task.title,
-      duration: task.duration,
-      status: task.status,
-      groupId: task.group_id,
-      hasScheduledStart: !!task.scheduled_start,
-      hasScheduledEnd: !!task.scheduled_end,
-      dueDate: task.due_date,
-      parentTaskId: task.parent_task_id,
-    });
 
     // Check if task has subtasks
     const subtasksResult = await db.execute(
@@ -82,19 +65,8 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
     );
     const subtasks = subtasksResult.rows.map(mapRowToTask);
 
-    console.log("[Schedule Now API] Subtasks check", {
-      subtaskCount: subtasks.length,
-      subtasks: subtasks.map((st) => ({
-        id: st.id,
-        title: st.title,
-        duration: st.duration,
-        status: st.status,
-      })),
-    });
-
     // If task has subtasks, schedule each subtask in order
     if (subtasks.length > 0) {
-      console.log("[Schedule Now API] Processing parent task with subtasks");
       const feedback: string[] = [];
       const scheduledSubtasks: Task[] = [];
       const shuffledTasks: Array<{ taskId: string; newSlot: { start: Date; end: Date } }> = [];
@@ -113,17 +85,10 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
         try {
           awakeHours = JSON.parse(userResult.rows[0].awake_hours as string);
         } catch (e) {
-          console.error("[Schedule Now API] Error parsing awake_hours JSON:", e);
+          console.error("Error parsing awake_hours JSON:", e);
           awakeHours = null;
         }
       }
-
-      console.log("[Schedule Now API] User settings", {
-        userTimezone,
-        awakeHours,
-        rawTimezone: userResult.rows[0]?.timezone,
-        rawAwakeHours: userResult.rows[0]?.awake_hours,
-      });
 
       // Get task's group if it has one
       let taskGroup: TaskGroup | null = null;
@@ -139,7 +104,7 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
             try {
               autoScheduleHours = JSON.parse(row.auto_schedule_hours as string);
             } catch (e) {
-              console.error("[Schedule Now API] Error parsing auto_schedule_hours JSON:", e);
+              console.error("Error parsing auto_schedule_hours JSON:", e);
             }
           }
           taskGroup = {
@@ -156,20 +121,7 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
             created_at: row.created_at as string,
             updated_at: row.updated_at as string,
           };
-          console.log("[Schedule Now API] Task group found", {
-            groupId: taskGroup.id,
-            groupName: taskGroup.name,
-            autoScheduleEnabled: taskGroup.auto_schedule_enabled,
-            autoScheduleHours: taskGroup.auto_schedule_hours,
-            priority: taskGroup.priority,
-          });
-        } else {
-          console.warn("[Schedule Now API] Task group ID provided but group not found", {
-            groupId: task.group_id,
-          });
         }
-      } else {
-        console.log("[Schedule Now API] Task has no group");
       }
 
       // Get all tasks for conflict checking
@@ -177,10 +129,6 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
         session.user.id,
       ]);
       let allTasks = allTasksResult.rows.map(mapRowToTask);
-      console.log("[Schedule Now API] All tasks loaded", {
-        totalTasks: allTasks.length,
-        scheduledTasks: allTasks.filter((t) => t.scheduled_start).length,
-      });
 
       // Build dependency map from task_dependencies table
       const dependencyMap = new Map<string, string[]>();
@@ -217,13 +165,6 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
 
         // Use unified scheduler, starting from lastScheduledEnd if available
         // This ensures we respect working hours and group rules while scheduling sequentially
-        console.log("[Schedule Now API] Scheduling subtask", {
-          subtaskId: subtask.id,
-          subtaskTitle: subtask.title,
-          subtaskDuration: subtask.duration,
-          startFrom: lastScheduledEnd?.toISOString(),
-        });
-
         const scheduleResult = scheduleTaskUnified({
           mode: "now",
           task: subtask,
@@ -233,15 +174,6 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
           timezone: userTimezone,
           startFrom: lastScheduledEnd || undefined,
           dependencyMap,
-        });
-
-        console.log("[Schedule Now API] Subtask schedule result", {
-          subtaskId: subtask.id,
-          hasSlot: !!scheduleResult.slot,
-          slotStart: scheduleResult.slot?.start.toISOString(),
-          slotEnd: scheduleResult.slot?.end.toISOString(),
-          error: scheduleResult.error,
-          feedback: scheduleResult.feedback,
         });
 
         if (scheduleResult.slot) {
@@ -280,12 +212,6 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
           }
         } else {
           const errorMsg = scheduleResult.error || "No available time slot";
-          console.error("[Schedule Now API] Failed to schedule subtask", {
-            subtaskId: subtask.id,
-            subtaskTitle: subtask.title,
-            error: errorMsg,
-            feedback: scheduleResult.feedback,
-          });
           feedback.push(`Failed to schedule "${subtask.title}": ${errorMsg}`);
         }
       }
@@ -315,17 +241,11 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
 
     // Task must have a duration to be scheduled
     if (!task.duration || task.duration <= 0) {
-      console.error("[Schedule Now API] Task has no duration", {
-        taskId: task.id,
-        duration: task.duration,
-      });
       return NextResponse.json(
         { error: "Task must have a duration to be scheduled" },
         { status: 400 }
       );
     }
-
-    console.log("[Schedule Now API] Processing single task (no subtasks)");
 
     // Get user's timezone and awake hours
     const userResult = await db.execute("SELECT timezone, awake_hours FROM users WHERE id = ?", [
@@ -341,17 +261,10 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
       try {
         awakeHours = JSON.parse(userResult.rows[0].awake_hours as string);
       } catch (e) {
-        console.error("[Schedule Now API] Error parsing awake_hours JSON:", e);
+        console.error("Error parsing awake_hours JSON:", e);
         awakeHours = null;
       }
     }
-
-    console.log("[Schedule Now API] User settings", {
-      userTimezone,
-      awakeHours,
-      rawTimezone: userResult.rows[0]?.timezone,
-      rawAwakeHours: userResult.rows[0]?.awake_hours,
-    });
 
     // Get task's group if it has one
     let taskGroup: TaskGroup | null = null;
@@ -367,7 +280,7 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
           try {
             autoScheduleHours = JSON.parse(row.auto_schedule_hours as string);
           } catch (e) {
-            console.error("[Schedule Now API] Error parsing auto_schedule_hours JSON:", e);
+            console.error("Error parsing auto_schedule_hours JSON:", e);
           }
         }
         taskGroup = {
@@ -384,20 +297,7 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
           created_at: row.created_at as string,
           updated_at: row.updated_at as string,
         };
-        console.log("[Schedule Now API] Task group found", {
-          groupId: taskGroup.id,
-          groupName: taskGroup.name,
-          autoScheduleEnabled: taskGroup.auto_schedule_enabled,
-          autoScheduleHours: taskGroup.auto_schedule_hours,
-          priority: taskGroup.priority,
-        });
-      } else {
-        console.warn("[Schedule Now API] Task group ID provided but group not found", {
-          groupId: task.group_id,
-        });
       }
-    } else {
-      console.log("[Schedule Now API] Task has no group");
     }
 
     // Get all tasks for the user to check for conflicts
@@ -405,10 +305,6 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
       session.user.id,
     ]);
     const allTasks = allTasksResult.rows.map(mapRowToTask);
-    console.log("[Schedule Now API] All tasks loaded", {
-      totalTasks: allTasks.length,
-      scheduledTasks: allTasks.filter((t) => t.scheduled_start).length,
-    });
 
     // Build dependency map from task_dependencies table
     const dependencyMap = new Map<string, string[]>();
@@ -429,18 +325,6 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
     }
 
     // Use unified scheduler with "now" mode
-    console.log("[Schedule Now API] Calling scheduleTaskUnified", {
-      mode: "now",
-      taskId: task.id,
-      taskDuration: task.duration,
-      taskGroupId: task.group_id,
-      userTimezone,
-      hasAwakeHours: !!awakeHours,
-      hasTaskGroup: !!taskGroup,
-      allTasksCount: allTasks.length,
-      dependencyCount: dependencyMap.size,
-    });
-
     const result = scheduleTaskUnified({
       mode: "now",
       task,
@@ -451,21 +335,7 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
       dependencyMap,
     });
 
-    console.log("[Schedule Now API] scheduleTaskUnified result", {
-      hasSlot: !!result.slot,
-      slotStart: result.slot?.start.toISOString(),
-      slotEnd: result.slot?.end.toISOString(),
-      error: result.error,
-      feedback: result.feedback,
-      shuffledTasksCount: result.shuffledTasks?.length || 0,
-    });
-
     if (!result.slot) {
-      console.error("[Schedule Now API] No slot found", {
-        error: result.error,
-        feedback: result.feedback,
-        taskId: task.id,
-      });
       return NextResponse.json(
         {
           error: result.error || "Unable to schedule task. No available time slot found.",
@@ -477,12 +347,6 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
 
     // Update task with the scheduled times
     const updatedAt = new Date().toISOString();
-    console.log("[Schedule Now API] Updating task with scheduled times", {
-      taskId: id,
-      scheduledStart: result.slot.start.toISOString(),
-      scheduledEnd: result.slot.end.toISOString(),
-    });
-
     await db.execute(
       `UPDATE tasks SET scheduled_start = ?, scheduled_end = ?, updated_at = ? WHERE id = ? AND user_id = ?`,
       [
@@ -502,28 +366,13 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
 
     const updatedTask = mapRowToTask(updatedResult.rows[0]);
 
-    const duration = Date.now() - startTime;
-    console.log("[Schedule Now API] Task scheduled successfully", {
-      taskId: updatedTask.id,
-      scheduledStart: updatedTask.scheduled_start,
-      scheduledEnd: updatedTask.scheduled_end,
-      durationMs: duration,
-    });
-
     return NextResponse.json({
       task: updatedTask,
       message: "Task scheduled successfully",
       feedback: result.feedback,
     });
   } catch (error) {
-    const duration = Date.now() - startTime;
-    console.error("[Schedule Now API] Error scheduling task:", error);
-    console.error("[Schedule Now API] Error details", {
-      errorType: error instanceof Error ? error.constructor.name : typeof error,
-      errorMessage: error instanceof Error ? error.message : String(error),
-      errorStack: error instanceof Error ? error.stack : undefined,
-      durationMs: duration,
-    });
+    console.error("Error scheduling task:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

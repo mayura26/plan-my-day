@@ -1314,21 +1314,12 @@ export function scheduleTaskUnified(options: UnifiedSchedulingOptions): Scheduli
   let iterations = 0;
   const maxIterations = 10000; // Safety limit
 
-  console.log("[Scheduler] Starting search loop", {
-    mode,
-    startFrom: startFrom.toISOString(),
-    maxSearchTime: maxSearchTime.toISOString(),
-    currentTimeUTC: currentTimeUTC.toISOString(),
-    durationMs,
-  });
-
   while (currentTimeUTC < maxSearchTime && iterations < maxIterations) {
     iterations++;
 
     // Check timeout
     if (Date.now() - startTime > maxTimeout) {
       reportProgress("Scheduling timeout reached (30s)");
-      console.error("[Scheduler] Timeout reached", { iterations });
       return {
         slot: null,
         feedback,
@@ -1338,14 +1329,6 @@ export function scheduleTaskUnified(options: UnifiedSchedulingOptions): Scheduli
 
     const slotStartUTC = new Date(currentTimeUTC);
     const slotEndUTC = new Date(slotStartUTC.getTime() + durationMs);
-
-    if (iterations % 100 === 0 || iterations <= 10) {
-      console.log(`[Scheduler] Iteration ${iterations}`, {
-        currentTimeUTC: currentTimeUTC.toISOString(),
-        slotStartUTC: slotStartUTC.toISOString(),
-        slotEndUTC: slotEndUTC.toISOString(),
-      });
-    }
 
     // Check if we're past today for "today" mode
     if (mustBeToday) {
@@ -1370,25 +1353,8 @@ export function scheduleTaskUnified(options: UnifiedSchedulingOptions): Scheduli
     const slotTzTime = getTimeInTimezone(slotStartUTC, timezone);
     const dayHours = getHoursForDay(slotTzTime.dayOfWeek);
 
-    if (iterations <= 10 || iterations % 50 === 0) {
-      console.log(`[Scheduler] Checking slot`, {
-        iteration: iterations,
-        slotTzTime: {
-          year: slotTzTime.year,
-          month: slotTzTime.month,
-          day: slotTzTime.day,
-          hour: slotTzTime.hour,
-          minute: slotTzTime.minute,
-          dayOfWeek: slotTzTime.dayOfWeek,
-        },
-        dayHours,
-        hasDayHours: !!dayHours,
-      });
-    }
-
     // Skip days with no hours configured (unless today mode with preferGroupRules)
     if (!dayHours) {
-      console.log(`[Scheduler] No hours for ${slotTzTime.dayOfWeek}, moving to next day`);
       if (mustBeToday && preferGroupRules) {
         // For today mode with preferGroupRules, fall back to awake hours
         const awakeDayHours = awakeHours?.[slotTzTime.dayOfWeek as keyof GroupScheduleHours];
@@ -1470,16 +1436,6 @@ export function scheduleTaskUnified(options: UnifiedSchedulingOptions): Scheduli
     const endInMinutes = dayHours.end * 60;
     const isInHours = slotTimeInMinutes >= startInMinutes && slotTimeInMinutes < endInMinutes;
 
-    if (iterations <= 10 || iterations % 50 === 0) {
-      console.log(`[Scheduler] Hours check`, {
-        iteration: iterations,
-        slotTimeInMinutes,
-        startInMinutes,
-        endInMinutes,
-        isInHours,
-      });
-    }
-
     // For today mode with preferGroupRules, allow outside group hours but check awake hours
     if (!isInHours) {
       if (mustBeToday && preferGroupRules && useGroupRules) {
@@ -1546,11 +1502,15 @@ export function scheduleTaskUnified(options: UnifiedSchedulingOptions): Scheduli
 
       // If before hours on current day, jump to start of current day's hours
       if (slotTimeInMinutes < startInMinutes) {
-        console.log(`[Scheduler] Before hours (${slotTzTime.hour}:${slotTzTime.minute} < ${dayHours.start}:00), jumping to start of ${slotTzTime.dayOfWeek} hours`);
+        console.log(
+          `[Scheduler] Before hours (${slotTzTime.hour}:${slotTzTime.minute} < ${dayHours.start}:00), jumping to start of ${slotTzTime.dayOfWeek} hours`
+        );
         // Use createDateInTimezone to properly convert the current day's start time to UTC
         currentTimeUTC = createDateInTimezone(slotStartUTC, dayHours.start, 0, timezone);
         const verifyTz = getTimeInTimezone(currentTimeUTC, timezone);
-        console.log(`[Scheduler] Found start time: ${currentTimeUTC.toISOString()} (${verifyTz.hour}:${verifyTz.minute} ${verifyTz.dayOfWeek})`);
+        console.log(
+          `[Scheduler] Found start time: ${currentTimeUTC.toISOString()} (${verifyTz.hour}:${verifyTz.minute} ${verifyTz.dayOfWeek})`
+        );
         // If we went backwards (shouldn't happen but just in case), advance
         if (currentTimeUTC.getTime() <= slotStartUTC.getTime()) {
           // This shouldn't happen, but if it does, just add 24 hours
@@ -1563,7 +1523,9 @@ export function scheduleTaskUnified(options: UnifiedSchedulingOptions): Scheduli
       // After hours (or not today) - jump to start of next day with hours
       if (isToday && slotTimeInMinutes >= endInMinutes) {
         // After hours today - jump to start of next day with hours
-        console.log(`[Scheduler] After hours today (${slotTzTime.hour}:${slotTzTime.minute} >= ${dayHours.end}:00), jumping to next day`);
+        console.log(
+          `[Scheduler] After hours today (${slotTzTime.hour}:${slotTzTime.minute} >= ${dayHours.end}:00), jumping to next day`
+        );
         const nextDay = new Date(slotStartUTC);
         nextDay.setUTCDate(nextDay.getUTCDate() + 1);
         // Find next day with hours configured
@@ -1574,11 +1536,19 @@ export function scheduleTaskUnified(options: UnifiedSchedulingOptions): Scheduli
           const candidateDayHours = getHoursForDay(candidateTz.dayOfWeek);
           if (candidateDayHours) {
             // Use createDateInTimezone to properly convert to UTC
-            currentTimeUTC = createDateInTimezone(candidateDay, candidateDayHours.start, 0, timezone);
+            currentTimeUTC = createDateInTimezone(
+              candidateDay,
+              candidateDayHours.start,
+              0,
+              timezone
+            );
             const verifyTz = getTimeInTimezone(currentTimeUTC, timezone);
-            console.log(`[Scheduler] Found next day start: ${currentTimeUTC.toISOString()} (${candidateTz.dayOfWeek} ${candidateDayHours.start}:00, verified: ${verifyTz.hour}:${verifyTz.minute})`);
             // Verify we got the right day
-            if (verifyTz.year === candidateTz.year && verifyTz.month === candidateTz.month && verifyTz.day === candidateTz.day) {
+            if (
+              verifyTz.year === candidateTz.year &&
+              verifyTz.month === candidateTz.month &&
+              verifyTz.day === candidateTz.day
+            ) {
               break;
             }
           }
@@ -1593,7 +1563,6 @@ export function scheduleTaskUnified(options: UnifiedSchedulingOptions): Scheduli
         // Otherwise move to next day
         if (slotTimeInMinutes >= endInMinutes) {
           // After hours on this day - move to next day
-          console.log(`[Scheduler] After hours on ${slotTzTime.dayOfWeek} (${slotTzTime.hour}:${slotTzTime.minute} >= ${dayHours.end}:00), moving to next day`);
           const nextDay = new Date(slotStartUTC);
           nextDay.setUTCDate(nextDay.getUTCDate() + 1);
           // Get the next day's hours (not the current day's)
@@ -1602,8 +1571,6 @@ export function scheduleTaskUnified(options: UnifiedSchedulingOptions): Scheduli
           if (nextDayHours) {
             // Use createDateInTimezone to properly convert the next day's start time to UTC
             currentTimeUTC = createDateInTimezone(nextDay, nextDayHours.start, 0, timezone);
-            const verifyTz = getTimeInTimezone(currentTimeUTC, timezone);
-            console.log(`[Scheduler] Found next day start: ${currentTimeUTC.toISOString()} (${nextDayTz.dayOfWeek} ${nextDayHours.start}:00, verified: ${verifyTz.hour}:${verifyTz.minute})`);
           } else {
             // No hours for next day, search for next day with hours
             for (let dayOffset = 1; dayOffset <= 7; dayOffset++) {
@@ -1612,30 +1579,38 @@ export function scheduleTaskUnified(options: UnifiedSchedulingOptions): Scheduli
               const candidateDayTz = getTimeInTimezone(candidateDay, timezone);
               const candidateDayHours = getHoursForDay(candidateDayTz.dayOfWeek);
               if (candidateDayHours) {
-                currentTimeUTC = createDateInTimezone(candidateDay, candidateDayHours.start, 0, timezone);
-                console.log(`[Scheduler] Found day ${dayOffset} ahead: ${currentTimeUTC.toISOString()} (${candidateDayTz.dayOfWeek} ${candidateDayHours.start}:00)`);
+                currentTimeUTC = createDateInTimezone(
+                  candidateDay,
+                  candidateDayHours.start,
+                  0,
+                  timezone
+                );
                 break;
               }
             }
           }
           // Verify we actually advanced
           if (currentTimeUTC.getTime() <= slotStartUTC.getTime()) {
-            console.warn(`[Scheduler] Could not find next day, falling back to +24h`);
             currentTimeUTC = new Date(slotStartUTC.getTime() + 24 * 60 * 60 * 1000);
-            currentTimeUTC.setUTCMinutes(Math.floor(currentTimeUTC.getUTCMinutes() / 15) * 15, 0, 0);
+            currentTimeUTC.setUTCMinutes(
+              Math.floor(currentTimeUTC.getUTCMinutes() / 15) * 15,
+              0,
+              0
+            );
           }
         } else {
           // Before hours on this day - jump to start of current day's hours
-          console.log(`[Scheduler] Before hours on ${slotTzTime.dayOfWeek} (${slotTzTime.hour}:${slotTzTime.minute} < ${dayHours.start}:00), jumping to start`);
           // Use createDateInTimezone to properly convert the current day's start time to UTC
           currentTimeUTC = createDateInTimezone(slotStartUTC, dayHours.start, 0, timezone);
-          const verifyTz = getTimeInTimezone(currentTimeUTC, timezone);
-          console.log(`[Scheduler] Found start time: ${currentTimeUTC.toISOString()} (${verifyTz.hour}:${verifyTz.minute} ${verifyTz.dayOfWeek})`);
           // If we went backwards (shouldn't happen but just in case), advance
           if (currentTimeUTC.getTime() <= slotStartUTC.getTime()) {
             // This shouldn't happen, but if it does, just add 24 hours
             currentTimeUTC = new Date(slotStartUTC.getTime() + 24 * 60 * 60 * 1000);
-            currentTimeUTC.setUTCMinutes(Math.floor(currentTimeUTC.getUTCMinutes() / 15) * 15, 0, 0);
+            currentTimeUTC.setUTCMinutes(
+              Math.floor(currentTimeUTC.getUTCMinutes() / 15) * 15,
+              0,
+              0
+            );
           }
         }
         continue;
@@ -1667,7 +1642,11 @@ export function scheduleTaskUnified(options: UnifiedSchedulingOptions): Scheduli
           const candidateTz = getTimeInTimezone(candidate, timezone);
           if (candidateTz.hour === nextDayHours.start && candidateTz.minute === 0) {
             currentTimeUTC = candidate;
-            currentTimeUTC.setUTCMinutes(Math.floor(currentTimeUTC.getUTCMinutes() / 15) * 15, 0, 0);
+            currentTimeUTC.setUTCMinutes(
+              Math.floor(currentTimeUTC.getUTCMinutes() / 15) * 15,
+              0,
+              0
+            );
             break;
           }
         }
@@ -1727,30 +1706,13 @@ export function scheduleTaskUnified(options: UnifiedSchedulingOptions): Scheduli
 
     if (hasConflict && latestConflictEnd) {
       // Optimize: jump to end of conflict
-      const conflictEndTz = getTimeInTimezone(latestConflictEnd, timezone);
       reportProgress(`Conflict detected, jumping to ${new Date(latestConflictEnd).toISOString()}`);
-      console.log(`[Scheduler] Conflict detected`, {
-        iteration: iterations,
-        conflictEnd: latestConflictEnd.toISOString(),
-        conflictEndTz: {
-          year: conflictEndTz.year,
-          month: conflictEndTz.month,
-          day: conflictEndTz.day,
-          hour: conflictEndTz.hour,
-          minute: conflictEndTz.minute,
-          dayOfWeek: conflictEndTz.dayOfWeek,
-        },
-        currentTimeBefore: currentTimeUTC.toISOString(),
-      });
       currentTimeUTC = new Date(latestConflictEnd);
       currentTimeUTC.setUTCMinutes(Math.ceil(currentTimeUTC.getUTCMinutes() / 15) * 15, 0, 0);
       if (currentTimeUTC.getUTCMinutes() >= 60) {
         currentTimeUTC.setUTCHours(currentTimeUTC.getUTCHours() + 1, 0, 0, 0);
         currentTimeUTC.setUTCMinutes(0, 0, 0);
       }
-      console.log(`[Scheduler] After conflict jump`, {
-        currentTimeAfter: currentTimeUTC.toISOString(),
-      });
       continue;
     }
 
@@ -1766,13 +1728,6 @@ export function scheduleTaskUnified(options: UnifiedSchedulingOptions): Scheduli
   }
 
   // No slot found
-  console.error("[Scheduler] No slot found", {
-    iterations,
-    currentTimeUTC: currentTimeUTC.toISOString(),
-    maxSearchTime: maxSearchTime.toISOString(),
-    reachedMaxTime: currentTimeUTC >= maxSearchTime,
-    reachedMaxIterations: iterations >= maxIterations,
-  });
   reportProgress("No available slot found within search window");
   return {
     slot: null,

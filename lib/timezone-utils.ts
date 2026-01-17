@@ -359,9 +359,11 @@ export function createDateInTimezone(
   const refTzHour = parseInt(refInTz.find((p) => p.type === "hour")?.value || "0", 10);
   const refUTCHour = referenceDate.getUTCHours();
   const estimatedTzOffset = refTzHour - refUTCHour;
-  
+
   // Apply estimated offset (this is a last resort and may be slightly off)
-  const fallbackUTC = new Date(Date.UTC(year, month, date, hours - estimatedTzOffset, minutes, 0, 0));
+  const fallbackUTC = new Date(
+    Date.UTC(year, month, date, hours - estimatedTzOffset, minutes, 0, 0)
+  );
   return fallbackUTC;
 }
 
