@@ -367,7 +367,9 @@ export function TaskDetailDialog({
     }
   };
 
-  const handleSchedule = async (mode: "now" | "today" | "next-week" | "next-month" | "asap") => {
+  const handleSchedule = async (
+    mode: "now" | "today" | "next-week" | "next-month" | "asap" | "due-date"
+  ) => {
     if (!task) return;
 
     setIsScheduling(true);
@@ -379,6 +381,7 @@ export function TaskDetailDialog({
         "next-week": "schedule-next-week",
         "next-month": "schedule-next-month",
         asap: "schedule-asap",
+        "due-date": "schedule-due-date",
       };
 
       const response = await fetch(`/api/tasks/${task.id}/${endpointMap[mode]}`, {
@@ -436,6 +439,7 @@ export function TaskDetailDialog({
         "next-week": "Schedule Next Week",
         "next-month": "Schedule Next Month",
         asap: "Schedule ASAP",
+        "due-date": "Schedule to Due Date",
       };
 
       // Show feedback messages as toasts
@@ -792,6 +796,12 @@ export function TaskDetailDialog({
                                 <Calendar className="h-4 w-4 mr-2" />
                                 Schedule Next Month
                               </DropdownMenuItem>
+                              {task.due_date && (
+                                <DropdownMenuItem onClick={() => handleSchedule("due-date")}>
+                                  <Flag className="h-4 w-4 mr-2" />
+                                  Schedule to Due Date
+                                </DropdownMenuItem>
+                              )}
                               <DropdownMenuItem onClick={() => handleSchedule("asap")}>
                                 <Zap className="h-4 w-4 mr-2" />
                                 Schedule ASAP

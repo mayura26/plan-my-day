@@ -1031,7 +1031,7 @@ export function rescheduleTaskWithShuffling(
 /**
  * Scheduling mode types
  */
-export type SchedulingMode = "now" | "today" | "next-week" | "next-month" | "asap";
+export type SchedulingMode = "now" | "today" | "next-week" | "next-month" | "asap" | "due-date";
 
 /**
  * Scheduling result with feedback messages
@@ -1131,6 +1131,286 @@ function getEndOfToday(currentDate: Date, timezone: string): Date {
 
   // Use createDateInTimezone to get the UTC Date that represents 23:59:59 today in the user's timezone
   return createDateInTimezone(todayDate, 23, 59, timezone);
+}
+
+/**
+ * Find an available time slot before a deadline (due date), searching backwards
+ * Starts from the due date day and works backwards until finding a slot
+ * All date math is done in UTC. Working hours are checked by converting UTC times to user's timezone.
+ *
+ * @param task The task to schedule (must have duration)
+ * @param existingTasks All existing scheduled tasks (scheduled_start/end are in UTC)
+ * @param deadline The deadline (due date) to schedule before (in UTC)
+ * @param workingHours Per-day working hours configuration (defaults to 9-17 for all days if not provided)
+ * @param maxDaysBack Maximum days to search backwards (default 30)
+ * @param timezone User's timezone (used only to check if UTC times fall within working hours)
+ * @param dependencyMap Optional map of task_id -> [depends_on_task_id, ...] for dependency checking
+ * @param allTasks Optional all tasks array (required if dependencyMap is provided)
+ * @returns Time slot in UTC or null if no slot found
+ */
+export function findAvailableSlotBeforeDeadline(
+  task: Task,
+  existingTasks: Task[],
+  deadline: Date,
+  workingHours: GroupScheduleHours | null = null,
+  maxDaysBack: number = 30,
+  timezone: string = "UTC",
+  dependencyMap?: DependencyMap,
+  allTasks?: Task[]
+): TimeSlot | null {
+  if (!task.duration || task.duration <= 0) {
+    return null;
+  }
+
+  const durationMs = task.duration * 60 * 1000; // Convert minutes to milliseconds
+  const nowUTC = new Date();
+
+  // Check dependency constraints if dependencyMap is provided
+  let dependencyConstraint: Date | null = null;
+  if (dependencyMap && allTasks) {
+    dependencyConstraint = getDependencyConstraint(task, allTasks, dependencyMap);
+  }
+
+  // Get all scheduled time slots from existing tasks (all UTC)
+  const scheduledSlots: TimeSlot[] = existingTasks
+    .filter(
+      (t) =>
+        t.id !== task.id &&
+        t.scheduled_start &&
+        t.scheduled_end &&
+        t.status !== "completed" &&
+        t.status !== "cancelled"
+    )
+    .map((t) => {
+      if (!t.scheduled_start || !t.scheduled_end) {
+        throw new Error("Scheduled start and end must be defined");
+      }
+      return {
+        start: new Date(t.scheduled_start),
+        end: new Date(t.scheduled_end),
+      };
+    })
+    .sort((a, b) => a.start.getTime() - b.start.getTime());
+
+  // Helper: Get what day/time a UTC timestamp represents in the user's timezone
+  const getTimeInTimezone = (
+    utcDate: Date
+  ): {
+    year: number;
+    month: number;
+    day: number;
+    hour: number;
+    minute: number;
+    dayOfWeek: "monday" | "tuesday" | "wednesday" | "thursday" | "friday" | "saturday" | "sunday";
+  } => {
+    const formatter = new Intl.DateTimeFormat("en-US", {
+      timeZone: timezone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      weekday: "long",
+      hour12: false,
+    });
+    const parts = formatter.formatToParts(utcDate);
+    const weekday = parts.find((p) => p.type === "weekday")?.value?.toLowerCase() || "monday";
+    return {
+      year: parseInt(parts.find((p) => p.type === "year")?.value || "0", 10),
+      month: parseInt(parts.find((p) => p.type === "month")?.value || "0", 10) - 1,
+      day: parseInt(parts.find((p) => p.type === "day")?.value || "0", 10),
+      hour: parseInt(parts.find((p) => p.type === "hour")?.value || "0", 10),
+      minute: parseInt(parts.find((p) => p.type === "minute")?.value || "0", 10),
+      dayOfWeek: weekday as
+        | "monday"
+        | "tuesday"
+        | "wednesday"
+        | "thursday"
+        | "friday"
+        | "saturday"
+        | "sunday",
+    };
+  };
+
+  // Helper: Get working hours for a specific day
+  const getWorkingHoursForDay = (day: string): { start: number; end: number } | null => {
+    const daySchedule = workingHours?.[day as keyof GroupScheduleHours];
+    if (daySchedule && daySchedule !== null) {
+      return daySchedule;
+    }
+    if (!workingHours || Object.keys(workingHours).length === 0) {
+      return { start: 9, end: 17 };
+    }
+    return null;
+  };
+
+  // Start from deadline and work backwards day by day
+  for (let dayOffset = 0; dayOffset <= maxDaysBack; dayOffset++) {
+    // Calculate the day we're checking (0 = due date day, 1 = day before, etc.)
+    const checkDay = new Date(deadline);
+    checkDay.setUTCDate(checkDay.getUTCDate() - dayOffset);
+
+    const checkDayTz = getTimeInTimezone(checkDay);
+    const dayHours = getWorkingHoursForDay(checkDayTz.dayOfWeek);
+
+    // Skip days with no working hours
+    if (!dayHours) {
+      continue;
+    }
+
+    // Determine the latest possible end time for this day
+    let latestEndTime: Date;
+    if (dayOffset === 0) {
+      // On due date day: latest end time is the deadline
+      latestEndTime = new Date(deadline);
+    } else {
+      // On previous days: latest end time is end of working hours
+      latestEndTime = createDateInTimezone(checkDay, dayHours.end, 0, timezone);
+    }
+
+    // Calculate latest possible start time (latest end time - task duration)
+    let latestStartTime = new Date(latestEndTime.getTime() - durationMs);
+
+    // Round down to previous 15-minute interval
+    const latestMinutes = latestStartTime.getUTCMinutes();
+    const roundedMinutes = Math.floor(latestMinutes / 15) * 15;
+    latestStartTime.setUTCMinutes(roundedMinutes, 0, 0);
+
+    // Get start of working hours for this day
+    const dayStartTime = createDateInTimezone(checkDay, dayHours.start, 0, timezone);
+
+    // Ensure we don't start before the start of working hours
+    if (latestStartTime < dayStartTime) {
+      // Task is too long to fit in available time on this day, try previous day
+      continue;
+    }
+
+    // Also check dependency constraint
+    if (dependencyConstraint && latestStartTime < dependencyConstraint) {
+      // Can't schedule before dependency completion, but we'll continue checking earlier days
+      // since dependency might be in the past
+      if (dayOffset === 0) {
+        // On due date day, we need to check if there's any valid slot after dependency
+        const earliestStartTime = new Date(
+          Math.max(dayStartTime.getTime(), dependencyConstraint.getTime())
+        );
+        if (earliestStartTime >= latestStartTime) {
+          // No valid slot on due date day, continue to previous day
+          continue;
+        }
+        latestStartTime = earliestStartTime;
+        // Round down to previous 15-minute interval
+        const depMinutes = latestStartTime.getUTCMinutes();
+        const depRoundedMinutes = Math.floor(depMinutes / 15) * 15;
+        latestStartTime.setUTCMinutes(depRoundedMinutes, 0, 0);
+      } else {
+        // On previous days, skip if dependency is after the end of working hours
+        const dayEndTime = createDateInTimezone(checkDay, dayHours.end, 0, timezone);
+        if (dependencyConstraint > dayEndTime) {
+          continue;
+        }
+      }
+    }
+
+    // Search backwards from latest start time to start of working hours
+    let currentTimeUTC = new Date(latestStartTime);
+
+    while (currentTimeUTC >= dayStartTime) {
+      const slotStartUTC = new Date(currentTimeUTC);
+      const slotEndUTC = new Date(slotStartUTC.getTime() + durationMs);
+
+      // Verify slot end doesn't exceed our deadline/working hours
+      if (slotEndUTC > latestEndTime) {
+        // Move back 15 minutes
+        currentTimeUTC = new Date(currentTimeUTC.getTime() - 15 * 60 * 1000);
+        continue;
+      }
+
+      // Get what day/time this slot represents in user's timezone
+      const slotTzTime = getTimeInTimezone(slotStartUTC);
+      const slotTimeInMinutes = slotTzTime.hour * 60 + slotTzTime.minute;
+      const startInMinutes = dayHours.start * 60;
+      const endInMinutes = dayHours.end * 60;
+
+      // Check if within working hours
+      if (slotTimeInMinutes < startInMinutes || slotTimeInMinutes >= endInMinutes) {
+        // Move back 15 minutes
+        currentTimeUTC = new Date(currentTimeUTC.getTime() - 15 * 60 * 1000);
+        continue;
+      }
+
+      // Check if slot end is within working hours
+      const slotEndTzTime = getTimeInTimezone(slotEndUTC);
+      const slotEndTimeInMinutes = slotEndTzTime.hour * 60 + slotEndTzTime.minute;
+      if (slotEndTimeInMinutes < startInMinutes || slotEndTimeInMinutes > endInMinutes) {
+        // Move back 15 minutes
+        currentTimeUTC = new Date(currentTimeUTC.getTime() - 15 * 60 * 1000);
+        continue;
+      }
+
+      // Check for conflicts with existing scheduled tasks
+      let hasConflict = false;
+      let earliestConflictStart: Date | null = null;
+
+      for (const scheduledSlot of scheduledSlots) {
+        const ourStart = slotStartUTC.getTime();
+        const ourEnd = slotEndUTC.getTime();
+        const theirStart = scheduledSlot.start.getTime();
+        const theirEnd = scheduledSlot.end.getTime();
+
+        const hasOverlap = ourStart < theirEnd && ourEnd > theirStart;
+
+        if (hasOverlap) {
+          hasConflict = true;
+          // Track the earliest conflict start time (to search backwards from it)
+          if (!earliestConflictStart || theirStart < earliestConflictStart.getTime()) {
+            earliestConflictStart = new Date(scheduledSlot.start);
+          }
+        }
+      }
+
+      if (hasConflict && earliestConflictStart) {
+        // Move to 15 minutes before the earliest conflict start
+        currentTimeUTC = new Date(earliestConflictStart.getTime() - durationMs);
+        // Round down to previous 15-minute interval
+        const conflictMinutes = currentTimeUTC.getUTCMinutes();
+        const conflictRoundedMinutes = Math.floor(conflictMinutes / 15) * 15;
+        currentTimeUTC.setUTCMinutes(conflictRoundedMinutes, 0, 0);
+        continue;
+      }
+
+      // Check dependency constraint again (for the specific slot)
+      if (dependencyConstraint && slotStartUTC < dependencyConstraint) {
+        // Move back to after dependency
+        currentTimeUTC = new Date(Math.max(dayStartTime.getTime(), dependencyConstraint.getTime()));
+        // Round down to previous 15-minute interval
+        const depCheckMinutes = currentTimeUTC.getUTCMinutes();
+        const depCheckRoundedMinutes = Math.floor(depCheckMinutes / 15) * 15;
+        currentTimeUTC.setUTCMinutes(depCheckRoundedMinutes, 0, 0);
+        if (currentTimeUTC < dayStartTime) {
+          // No valid slot on this day, try previous day
+          break;
+        }
+        continue;
+      }
+
+      // Verify the slot is not in the past (unless dependency requires it)
+      if (!dependencyConstraint && slotStartUTC < nowUTC) {
+        // Slot is in the past, but no dependency constraint, so skip it
+        // Try previous day
+        break;
+      }
+
+      // Found a valid slot!
+      return {
+        start: slotStartUTC,
+        end: slotEndUTC,
+      };
+    }
+  }
+
+  // No slot found
+  return null;
 }
 
 /**
@@ -1249,6 +1529,73 @@ export function scheduleTaskUnified(options: UnifiedSchedulingOptions): Scheduli
         reportProgress,
         maxTimeout
       );
+
+    case "due-date": {
+      reportProgress("Mode: Schedule to Due Date - Searching backwards from due date");
+      if (!task.due_date) {
+        return {
+          slot: null,
+          feedback,
+          error: "Task must have a due date to use 'Schedule to Due Date' mode",
+        };
+      }
+      const dueDate = new Date(task.due_date);
+
+      // Check dependency constraints
+      const adjustedDeadline = dueDate;
+      if (dependencyConstraint) {
+        // If dependency completion is after due date, we can't schedule
+        if (dependencyConstraint > dueDate) {
+          reportProgress(
+            `Dependency completion (${new Date(dependencyConstraint).toLocaleString("en-US", { timeZone: timezone })}) is after due date (${dueDate.toLocaleString("en-US", { timeZone: timezone })}). Cannot schedule before due date.`
+          );
+          return {
+            slot: null,
+            feedback,
+            error:
+              "Dependency completion time is after the due date. Cannot schedule task before due date.",
+          };
+        }
+      }
+
+      // Use backward search function
+      const slot = findAvailableSlotBeforeDeadline(
+        task,
+        allTasks,
+        adjustedDeadline,
+        scheduleHours ?? null,
+        30, // maxDaysBack
+        timezone,
+        dependencyMap,
+        allTasks
+      );
+
+      if (slot) {
+        // Check if slot is before now (unless dependency requires it)
+        if (!dependencyConstraint && slot.start < nowUTC) {
+          reportProgress("Found slot but it's in the past. No valid slots before due date.");
+          return {
+            slot: null,
+            feedback,
+            error:
+              "Unable to find an available time slot before the due date. All potential slots are in the past.",
+          };
+        }
+        reportProgress(`Found available slot before due date: ${slot.start.toISOString()}`);
+        return {
+          slot,
+          feedback,
+        };
+      } else {
+        reportProgress("No available slot found before due date within 30 days");
+        return {
+          slot: null,
+          feedback,
+          error:
+            "Unable to find an available time slot before the due date within the search window.",
+        };
+      }
+    }
 
     default:
       return {

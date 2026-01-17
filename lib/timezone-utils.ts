@@ -257,21 +257,6 @@ export function createDateInTimezone(
   const date = parseInt(dayParts.find((p) => p.type === "day")?.value || "0", 10);
 
   // Debug logging for future dates
-  const today = new Date();
-  const isFutureDate = day > today;
-  if (isFutureDate && hours >= 17) {
-    console.log("createDateInTimezone - extracting date:", {
-      inputDay: day.toISOString(),
-      inputDayLocal: day.toString(),
-      timezone,
-      extractedYear: year,
-      extractedMonth: month + 1,
-      extractedDate: date,
-      targetHours: hours,
-      targetMinutes: minutes,
-      dayParts: dayParts.map((p) => `${p.type}: ${p.value}`),
-    });
-  }
 
   // Now find the UTC timestamp that represents midnight (00:00) on this date in the target timezone
   // Then add hours and minutes to get the final time
@@ -313,14 +298,6 @@ export function createDateInTimezone(
       tzHour === hours &&
       tzMinute === minutes
     ) {
-      if (isFutureDate) {
-        console.log("createDateInTimezone - found match:", {
-          resultUTC: testTime.toISOString(),
-          resultLocal: testTime.toString(),
-          verifiedTzTime: `${tzHour}:${tzMinute.toString().padStart(2, "0")}`,
-          expectedTzTime: `${hours}:${minutes.toString().padStart(2, "0")}`,
-        });
-      }
       return testTime;
     }
   }
@@ -348,10 +325,7 @@ export function createDateInTimezone(
     }
   }
 
-  // Final fallback: this should rarely happen, but log a warning
-  console.warn(
-    `Could not find exact timezone match for ${year}-${month + 1}-${date} ${hours}:${minutes} in ${timezone}, using fallback`
-  );
+  // Final fallback: this should rarely happen
   // Don't use Date.UTC directly - it's wrong. Instead, try to estimate based on a known date
   // Use the current date as a reference to estimate the offset
   const referenceDate = new Date();
