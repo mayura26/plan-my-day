@@ -125,6 +125,7 @@ async function backupDatabase() {
  */
 async function cleanupOldBackups() {
   try {
+    console.log(`   Cleanup: MAX_BACKUPS is set to ${MAX_BACKUPS}`);
     const files = fs
       .readdirSync(BACKUPS_DIR)
       .filter((file) => file.startsWith("db-backup-") && file.endsWith(".json"))

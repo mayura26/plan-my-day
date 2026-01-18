@@ -281,13 +281,24 @@ export function UpdatePrompt() {
 
       const waitingWorker = registration.waiting;
       if (waitingWorker) {
+        // Set flag so controllerchange handler knows to reload
+        userRequestedReload = true;
+
         // Tell the waiting service worker to skip waiting and activate
         waitingWorker.postMessage({ type: "SKIP_WAITING" });
 
-        // Clear cache and reload after a short delay
+        // Set up timeout fallback in case controllerchange doesn't fire
+        // The controllerchange event should trigger reload via handleControllerChange
         setTimeout(async () => {
-          await clearCacheAndReload();
-        }, 500);
+          // If controllerchange didn't fire within 5 seconds, fall back to clearCacheAndReload
+          if (userRequestedReload) {
+            console.warn("Controllerchange event did not fire, using fallback reload");
+            userRequestedReload = false;
+            await clearCacheAndReload();
+          }
+        }, 5000);
+        // Note: We don't store the timeout ID since we can't reliably clear it
+        // when controllerchange fires (it's async). The page will reload anyway if either fires.
       } else {
         // No waiting worker, but user wants to force update
         // Clear cache and reload anyway (like reference "clear cache and reload")
@@ -295,10 +306,14 @@ export function UpdatePrompt() {
       }
     } catch (error) {
       console.error("Error forcing update:", error);
+      // Reset flag on error
+      userRequestedReload = false;
       // Even on error, try to clear cache and reload
       await clearCacheAndReload();
     } finally {
-      setIsUpdating(false);
+      // Note: setIsUpdating(false) is intentionally not called here because
+      // we're about to reload the page. If the reload fails or is delayed,
+      // the component will unmount anyway.
     }
   };
 

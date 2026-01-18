@@ -64,6 +64,47 @@ BACKUPS_DIR=/var/backups/plan-my-day
 MAX_BACKUPS=90
 ```
 
+### Coolify Deployment Setup
+
+If you're deploying with **Coolify**, you need to set up persistent storage to prevent backups from being deleted on each deployment:
+
+1. **Create host directory (optional, for bind mounts):**
+   ```bash
+   # Choose one of these locations on your host:
+   sudo mkdir -p /data/backups/plan-my-day
+   # OR
+   sudo mkdir -p /var/backups/plan-my-day
+   # OR
+   sudo mkdir -p /mnt/backups/plan-my-day
+   
+   # Set appropriate permissions (adjust user/group as needed)
+   sudo chown -R $USER:$USER /data/backups/plan-my-day
+   ```
+
+2. **Add Persistent Storage:**
+   - Go to your app in Coolify → **Configuration** → **Persistent Storage**
+   - Click **"+ Add"**
+   - Configure:
+     - **Name:** `backups` (or any name you prefer)
+     - **Mount Path:** `/app/backups` (this is the path inside the container)
+     - **Type:** 
+       - **Volume** (recommended) - Docker-managed, simpler setup
+       - **Bind Mount** - If you want to use a specific host directory (e.g., `/data/backups/plan-my-day`), set:
+         - **Source:** `/data/backups/plan-my-day` (your host path)
+         - **Destination:** `/app/backups` (container path)
+
+3. **Set Environment Variable:**
+   - Go to **Configuration** → **Environment Variables**
+   - Add a new variable:
+     - **Key:** `BACKUPS_DIR`
+     - **Value:** `/app/backups` (must match the Mount Path from step 2)
+
+4. **Redeploy:**
+   - Redeploy your application for the changes to take effect
+   - Backups will now persist across deployments
+
+**Important:** The `BACKUPS_DIR` environment variable must match the mount path you configured in persistent storage.
+
 ## Backup Format
 
 Backups are stored as JSON files with the following naming:
@@ -129,4 +170,13 @@ ls -lh backups/db-backup-*.json | tail -5
 - Reduce `MAX_BACKUPS` to keep fewer backups
 - Manually delete old backups from the backups directory
 - Consider compressing old backups (set `COMPRESS_BACKUPS=true`)
+
+### Backups deleted on deployment (Coolify/Container deployments)
+- **Problem:** Backups are deleted every time you deploy
+- **Solution:** Set up persistent storage in Coolify and configure `BACKUPS_DIR` environment variable
+- **Verify:** After deployment, check that backups persist by:
+  1. Creating a backup
+  2. Deploying a new version
+  3. Checking that the backup still exists
+- **Check logs:** The backup script logs which directory it's using - verify it matches your persistent storage mount path
 
