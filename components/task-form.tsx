@@ -173,10 +173,14 @@ export function TaskForm({
 
     if (formData.task_type === "event") {
       if (!formData.scheduled_start) {
-        newErrors.scheduled_start = "Start time required";
+        newErrors.scheduled_start = "Start time is required for events";
       }
       if (!formData.scheduled_end) {
-        newErrors.scheduled_end = "End time required";
+        newErrors.scheduled_end = "End time is required for events";
+      }
+      // Prevent submission if scheduling is missing
+      if (!formData.scheduled_start || !formData.scheduled_end) {
+        // Errors already added above, just ensure we return early
       }
     }
 
@@ -698,26 +702,32 @@ export function TaskForm({
           )}
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1">
-            <span className="text-xs text-muted-foreground">Start</span>
+            <span className="text-xs text-muted-foreground">
+              Start{isEvent && <span className="text-red-500 ml-1">*</span>}
+            </span>
             <Input
               id="scheduled_start"
               type="datetime-local"
               value={formData.scheduled_start || ""}
               onChange={(e) => handleInputChange("scheduled_start", e.target.value)}
               className={`h-10 text-sm ${errors.scheduled_start ? "border-red-500" : ""}`}
+              required={isEvent}
             />
             {errors.scheduled_start && (
               <p className="text-xs text-red-500">{errors.scheduled_start}</p>
             )}
           </div>
           <div className="space-y-1">
-            <span className="text-xs text-muted-foreground">End</span>
+            <span className="text-xs text-muted-foreground">
+              End{isEvent && <span className="text-red-500 ml-1">*</span>}
+            </span>
             <Input
               id="scheduled_end"
               type="datetime-local"
               value={formData.scheduled_end || ""}
               onChange={(e) => handleInputChange("scheduled_end", e.target.value)}
               className={`h-10 text-sm ${errors.scheduled_end ? "border-red-500" : ""}`}
+              required={isEvent}
             />
             {errors.scheduled_end && <p className="text-xs text-red-500">{errors.scheduled_end}</p>}
           </div>

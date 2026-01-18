@@ -103,6 +103,31 @@ export async function GET(request: NextRequest) {
       params.push(parseInt(offset, 10));
     }
 
+    // Auto-complete events where scheduled_end has passed
+    // Events should never be overdue - they auto-complete when time is up
+    // Do this before fetching tasks so we get the correct status
+    //
+    // Timezone handling:
+    // - scheduled_end is stored as UTC ISO string (e.g., "2024-01-15T10:30:00.000Z")
+    // - When user schedules "5pm PST", it's converted to UTC and stored as ISO string
+    // - We compare scheduled_end (UTC ISO string) against current UTC time (also ISO string)
+    // - SQLite stores DATETIME as TEXT, and ISO 8601 format is lexicographically sortable
+    // - So string comparison (<) works correctly: "2024-01-15T10:30:00.000Z" < "2024-01-15T11:30:00.000Z"
+    // - No timezone conversion needed - both values are already in UTC ISO format
+    const nowUTC = new Date();
+    const nowISO = nowUTC.toISOString();
+
+    await db.execute(
+      `UPDATE tasks 
+       SET status = 'completed', updated_at = ? 
+       WHERE user_id = ? 
+       AND task_type = 'event' 
+       AND status NOT IN ('completed', 'cancelled')
+       AND scheduled_end IS NOT NULL 
+       AND scheduled_end < ?`,
+      [nowISO, session.user.id, nowISO]
+    );
+
     const result = await db.execute(query, params);
     const tasks = result.rows.map(mapRowToTask);
 

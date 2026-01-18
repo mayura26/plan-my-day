@@ -97,6 +97,10 @@ export function parseDuration(duration: string): number {
 }
 
 export function isTaskOverdue(task: Task): boolean {
+  // Events never overdue - they auto-complete when time is up
+  if (task.task_type === "event") {
+    return false;
+  }
   if (
     task.status === "completed" ||
     task.status === "cancelled" ||
@@ -286,10 +290,15 @@ export function filterTasksByDateRange(tasks: Task[], startDate: string, endDate
 
 /**
  * Get all overdue tasks (due_date or scheduled_end is in the past and not completed/cancelled/rescheduled/ignored)
+ * Events are excluded as they auto-complete when time is up
  */
 export function getOverdueTasks(tasks: Task[]): Task[] {
   const now = new Date();
   return tasks.filter((task) => {
+    // Events never overdue - they auto-complete when time is up
+    if (task.task_type === "event") {
+      return false;
+    }
     if (
       task.status === "completed" ||
       task.status === "cancelled" ||
