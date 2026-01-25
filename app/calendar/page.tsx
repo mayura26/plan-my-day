@@ -35,11 +35,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { WeeklyCalendar } from "@/components/weekly-calendar";
 import { useUserTimezone } from "@/hooks/use-user-timezone";
 import { sortTasksByCreatedTimeDesc } from "@/lib/task-utils";
-import {
-  createDateInTimezone,
-  formatDateTimeLocalForTimezone,
-  getDateInTimezone,
-} from "@/lib/timezone-utils";
+import { createDateInTimezone, getDateInTimezone } from "@/lib/timezone-utils";
 import type { CreateTaskRequest, DayNote, Task, TaskGroup, TaskType } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -582,14 +578,11 @@ export default function CalendarPage() {
     // Calculate end time (30 minutes later)
     const endDate = new Date(startDate.getTime() + 30 * 60000);
 
-    // Convert to datetime-local format for the form inputs
-    const scheduledStart = formatDateTimeLocalForTimezone(startDate.toISOString(), timezone);
-    const scheduledEnd = formatDateTimeLocalForTimezone(endDate.toISOString(), timezone);
-
-    // Set initial data for quick add
+    // Pass UTC ISO strings - TaskForm will handle conversion to datetime-local format
+    // (consistent with how editing tasks works)
     setQuickAddInitialData({
-      scheduled_start: scheduledStart,
-      scheduled_end: scheduledEnd,
+      scheduled_start: startDate.toISOString(),
+      scheduled_end: endDate.toISOString(),
       duration: 30, // Default duration of 30 minutes
     });
 
