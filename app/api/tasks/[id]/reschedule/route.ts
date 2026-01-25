@@ -1,9 +1,9 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { rescheduleTaskWithShuffling, scheduleTask } from "@/lib/scheduler-utils";
+import { scheduleTaskUnified } from "@/lib/scheduler-utils";
 import { getUserTimezone } from "@/lib/timezone-utils";
 import { db } from "@/lib/turso";
-import type { RescheduleTaskRequest, Task, TaskStatus, TaskType } from "@/lib/types";
+import type { RescheduleTaskRequest, Task, TaskGroup, TaskStatus, TaskType } from "@/lib/types";
 
 // Helper to map database row to Task object
 function mapRowToTask(row: any): Task {
@@ -80,7 +80,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       );
     }
 
-    // Get user's timezone and working hours
+    // Get user's timezone and awake hours
     const userResult = await db.execute("SELECT timezone, awake_hours FROM users WHERE id = ?", [
       session.user.id,
     ]);
@@ -89,13 +89,47 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         ? getUserTimezone(userResult.rows[0].timezone as string | null)
         : "UTC";
 
-    let workingHours = null;
+    let awakeHours = null;
     if (userResult.rows.length > 0 && userResult.rows[0].awake_hours) {
       try {
-        workingHours = JSON.parse(userResult.rows[0].awake_hours as string);
+        awakeHours = JSON.parse(userResult.rows[0].awake_hours as string);
       } catch (e) {
         console.error("Error parsing awake_hours JSON:", e);
-        workingHours = null;
+        awakeHours = null;
+      }
+    }
+
+    // Get task's group if it has one
+    let taskGroup: TaskGroup | null = null;
+    if (task.group_id) {
+      const groupResult = await db.execute(
+        "SELECT * FROM task_groups WHERE id = ? AND user_id = ?",
+        [task.group_id, session.user.id]
+      );
+      if (groupResult.rows.length > 0) {
+        const row = groupResult.rows[0];
+        let autoScheduleHours = null;
+        if (row.auto_schedule_hours) {
+          try {
+            autoScheduleHours = JSON.parse(row.auto_schedule_hours as string);
+          } catch (e) {
+            console.error("Error parsing auto_schedule_hours JSON:", e);
+          }
+        }
+        taskGroup = {
+          id: row.id as string,
+          user_id: row.user_id as string,
+          name: row.name as string,
+          color: row.color as string,
+          collapsed: Boolean(row.collapsed),
+          parent_group_id: (row.parent_group_id as string) || null,
+          is_parent_group: Boolean(row.is_parent_group),
+          auto_schedule_enabled: Boolean(row.auto_schedule_enabled ?? false),
+          auto_schedule_hours: autoScheduleHours,
+          priority: row.priority ? (row.priority as number) : undefined,
+          created_at: row.created_at as string,
+          updated_at: row.updated_at as string,
+        };
       }
     }
 
@@ -105,52 +139,61 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     ]);
     const allTasks = allTasksResult.rows.map(mapRowToTask);
 
+    // Build dependency map from task_dependencies table
+    const dependencyMap = new Map<string, string[]>();
+    const depsResult = await db.execute(
+      "SELECT task_id, depends_on_task_id FROM task_dependencies WHERE task_id IN (SELECT id FROM tasks WHERE user_id = ?)",
+      [session.user.id]
+    );
+    for (const row of depsResult.rows) {
+      const taskId = row.task_id as string;
+      const dependsOnId = row.depends_on_task_id as string;
+      if (!dependencyMap.has(taskId)) {
+        dependencyMap.set(taskId, []);
+      }
+      const deps = dependencyMap.get(taskId);
+      if (deps) {
+        deps.push(dependsOnId);
+      }
+    }
+
     const now = new Date().toISOString();
     let updatedTask: Task;
     const shuffledTasks: Array<{ taskId: string; task: Task }> = [];
 
-    if (body.mode === "next-available") {
-      // Use optimal scheduler (respects due date)
-      const slot = scheduleTask(task, allTasks, workingHours, userTimezone, {
-        strategy: "optimal",
-      });
+    // Use unified scheduler with appropriate mode
+    // "next-available" maps to "now" mode (finds next available slot respecting rules)
+    // "asap-shuffle" maps to "asap" mode (shuffles other tasks if needed)
+    const schedulingMode = body.mode === "next-available" ? "now" : "asap";
 
-      if (!slot) {
-        return NextResponse.json(
-          { error: "No available time slot found within the search window" },
-          { status: 404 }
-        );
-      }
+    const result = scheduleTaskUnified({
+      mode: schedulingMode,
+      task,
+      allTasks,
+      taskGroup,
+      awakeHours,
+      timezone: userTimezone,
+      dependencyMap,
+    });
 
-      // Update task with the scheduled times
-      await db.execute(
-        `UPDATE tasks SET scheduled_start = ?, scheduled_end = ?, updated_at = ? WHERE id = ? AND user_id = ?`,
-        [slot.start.toISOString(), slot.end.toISOString(), now, id, session.user.id]
+    if (!result.slot) {
+      return NextResponse.json(
+        {
+          error: result.error || "No available time slot found within the search window",
+          feedback: result.feedback,
+        },
+        { status: 404 }
       );
+    }
 
-      // Fetch updated task
-      const updatedResult = await db.execute("SELECT * FROM tasks WHERE id = ? AND user_id = ?", [
-        id,
-        session.user.id,
-      ]);
-      updatedTask = mapRowToTask(updatedResult.rows[0]);
-    } else {
-      // ASAP shuffle mode
-      const result = rescheduleTaskWithShuffling(task, allTasks, workingHours, userTimezone);
+    // Update task with the scheduled times
+    await db.execute(
+      `UPDATE tasks SET scheduled_start = ?, scheduled_end = ?, updated_at = ? WHERE id = ? AND user_id = ?`,
+      [result.slot.start.toISOString(), result.slot.end.toISOString(), now, id, session.user.id]
+    );
 
-      // Update the rescheduled task
-      await db.execute(
-        `UPDATE tasks SET scheduled_start = ?, scheduled_end = ?, updated_at = ? WHERE id = ? AND user_id = ?`,
-        [
-          result.taskSlot.start.toISOString(),
-          result.taskSlot.end.toISOString(),
-          now,
-          id,
-          session.user.id,
-        ]
-      );
-
-      // Update all shuffled tasks
+    // Update all shuffled tasks if any (for asap mode)
+    if (result.shuffledTasks && result.shuffledTasks.length > 0) {
       for (const shuffled of result.shuffledTasks) {
         await db.execute(
           `UPDATE tasks SET scheduled_start = ?, scheduled_end = ?, updated_at = ? WHERE id = ? AND user_id = ?`,
@@ -175,14 +218,14 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
           });
         }
       }
-
-      // Fetch updated task
-      const updatedResult = await db.execute("SELECT * FROM tasks WHERE id = ? AND user_id = ?", [
-        id,
-        session.user.id,
-      ]);
-      updatedTask = mapRowToTask(updatedResult.rows[0]);
     }
+
+    // Fetch updated task
+    const updatedResult = await db.execute("SELECT * FROM tasks WHERE id = ? AND user_id = ?", [
+      id,
+      session.user.id,
+    ]);
+    updatedTask = mapRowToTask(updatedResult.rows[0]);
 
     // Note: We don't mark the task as "rescheduled" - that status is only for tasks that have been
     // carried over. A rescheduled task remains in its current status (typically "pending") since
@@ -191,6 +234,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     return NextResponse.json({
       task: updatedTask,
       shuffledTasks: shuffledTasks.map((st) => st.task),
+      feedback: result.feedback,
       message:
         body.mode === "asap-shuffle"
           ? `Task rescheduled with ${shuffledTasks.length} task(s) shuffled.`

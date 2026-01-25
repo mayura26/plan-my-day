@@ -368,7 +368,7 @@ export function TaskDetailDialog({
   };
 
   const handleSchedule = async (
-    mode: "now" | "today" | "next-week" | "next-month" | "asap" | "due-date"
+    mode: "now" | "today" | "tomorrow" | "next-week" | "next-month" | "asap" | "due-date"
   ) => {
     if (!task) return;
 
@@ -378,6 +378,7 @@ export function TaskDetailDialog({
       const endpointMap = {
         now: "schedule-now",
         today: "schedule-today",
+        tomorrow: "schedule-tomorrow",
         "next-week": "schedule-next-week",
         "next-month": "schedule-next-month",
         asap: "schedule-asap",
@@ -436,6 +437,7 @@ export function TaskDetailDialog({
       const modeLabels = {
         now: "Schedule Now",
         today: "Schedule Today",
+        tomorrow: "Schedule Tomorrow",
         "next-week": "Schedule Next Week",
         "next-month": "Schedule Next Month",
         asap: "Schedule ASAP",
@@ -788,6 +790,10 @@ export function TaskDetailDialog({
                                 <CalendarClock className="h-4 w-4 mr-2" />
                                 Schedule Today
                               </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleSchedule("tomorrow")}>
+                                <CalendarClock className="h-4 w-4 mr-2" />
+                                Schedule Tomorrow
+                              </DropdownMenuItem>
                               <DropdownMenuItem onClick={() => handleSchedule("next-week")}>
                                 <Calendar className="h-4 w-4 mr-2" />
                                 Schedule Next Week
@@ -796,12 +802,16 @@ export function TaskDetailDialog({
                                 <Calendar className="h-4 w-4 mr-2" />
                                 Schedule Next Month
                               </DropdownMenuItem>
-                              {task.due_date && (
-                                <DropdownMenuItem onClick={() => handleSchedule("due-date")}>
-                                  <Flag className="h-4 w-4 mr-2" />
-                                  Schedule to Due Date
-                                </DropdownMenuItem>
-                              )}
+                              <DropdownMenuItem
+                                onClick={() => task.due_date && handleSchedule("due-date")}
+                                disabled={!task.due_date}
+                              >
+                                <Flag className="h-4 w-4 mr-2" />
+                                Schedule to Due Date
+                                {!task.due_date && (
+                                  <span className="ml-2 text-xs text-muted-foreground">(no due date)</span>
+                                )}
+                              </DropdownMenuItem>
                               <DropdownMenuItem onClick={() => handleSchedule("asap")}>
                                 <Zap className="h-4 w-4 mr-2" />
                                 Schedule ASAP

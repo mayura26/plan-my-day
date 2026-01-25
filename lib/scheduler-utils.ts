@@ -1031,7 +1031,7 @@ export function rescheduleTaskWithShuffling(
 /**
  * Scheduling mode types
  */
-export type SchedulingMode = "now" | "today" | "next-week" | "next-month" | "asap" | "due-date";
+export type SchedulingMode = "now" | "today" | "tomorrow" | "next-week" | "next-month" | "asap" | "due-date";
 
 /**
  * Scheduling result with feedback messages
@@ -1131,6 +1131,34 @@ function getEndOfToday(currentDate: Date, timezone: string): Date {
 
   // Use createDateInTimezone to get the UTC Date that represents 23:59:59 today in the user's timezone
   return createDateInTimezone(todayDate, 23, 59, timezone);
+}
+
+/**
+ * Get the start of tomorrow in user's timezone
+ * Returns a UTC Date that represents midnight on tomorrow in the user's timezone
+ */
+function getStartOfTomorrow(currentDate: Date, timezone: string): Date {
+  const tzTime = getTimeInTimezone(currentDate, timezone);
+
+  // Create a Date object at noon UTC for tomorrow
+  const tomorrowDate = new Date(Date.UTC(tzTime.year, tzTime.month, tzTime.day + 1, 12, 0, 0, 0));
+
+  // Use createDateInTimezone to get the UTC Date that represents midnight tomorrow in the user's timezone
+  return createDateInTimezone(tomorrowDate, 0, 0, timezone);
+}
+
+/**
+ * Get the end of tomorrow in user's timezone
+ * Returns a UTC Date that represents 23:59:59 on tomorrow in the user's timezone
+ */
+function getEndOfTomorrow(currentDate: Date, timezone: string): Date {
+  const tzTime = getTimeInTimezone(currentDate, timezone);
+
+  // Create a Date object at noon UTC for tomorrow
+  const tomorrowDate = new Date(Date.UTC(tzTime.year, tzTime.month, tzTime.day + 1, 12, 0, 0, 0));
+
+  // Use createDateInTimezone to get the UTC Date that represents 23:59:59 tomorrow in the user's timezone
+  return createDateInTimezone(tomorrowDate, 23, 59, timezone);
 }
 
 /**
@@ -1479,6 +1507,7 @@ export function scheduleTaskUnified(options: UnifiedSchedulingOptions): Scheduli
   let startFrom: Date;
   let maxSearchTime: Date;
   let mustBeToday = false;
+  let mustBeTomorrow = false;
   let preferGroupRules = false;
 
   switch (mode) {
@@ -1498,6 +1527,35 @@ export function scheduleTaskUnified(options: UnifiedSchedulingOptions): Scheduli
       mustBeToday = true;
       preferGroupRules = true;
       break;
+
+    case "tomorrow": {
+      reportProgress(
+        "Mode: Schedule Tomorrow - Task will be scheduled tomorrow"
+      );
+      // Get tomorrow's date in user's timezone
+      const tomorrowMidnight = getStartOfTomorrow(nowUTC, timezone);
+      const tomorrowTzTime = getTimeInTimezone(tomorrowMidnight, timezone);
+
+      // Get the working hours for tomorrow's day of week
+      // Use group hours if available, otherwise awake hours, otherwise default 9-17
+      const tomorrowDayOfWeek = tomorrowTzTime.dayOfWeek;
+      const groupHoursForTomorrow = taskGroup?.auto_schedule_enabled && taskGroup?.auto_schedule_hours
+        ? taskGroup.auto_schedule_hours[tomorrowDayOfWeek as keyof GroupScheduleHours]
+        : null;
+      const awakeHoursForTomorrow = awakeHours?.[tomorrowDayOfWeek as keyof GroupScheduleHours];
+      const tomorrowHours = groupHoursForTomorrow || awakeHoursForTomorrow || { start: 9, end: 17 };
+
+      // Start at the beginning of working hours tomorrow, not midnight
+      startFrom = createDateInTimezone(tomorrowMidnight, tomorrowHours.start, 0, timezone);
+      maxSearchTime = getEndOfTomorrow(nowUTC, timezone);
+      mustBeTomorrow = true;
+      preferGroupRules = true;
+
+      reportProgress(
+        `Tomorrow is ${tomorrowDayOfWeek}, working hours: ${tomorrowHours.start}:00 - ${tomorrowHours.end}:00`
+      );
+      break;
+    }
 
     case "next-week":
       reportProgress("Mode: Schedule Next Week - Task must be scheduled next week onwards");
@@ -1696,67 +1754,106 @@ export function scheduleTaskUnified(options: UnifiedSchedulingOptions): Scheduli
       }
     }
 
+    if (mustBeTomorrow) {
+      const slotTzTime = getTimeInTimezone(slotStartUTC, timezone);
+      const nowTzTime = getTimeInTimezone(nowUTC, timezone);
+      // Tomorrow is nowTzTime.day + 1
+      const tomorrowDate = new Date(Date.UTC(nowTzTime.year, nowTzTime.month, nowTzTime.day + 1));
+      const isTomorrow =
+        slotTzTime.year === tomorrowDate.getUTCFullYear() &&
+        slotTzTime.month === tomorrowDate.getUTCMonth() &&
+        slotTzTime.day === tomorrowDate.getUTCDate();
+
+      if (!isTomorrow) {
+        reportProgress("No available slot found tomorrow");
+        return {
+          slot: null,
+          feedback,
+          error: "Unable to schedule task tomorrow. Please try Schedule Now or another mode.",
+        };
+      }
+    }
+
     // Get timezone info for this slot
     const slotTzTime = getTimeInTimezone(slotStartUTC, timezone);
     const dayHours = getHoursForDay(slotTzTime.dayOfWeek);
 
-    // Skip days with no hours configured (unless today mode with preferGroupRules)
+    // Skip days with no hours configured (unless today/tomorrow mode with preferGroupRules)
     if (!dayHours) {
-      if (mustBeToday && preferGroupRules) {
-        // For today mode with preferGroupRules, fall back to awake hours
+      if ((mustBeToday || mustBeTomorrow) && preferGroupRules) {
+        // For today/tomorrow mode with preferGroupRules, fall back to awake hours or default hours
         const awakeDayHours = awakeHours?.[slotTzTime.dayOfWeek as keyof GroupScheduleHours];
-        if (awakeDayHours && awakeDayHours !== null) {
-          // Use awake hours instead
-          const timeInMinutes = slotTzTime.hour * 60 + slotTzTime.minute;
-          const awakeStart = awakeDayHours.start * 60;
-          const awakeEnd = awakeDayHours.end * 60;
+        // Use awake hours if available, otherwise use default 9-17 for today/tomorrow mode
+        const fallbackHours = awakeDayHours ?? { start: 9, end: 17 };
 
-          // Check if within awake hours
-          if (timeInMinutes >= awakeStart && timeInMinutes < awakeEnd) {
-            // Check conflicts
-            let hasConflict = false;
-            let latestConflictEnd: Date | null = null;
+        const timeInMinutes = slotTzTime.hour * 60 + slotTzTime.minute;
+        const fallbackStart = fallbackHours.start * 60;
+        const fallbackEnd = fallbackHours.end * 60;
 
-            for (const scheduledSlot of scheduledSlots) {
-              const ourStart = slotStartUTC.getTime();
-              const ourEnd = slotEndUTC.getTime();
-              const theirStart = scheduledSlot.start.getTime();
-              const theirEnd = scheduledSlot.end.getTime();
+        // Check if within fallback hours
+        if (timeInMinutes >= fallbackStart && timeInMinutes < fallbackEnd) {
+          // Check conflicts
+          let hasConflict = false;
+          let latestConflictEnd: Date | null = null;
 
-              if (ourStart < theirEnd && ourEnd > theirStart) {
-                hasConflict = true;
-                if (!latestConflictEnd || theirEnd > latestConflictEnd.getTime()) {
-                  latestConflictEnd = new Date(scheduledSlot.end);
-                }
+          for (const scheduledSlot of scheduledSlots) {
+            const ourStart = slotStartUTC.getTime();
+            const ourEnd = slotEndUTC.getTime();
+            const theirStart = scheduledSlot.start.getTime();
+            const theirEnd = scheduledSlot.end.getTime();
+
+            if (ourStart < theirEnd && ourEnd > theirStart) {
+              hasConflict = true;
+              if (!latestConflictEnd || theirEnd > latestConflictEnd.getTime()) {
+                latestConflictEnd = new Date(scheduledSlot.end);
               }
-            }
-
-            if (!hasConflict) {
-              reportProgress("Found available slot using awake hours");
-              return {
-                slot: {
-                  start: slotStartUTC,
-                  end: slotEndUTC,
-                },
-                feedback,
-              };
-            }
-
-            // Jump past conflict
-            if (latestConflictEnd) {
-              currentTimeUTC = new Date(latestConflictEnd);
-              currentTimeUTC.setUTCMinutes(
-                Math.ceil(currentTimeUTC.getUTCMinutes() / 15) * 15,
-                0,
-                0
-              );
-              if (currentTimeUTC.getUTCMinutes() >= 60) {
-                currentTimeUTC.setUTCHours(currentTimeUTC.getUTCHours() + 1, 0, 0, 0);
-              }
-              continue;
             }
           }
+
+          if (!hasConflict) {
+            reportProgress(
+              awakeDayHours
+                ? "Found available slot using awake hours"
+                : "Found available slot using default hours (9am-5pm)"
+            );
+            return {
+              slot: {
+                start: slotStartUTC,
+                end: slotEndUTC,
+              },
+              feedback,
+            };
+          }
+
+          // Jump past conflict
+          if (latestConflictEnd) {
+            currentTimeUTC = new Date(latestConflictEnd);
+            currentTimeUTC.setUTCMinutes(
+              Math.ceil(currentTimeUTC.getUTCMinutes() / 15) * 15,
+              0,
+              0
+            );
+            if (currentTimeUTC.getUTCMinutes() >= 60) {
+              currentTimeUTC.setUTCHours(currentTimeUTC.getUTCHours() + 1, 0, 0, 0);
+            }
+            continue;
+          }
+        } else if (timeInMinutes < fallbackStart) {
+          // Before fallback hours start, jump to the start
+          currentTimeUTC = createDateInTimezone(slotStartUTC, fallbackHours.start, 0, timezone);
+          continue;
         }
+        // If past fallback hours end, will fall through to "move to next day" which triggers tomorrow check
+      }
+
+      // Move to next day - but check if this would skip past our target day
+      if (mustBeTomorrow) {
+        reportProgress("No available slot found tomorrow within configured hours");
+        return {
+          slot: null,
+          feedback,
+          error: "Unable to schedule task tomorrow. No available time within working hours.",
+        };
       }
 
       // Move to next day
@@ -1783,9 +1880,9 @@ export function scheduleTaskUnified(options: UnifiedSchedulingOptions): Scheduli
     const endInMinutes = dayHours.end * 60;
     const isInHours = slotTimeInMinutes >= startInMinutes && slotTimeInMinutes < endInMinutes;
 
-    // For today mode with preferGroupRules, allow outside group hours but check awake hours
+    // For today/tomorrow mode with preferGroupRules, allow outside group hours but check awake hours
     if (!isInHours) {
-      if (mustBeToday && preferGroupRules && useGroupRules) {
+      if ((mustBeToday || mustBeTomorrow) && preferGroupRules && useGroupRules) {
         // Check awake hours as fallback
         const awakeDayHours = awakeHours?.[slotTzTime.dayOfWeek as keyof GroupScheduleHours];
         if (awakeDayHours && awakeDayHours !== null) {
@@ -1869,6 +1966,15 @@ export function scheduleTaskUnified(options: UnifiedSchedulingOptions): Scheduli
 
       // After hours (or not today) - jump to start of next day with hours
       if (isToday && slotTimeInMinutes >= endInMinutes) {
+        // For tomorrow mode, we can't skip to the next day
+        if (mustBeTomorrow) {
+          reportProgress("No available slot found tomorrow - past working hours");
+          return {
+            slot: null,
+            feedback,
+            error: "Unable to schedule task tomorrow. No available time within working hours.",
+          };
+        }
         // After hours today - jump to start of next day with hours
         console.log(
           `[Scheduler] After hours today (${slotTzTime.hour}:${slotTzTime.minute} >= ${dayHours.end}:00), jumping to next day`
@@ -1909,6 +2015,15 @@ export function scheduleTaskUnified(options: UnifiedSchedulingOptions): Scheduli
         // Not today or very late - if after hours on current day, jump to start of current day's hours
         // Otherwise move to next day
         if (slotTimeInMinutes >= endInMinutes) {
+          // For tomorrow mode, we can't skip to the next day
+          if (mustBeTomorrow) {
+            reportProgress("No available slot found tomorrow - past working hours");
+            return {
+              slot: null,
+              feedback,
+              error: "Unable to schedule task tomorrow. No available time within working hours.",
+            };
+          }
           // After hours on this day - move to next day
           const nextDay = new Date(slotStartUTC);
           nextDay.setUTCDate(nextDay.getUTCDate() + 1);

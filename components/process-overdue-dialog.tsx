@@ -25,6 +25,13 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useUserTimezone } from "@/hooks/use-user-timezone";
 import { getOverdueTasks } from "@/lib/task-utils";
@@ -44,10 +51,13 @@ type TaskAction =
   | "carryover"
   | "reschedule"
   | "schedule-now"
+  | "schedule-tomorrow"
   | "update-due-date"
   | "ignore"
   | "mark-complete"
   | null;
+
+type ScheduleMode = "now" | "today" | "tomorrow" | "next-week" | "next-month" | "asap";
 
 interface TaskActionState {
   action: TaskAction;
@@ -55,7 +65,7 @@ interface TaskActionState {
   notes?: string;
   newDueDate?: string;
   autoSchedule?: boolean;
-  rescheduleMode?: "next-available" | "asap-shuffle";
+  scheduleMode?: ScheduleMode;
 }
 
 export function ProcessOverdueDialog({
@@ -111,13 +121,13 @@ export function ProcessOverdueDialog({
                 additionalDuration: existing.additionalDuration,
                 notes: existing.notes,
                 newDueDate: existing.newDueDate,
-                rescheduleMode: existing.rescheduleMode,
+                scheduleMode: existing.scheduleMode,
               }
             : {};
-        // Set default reschedule mode if action is reschedule
+        // Set default schedule mode if action is reschedule
         const defaultState =
-          action === "reschedule" && !preservedState.rescheduleMode
-            ? { rescheduleMode: "next-available" as const }
+          action === "reschedule" && !preservedState.scheduleMode
+            ? { scheduleMode: "now" as ScheduleMode }
             : {};
         newActions.set(taskId, { action, ...preservedState, ...defaultState });
         setSelectedTaskId(taskId);
@@ -206,14 +216,18 @@ export function ProcessOverdueDialog({
 
           promises.push(createCarryover());
         } else if (actionState.action === "reschedule") {
-          // Reschedule task
-          const promise = fetch(`/api/tasks/${taskId}/reschedule`, {
+          // Reschedule task using the selected schedule mode
+          const mode = actionState.scheduleMode || "now";
+          const endpointMap: Record<ScheduleMode, string> = {
+            now: "schedule-now",
+            today: "schedule-today",
+            tomorrow: "schedule-tomorrow",
+            "next-week": "schedule-next-week",
+            "next-month": "schedule-next-month",
+            asap: "schedule-asap",
+          };
+          const promise = fetch(`/api/tasks/${taskId}/${endpointMap[mode]}`, {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              mode: actionState.rescheduleMode || "next-available",
-              auto_schedule: actionState.autoSchedule ?? false,
-            }),
           }).then(async (res) => {
             if (!res.ok) {
               const data = await res.json();
@@ -229,6 +243,17 @@ export function ProcessOverdueDialog({
             if (!res.ok) {
               const data = await res.json();
               throw new Error(data.error || `Failed to schedule ${task.title}`);
+            }
+          });
+          promises.push(promise);
+        } else if (actionState.action === "schedule-tomorrow") {
+          // Schedule task for tomorrow
+          const promise = fetch(`/api/tasks/${taskId}/schedule-tomorrow`, {
+            method: "POST",
+          }).then(async (res) => {
+            if (!res.ok) {
+              const data = await res.json();
+              throw new Error(data.error || `Failed to schedule ${task.title} for tomorrow`);
             }
           });
           promises.push(promise);
@@ -666,67 +691,49 @@ export function ProcessOverdueDialog({
                       <div className="space-y-2 pt-2 border-t">
                         <div className="border rounded-lg p-4 space-y-3 bg-muted/30">
                           <div>
-                            <Label>Reschedule Mode</Label>
-                            <div className="flex items-center gap-2 mt-2">
-                              <Button
-                                variant={
-                                  actionState.rescheduleMode === "next-available"
-                                    ? "default"
-                                    : "outline"
-                                }
-                                size="sm"
-                                onClick={(e) => {
-                                  e.preventDefault();
-                                  e.stopPropagation();
-                                  updateTaskAction(task.id, { rescheduleMode: "next-available" });
-                                }}
-                                className="flex-1"
-                                type="button"
-                                disabled={processingTaskId === task.id}
-                              >
-                                Next Available Slot
-                              </Button>
-                              <Button
-                                variant={
-                                  actionState.rescheduleMode === "asap-shuffle"
-                                    ? "default"
-                                    : "outline"
-                                }
-                                size="sm"
-                                onClick={(e) => {
-                                  e.preventDefault();
-                                  e.stopPropagation();
-                                  updateTaskAction(task.id, { rescheduleMode: "asap-shuffle" });
-                                }}
-                                className="flex-1"
-                                type="button"
-                                disabled={processingTaskId === task.id}
-                              >
-                                ASAP with Shuffling
-                              </Button>
-                            </div>
-                            <p className="text-xs text-muted-foreground mt-2">
-                              {actionState.rescheduleMode === "asap-shuffle"
-                                ? "Places task at next working hours slot and shuffles conflicting tasks forward"
-                                : "Finds the next available slot respecting due dates"}
-                            </p>
+                            <Label>Schedule To</Label>
+                            <Select
+                              value={actionState.scheduleMode || "now"}
+                              onValueChange={(value: ScheduleMode) =>
+                                updateTaskAction(task.id, { scheduleMode: value })
+                              }
+                              disabled={processingTaskId === task.id}
+                            >
+                              <SelectTrigger className="mt-2">
+                                <SelectValue placeholder="Select schedule option" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="now">Schedule Now</SelectItem>
+                                <SelectItem value="today">Schedule Today</SelectItem>
+                                <SelectItem value="tomorrow">Schedule Tomorrow</SelectItem>
+                                <SelectItem value="next-week">Schedule Next Week</SelectItem>
+                                <SelectItem value="next-month">Schedule Next Month</SelectItem>
+                                <SelectItem value="asap">Schedule ASAP (with shuffling)</SelectItem>
+                              </SelectContent>
+                            </Select>
                           </div>
                           <Button
                             onClick={async () => {
-                              const mode = actionState.rescheduleMode || "next-available";
+                              const mode = actionState.scheduleMode || "now";
+                              const endpointMap: Record<ScheduleMode, string> = {
+                                now: "schedule-now",
+                                today: "schedule-today",
+                                tomorrow: "schedule-tomorrow",
+                                "next-week": "schedule-next-week",
+                                "next-month": "schedule-next-month",
+                                asap: "schedule-asap",
+                              };
 
                               setProcessingTaskId(task.id);
                               setError(null);
 
                               try {
-                                const response = await fetch(`/api/tasks/${task.id}/reschedule`, {
-                                  method: "POST",
-                                  headers: { "Content-Type": "application/json" },
-                                  body: JSON.stringify({
-                                    mode,
-                                    auto_schedule: actionState.autoSchedule ?? false,
-                                  }),
-                                });
+                                const response = await fetch(
+                                  `/api/tasks/${task.id}/${endpointMap[mode]}`,
+                                  {
+                                    method: "POST",
+                                  }
+                                );
 
                                 if (!response.ok) {
                                   const data = await response.json();
@@ -774,10 +781,10 @@ export function ProcessOverdueDialog({
                     ) : null}
                   </div>
                 ) : (
-                  // Due date task: four options
+                  // Due date task: actions
                   <div className="space-y-2">
                     <Label>Action</Label>
-                    <div className="grid grid-cols-2 gap-2">
+                    <div className="grid grid-cols-3 gap-2">
                       <Button
                         variant={actionState?.action === "schedule-now" ? "default" : "outline"}
                         size="sm"
@@ -786,7 +793,17 @@ export function ProcessOverdueDialog({
                         type="button"
                       >
                         <CalendarClock className="h-3 w-3 mr-1" />
-                        Schedule Now
+                        Now
+                      </Button>
+                      <Button
+                        variant={actionState?.action === "schedule-tomorrow" ? "default" : "outline"}
+                        size="sm"
+                        onClick={(e) => handleSelectAction(task.id, "schedule-tomorrow", e)}
+                        className="text-xs"
+                        type="button"
+                      >
+                        <CalendarClock className="h-3 w-3 mr-1" />
+                        Tomorrow
                       </Button>
                       <Button
                         variant={actionState?.action === "update-due-date" ? "default" : "outline"}
@@ -796,7 +813,7 @@ export function ProcessOverdueDialog({
                         type="button"
                       >
                         <Calendar className="h-3 w-3 mr-1" />
-                        Update Due Date
+                        Due Date
                       </Button>
                       <Button
                         variant="outline"
