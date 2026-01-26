@@ -6,6 +6,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { CalendarSlot } from "@/components/calendar-slot";
 import { ResizableTask } from "@/components/calendar-task";
 import { RefreshButton } from "@/components/refresh-button";
+import { ShuffleButton } from "@/components/shuffle-button";
 import { Button } from "@/components/ui/button";
 import { doTasksOverlap } from "@/lib/overlap-utils";
 import { sortTasksByScheduledTime } from "@/lib/task-utils";
@@ -32,6 +33,7 @@ interface DayCalendarProps {
   onNoteClick?: (date: Date) => void;
   onSlotDoubleClick?: (day: Date, hour: number, minute: number) => void;
   onRefresh?: () => void | Promise<void>;
+  onShuffle?: () => void | Promise<void>;
   onOverlapClick?: (taskId: string) => void;
   parentTasksMap?: Map<string, string>;
 }
@@ -61,6 +63,7 @@ export function DayCalendar({
   onNoteClick,
   onSlotDoubleClick,
   onRefresh,
+  onShuffle,
   onOverlapClick,
   parentTasksMap,
 }: DayCalendarProps) {
@@ -235,6 +238,15 @@ export function DayCalendar({
             <Button variant="ghost" size="icon" onClick={goToNextDay} className="h-10 w-10">
               <ChevronRight className="h-4 w-4" />
             </Button>
+            {onShuffle && (
+              <ShuffleButton
+                onShuffle={onShuffle}
+                size="icon"
+                variant="ghost"
+                className="h-10 w-10"
+                aria-label="Shuffle tasks"
+              />
+            )}
             {onRefresh && (
               <RefreshButton
                 onRefresh={onRefresh}
@@ -277,6 +289,15 @@ export function DayCalendar({
           <Button variant="ghost" size="icon" onClick={goToNextDay} className="h-10 w-10">
             <ChevronRight className="h-4 w-4" />
           </Button>
+          {onShuffle && (
+            <ShuffleButton
+              onShuffle={onShuffle}
+              size="icon"
+              variant="ghost"
+              className="h-10 w-10"
+              aria-label="Shuffle tasks"
+            />
+          )}
           {onRefresh && (
             <RefreshButton
               onRefresh={onRefresh}

@@ -16,6 +16,7 @@ import {
   GitBranch,
   Link2,
   Lock,
+  LockOpen,
   Tag,
   Trash2,
   XCircle,
@@ -94,6 +95,7 @@ export function TaskDetailDialog({
     completed: 0,
     total: 0,
   });
+  const [isTogglingLock, setIsTogglingLock] = useState(false);
   const [notesExpanded, setNotesExpanded] = useState(false);
   const [notesCount, setNotesCount] = useState<{ completed: number; total: number }>({
     completed: 0,
@@ -581,12 +583,47 @@ export function TaskDetailDialog({
               <Badge className={`${getPriorityColor(task.priority)} text-xs px-1.5 py-0.5`}>
                 <Flag className="h-2.5 w-2.5 mr-0.5" />P{task.priority}
               </Badge>
-              {task.locked && (
-                <Badge variant="destructive" className="text-xs px-1.5 py-0.5">
-                  <Lock className="h-2.5 w-2.5 mr-0.5" />
-                  Locked
+              <button
+                type="button"
+                disabled={isTogglingLock}
+                onClick={async (e) => {
+                  e.stopPropagation();
+                  if (!task || isTogglingLock) return;
+                  setIsTogglingLock(true);
+                  try {
+                    const newLocked = !task.locked;
+                    const response = await fetch(`/api/tasks/${task.id}`, {
+                      method: "PUT",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ locked: newLocked }),
+                    });
+                    if (response.ok) {
+                      onTaskRefresh?.({ ...task, locked: newLocked });
+                      onTaskUpdate?.();
+                      toast.success(newLocked ? "Task locked" : "Task unlocked");
+                    } else {
+                      toast.error("Failed to toggle lock");
+                    }
+                  } catch {
+                    toast.error("Failed to toggle lock");
+                  } finally {
+                    setIsTogglingLock(false);
+                  }
+                }}
+                className="inline-block"
+              >
+                <Badge
+                  variant={task.locked ? "destructive" : "outline"}
+                  className="text-xs px-1.5 py-0.5 cursor-pointer hover:opacity-80 transition-opacity"
+                >
+                  {task.locked ? (
+                    <Lock className="h-2.5 w-2.5 mr-0.5" />
+                  ) : (
+                    <LockOpen className="h-2.5 w-2.5 mr-0.5" />
+                  )}
+                  {task.locked ? "Locked" : "Unlocked"}
                 </Badge>
-              )}
+              </button>
               {isBlocked && (
                 <Badge variant="destructive" className="text-xs px-1.5 py-0.5">
                   <GitBranch className="h-2.5 w-2.5 mr-0.5" />

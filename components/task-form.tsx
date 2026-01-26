@@ -1,6 +1,6 @@
 "use client";
 
-import { Calendar, CalendarClock, ChevronDown, Clock, Zap } from "lucide-react";
+import { Calendar, CalendarClock, ChevronDown, Clock, Lock, Unlock, Zap } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { DependencySelector } from "@/components/dependency-selector";
 import { Button } from "@/components/ui/button";
@@ -68,6 +68,7 @@ export function TaskForm({
     due_date: formatDateTimeLocalForTimezone(initialData?.due_date, timezone),
     auto_schedule: initialData?.auto_schedule || false,
     schedule_mode: (initialData as any)?.schedule_mode || "now",
+    locked: initialData?.locked !== undefined ? initialData.locked : (initialTaskType === "event" || initialTaskType === "todo"),
   } as CreateTaskRequest & { schedule_mode?: string });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -130,6 +131,7 @@ export function TaskForm({
         scheduled_end: formatDateTimeLocalForTimezone(initialData.scheduled_end, timezone),
         due_date: formatDateTimeLocalForTimezone(initialData.due_date, timezone),
         auto_schedule: initialData.auto_schedule || false,
+        locked: initialData.locked !== undefined ? initialData.locked : (taskType === "event" || taskType === "todo"),
       }));
       setShowDescription(!!initialData.description);
     }
@@ -296,6 +298,7 @@ export function TaskForm({
           updated.priority = undefined;
           updated.energy_level_required = undefined;
           updated.due_date = undefined;
+          updated.locked = true;
         } else if (value === "todo") {
           updated.energy_level_required = undefined;
           if (!updated.priority) updated.priority = 3;
@@ -303,9 +306,11 @@ export function TaskForm({
           if (!updated.duration) updated.duration = 30;
           // Reset the flag when switching to todo type
           setHasTriedSubmitWithoutDueDate(false);
+          updated.locked = true;
         } else {
           if (!updated.priority) updated.priority = 3;
           if (!updated.energy_level_required) updated.energy_level_required = 3;
+          updated.locked = false;
         }
       }
 
@@ -732,6 +737,29 @@ export function TaskForm({
             {errors.scheduled_end && <p className="text-xs text-red-500">{errors.scheduled_end}</p>}
           </div>
         </div>
+      </div>
+
+      {/* Lock Toggle */}
+      <div className="flex items-center gap-2">
+        <Switch
+          id="locked"
+          checked={formData.locked || false}
+          onCheckedChange={(checked) => handleInputChange("locked", checked)}
+        />
+        <Label
+          htmlFor="locked"
+          className="text-sm font-normal cursor-pointer flex items-center gap-1.5"
+        >
+          {formData.locked ? (
+            <Lock className="w-3.5 h-3.5" />
+          ) : (
+            <Unlock className="w-3.5 h-3.5" />
+          )}
+          <span>{formData.locked ? "Locked" : "Unlocked"}</span>
+        </Label>
+        <span className="text-xs text-muted-foreground ml-auto">
+          {formData.locked ? "Won\u0027t be moved by shuffle" : "Will be moved by shuffle"}
+        </span>
       </div>
 
       {/* Action Buttons */}

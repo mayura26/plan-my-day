@@ -12,6 +12,7 @@ import {
   useSensors,
 } from "@dnd-kit/core";
 import { format, startOfMonth } from "date-fns";
+import { toast } from "sonner";
 import { CheckSquare, ChevronDown, ChevronRight, Plus, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
@@ -210,6 +211,44 @@ export default function CalendarPage() {
       isFetchingGroupsRef.current = false;
     }
   }, []);
+
+  const handleShuffle = useCallback(async () => {
+    try {
+      const dateKey = format(currentDate, "yyyy-MM-dd");
+      const response = await fetch("/api/tasks/shuffle", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ date: dateKey, timezone }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.updatedTasks && data.updatedTasks.length > 0) {
+          // Update local task state with the returned tasks
+          setTasks((prev) => {
+            const updatedMap = new Map<string, Task>();
+            for (const task of data.updatedTasks) {
+              updatedMap.set(task.id, task);
+            }
+            return prev.map((t) => updatedMap.get(t.id) || t);
+          });
+
+          const dayCount = 1 + (data.cascadedDays?.length || 0);
+          toast.success(
+            `Shuffled ${data.movedCount} task${data.movedCount !== 1 ? "s" : ""}${dayCount > 1 ? ` across ${dayCount} days` : ""}`,
+          );
+        } else {
+          toast.info("No tasks needed shuffling.");
+        }
+      } else {
+        const error = await response.json();
+        toast.error(error.error || "Failed to shuffle tasks");
+      }
+    } catch (error) {
+      console.error("Error shuffling tasks:", error);
+      toast.error("Failed to shuffle tasks");
+    }
+  }, [currentDate, timezone]);
 
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -1328,6 +1367,7 @@ export default function CalendarPage() {
               onNoteClick={handleNoteClick}
               onSlotDoubleClick={handleSlotDoubleClick}
               onRefresh={() => fetchTasks(false)}
+              onShuffle={handleShuffle}
               onOverlapClick={handleOverlapClick}
               parentTasksMap={parentTasksMap}
             />
@@ -1347,6 +1387,7 @@ export default function CalendarPage() {
               onNoteClick={handleNoteClick}
               onSlotDoubleClick={handleSlotDoubleClick}
               onRefresh={() => fetchTasks(false)}
+              onShuffle={handleShuffle}
               onOverlapClick={handleOverlapClick}
               parentTasksMap={parentTasksMap}
             />

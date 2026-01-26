@@ -2488,3 +2488,438 @@ function scheduleTaskASAPWithShuffling(
     shuffledTasks,
   };
 }
+
+// ============================================================================
+// SHUFFLE TASKS FOR DAY
+// ============================================================================
+
+export interface ShuffleOptions {
+  targetDate: string; // YYYY-MM-DD
+  allTasks: Task[];
+  allGroups: TaskGroup[];
+  awakeHours: GroupScheduleHours | null;
+  timezone: string;
+  maxCascadeDays?: number; // Default: 7
+}
+
+export interface ShuffleResult {
+  movedTasks: Array<{ taskId: string; newStart: string; newEnd: string }>;
+  feedback: string[];
+  cascadedDays: string[];
+  error?: string;
+}
+
+/**
+ * Shuffle all unstarted, unlocked tasks for a day forward from "now" (or start of working hours).
+ * Tasks that don't fit within their group's allowed hours get pushed to the next day,
+ * which triggers a cascade shuffle on that day too.
+ */
+export function shuffleTasksForDay(options: ShuffleOptions): ShuffleResult {
+  const {
+    targetDate,
+    allTasks,
+    allGroups,
+    awakeHours,
+    timezone,
+    maxCascadeDays = 7,
+  } = options;
+
+  const feedback: string[] = [];
+  const movedTasks: Array<{ taskId: string; newStart: string; newEnd: string }> = [];
+  const cascadedDays: string[] = [];
+  const processedDays = new Set<string>();
+
+  // Build a mutable map of task slots so cascaded days see previous moves
+  const taskSlotOverrides = new Map<string, { start: Date; end: Date }>();
+
+  const daysQueue: string[] = [targetDate];
+
+  const startTime = Date.now();
+  const maxTimeout = 30000;
+
+  while (daysQueue.length > 0 && processedDays.size < maxCascadeDays) {
+    if (Date.now() - startTime > maxTimeout) {
+      feedback.push("Shuffle timed out. Some days may not have been processed.");
+      break;
+    }
+
+    const currentDay = daysQueue.shift()!;
+    if (processedDays.has(currentDay)) continue;
+    processedDays.add(currentDay);
+
+    if (currentDay !== targetDate) {
+      cascadedDays.push(currentDay);
+    }
+
+    const result = shuffleSingleDay(
+      currentDay,
+      allTasks,
+      allGroups,
+      awakeHours,
+      timezone,
+      taskSlotOverrides,
+      feedback,
+    );
+
+    for (const moved of result.movedTasks) {
+      // Update the overrides map so future days see the new position
+      taskSlotOverrides.set(moved.taskId, {
+        start: new Date(moved.newStart),
+        end: new Date(moved.newEnd),
+      });
+      movedTasks.push(moved);
+    }
+
+    for (const nextDay of result.pushedToDays) {
+      if (!processedDays.has(nextDay)) {
+        daysQueue.push(nextDay);
+      }
+    }
+  }
+
+  if (movedTasks.length === 0) {
+    feedback.push("No tasks needed shuffling.");
+  } else {
+    feedback.push(`Shuffled ${movedTasks.length} task(s).`);
+  }
+
+  return { movedTasks, feedback, cascadedDays };
+}
+
+/**
+ * Get the effective scheduled start/end for a task, accounting for overrides from previous shuffles.
+ */
+function getEffectiveSlot(
+  task: Task,
+  overrides: Map<string, { start: Date; end: Date }>,
+): { start: Date; end: Date } | null {
+  const override = overrides.get(task.id);
+  if (override) return override;
+  if (task.scheduled_start && task.scheduled_end) {
+    return { start: new Date(task.scheduled_start), end: new Date(task.scheduled_end) };
+  }
+  return null;
+}
+
+/**
+ * Parse a YYYY-MM-DD string into year/month/day numbers.
+ */
+function parseDateString(dateStr: string): { year: number; month: number; day: number } {
+  const [year, month, day] = dateStr.split("-").map(Number);
+  return { year, month: month - 1, day }; // month is 0-indexed
+}
+
+/**
+ * Check if a UTC Date falls on a given calendar date in the user's timezone.
+ */
+function isOnDay(
+  utcDate: Date,
+  targetYear: number,
+  targetMonth: number,
+  targetDay: number,
+  timezone: string,
+): boolean {
+  const tz = getTimeInTimezone(utcDate, timezone);
+  return tz.year === targetYear && tz.month === targetMonth && tz.day === targetDay;
+}
+
+/**
+ * Get the next calendar day as YYYY-MM-DD string.
+ */
+function getNextDayString(dateStr: string): string {
+  const { year, month, day } = parseDateString(dateStr);
+  const d = new Date(year, month, day + 1);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${dd}`;
+}
+
+/**
+ * Get the day-of-week name for a YYYY-MM-DD date.
+ */
+function getDayOfWeekForDate(dateStr: string): keyof GroupScheduleHours {
+  const { year, month, day } = parseDateString(dateStr);
+  const d = new Date(year, month, day);
+  const days: (keyof GroupScheduleHours)[] = [
+    "sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday",
+  ];
+  return days[d.getDay()];
+}
+
+/**
+ * Find the UTC Date that represents a specific hour:minute on a given calendar day in a timezone.
+ */
+function getUtcForTimezoneTime(
+  dateStr: string,
+  hour: number,
+  minute: number,
+  timezone: string,
+): Date {
+  const { year, month, day } = parseDateString(dateStr);
+  return createDateInTimezone(new Date(year, month, day), hour, minute, timezone);
+}
+
+/**
+ * Round a Date up to the next 15-minute boundary.
+ */
+function roundUpTo15Min(date: Date): Date {
+  const ms = date.getTime();
+  const fifteenMin = 15 * 60 * 1000;
+  const remainder = ms % fifteenMin;
+  if (remainder === 0) return new Date(ms);
+  return new Date(ms + fifteenMin - remainder);
+}
+
+interface SingleDayShuffleResult {
+  movedTasks: Array<{ taskId: string; newStart: string; newEnd: string }>;
+  pushedToDays: string[];
+}
+
+/**
+ * Shuffle a single day: place all moveable tasks sequentially from the cursor,
+ * skipping over fixed obstacles.
+ */
+function shuffleSingleDay(
+  dayStr: string,
+  allTasks: Task[],
+  allGroups: TaskGroup[],
+  awakeHours: GroupScheduleHours | null,
+  timezone: string,
+  taskSlotOverrides: Map<string, { start: Date; end: Date }>,
+  feedback: string[],
+): SingleDayShuffleResult {
+  const movedTasks: Array<{ taskId: string; newStart: string; newEnd: string }> = [];
+  const pushedToDays: string[] = [];
+
+  const { year: tYear, month: tMonth, day: tDay } = parseDateString(dayStr);
+
+  // Gather tasks scheduled on this day (using effective slots with overrides)
+  const dayTasks = allTasks.filter((t) => {
+    const slot = getEffectiveSlot(t, taskSlotOverrides);
+    if (!slot) return false;
+    return isOnDay(slot.start, tYear, tMonth, tDay, timezone);
+  });
+
+  // Separate into fixed and moveable
+  const fixedTasks: Task[] = [];
+  const moveableTasks: Task[] = [];
+
+  for (const task of dayTasks) {
+    const isFixed =
+      task.locked ||
+      task.status === "completed" ||
+      task.status === "in_progress" ||
+      task.status === "cancelled";
+
+    if (isFixed) {
+      fixedTasks.push(task);
+    } else if (task.status === "pending" && task.duration && task.duration > 0) {
+      moveableTasks.push(task);
+    } else if (!task.duration || task.duration <= 0) {
+      feedback.push(`Skipped "${task.title}" (no duration set).`);
+    }
+  }
+
+  if (moveableTasks.length === 0) {
+    return { movedTasks, pushedToDays };
+  }
+
+  // Sort moveable tasks by their current scheduled_start to preserve order
+  moveableTasks.sort((a, b) => {
+    const slotA = getEffectiveSlot(a, taskSlotOverrides);
+    const slotB = getEffectiveSlot(b, taskSlotOverrides);
+    const startA = slotA ? slotA.start.getTime() : 0;
+    const startB = slotB ? slotB.start.getTime() : 0;
+    if (startA !== startB) return startA - startB;
+    return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+  });
+
+  // Build obstacle list from fixed tasks
+  const obstacles: Array<{ start: Date; end: Date }> = [];
+  for (const t of fixedTasks) {
+    const slot = getEffectiveSlot(t, taskSlotOverrides);
+    if (slot) {
+      obstacles.push({ start: slot.start, end: slot.end });
+    }
+  }
+  obstacles.sort((a, b) => a.start.getTime() - b.start.getTime());
+
+  // Determine cursor start
+  const nowUTC = new Date();
+  const nowTz = getTimeInTimezone(nowUTC, timezone);
+  const isToday =
+    nowTz.year === tYear && nowTz.month === tMonth && nowTz.day === tDay;
+
+  let cursor: Date;
+  if (isToday) {
+    cursor = roundUpTo15Min(nowUTC);
+  } else {
+    // Start of working hours for this day (use awake hours as default)
+    const dayOfWeek = getDayOfWeekForDate(dayStr);
+    const dayHours = getWorkingHoursForDay(dayOfWeek, awakeHours);
+    if (dayHours) {
+      cursor = getUtcForTimezoneTime(dayStr, dayHours.start, 0, timezone);
+    } else {
+      cursor = getUtcForTimezoneTime(dayStr, 9, 0, timezone);
+    }
+  }
+
+  // Place each moveable task
+  for (const task of moveableTasks) {
+    const durationMs = task.duration! * 60 * 1000;
+
+    // Determine this task's working hours (group hours > awake hours > default)
+    const taskGroup = task.group_id
+      ? allGroups.find((g) => g.id === task.group_id)
+      : null;
+    const useGroupHours =
+      taskGroup?.auto_schedule_enabled && taskGroup?.auto_schedule_hours;
+    const effectiveHours = useGroupHours
+      ? taskGroup!.auto_schedule_hours!
+      : awakeHours;
+
+    const dayOfWeek = getDayOfWeekForDate(dayStr);
+    const dayHours = getWorkingHoursForDay(dayOfWeek, effectiveHours);
+
+    if (!dayHours) {
+      // This task's group doesn't allow work on this day
+      const nextDay = findNextValidDayForGroup(dayStr, effectiveHours, 7);
+      if (nextDay) {
+        pushedToDays.push(nextDay);
+        // Move task to start of working hours on that day
+        const nextDayOfWeek = getDayOfWeekForDate(nextDay);
+        const nextDayHours = getWorkingHoursForDay(nextDayOfWeek, effectiveHours);
+        if (nextDayHours) {
+          const newStart = getUtcForTimezoneTime(nextDay, nextDayHours.start, 0, timezone);
+          const newEnd = new Date(newStart.getTime() + durationMs);
+          movedTasks.push({
+            taskId: task.id,
+            newStart: newStart.toISOString(),
+            newEnd: newEnd.toISOString(),
+          });
+          taskSlotOverrides.set(task.id, { start: newStart, end: newEnd });
+        }
+      } else {
+        feedback.push(`Could not find a valid day for "${task.title}" within 7 days.`);
+      }
+      continue;
+    }
+
+    // Window boundaries for this day
+    const windowStart = getUtcForTimezoneTime(dayStr, dayHours.start, 0, timezone);
+    const windowEnd = getUtcForTimezoneTime(dayStr, dayHours.end, 0, timezone);
+
+    // Effective cursor: max of global cursor and window start
+    const effectiveCursor = new Date(Math.max(cursor.getTime(), windowStart.getTime()));
+
+    // Find a slot in today's window
+    const slot = findSlotInWindow(
+      effectiveCursor,
+      windowEnd,
+      durationMs,
+      obstacles,
+    );
+
+    if (slot) {
+      const currentSlot = getEffectiveSlot(task, taskSlotOverrides);
+      const changed =
+        !currentSlot ||
+        Math.abs(currentSlot.start.getTime() - slot.start.getTime()) > 60000;
+
+      if (changed) {
+        movedTasks.push({
+          taskId: task.id,
+          newStart: slot.start.toISOString(),
+          newEnd: slot.end.toISOString(),
+        });
+        taskSlotOverrides.set(task.id, slot);
+      }
+
+      // Add this task as an obstacle for subsequent tasks
+      obstacles.push(slot);
+      obstacles.sort((a, b) => a.start.getTime() - b.start.getTime());
+
+      // Advance cursor past this task
+      cursor = new Date(Math.max(cursor.getTime(), slot.end.getTime()));
+    } else {
+      // No room today, push to next day
+      const nextDay = findNextValidDayForGroup(dayStr, effectiveHours, 7);
+      if (nextDay) {
+        if (!pushedToDays.includes(nextDay)) {
+          pushedToDays.push(nextDay);
+        }
+        const nextDayOfWeek = getDayOfWeekForDate(nextDay);
+        const nextDayHours = getWorkingHoursForDay(nextDayOfWeek, effectiveHours);
+        if (nextDayHours) {
+          const newStart = getUtcForTimezoneTime(nextDay, nextDayHours.start, 0, timezone);
+          const newEnd = new Date(newStart.getTime() + durationMs);
+          movedTasks.push({
+            taskId: task.id,
+            newStart: newStart.toISOString(),
+            newEnd: newEnd.toISOString(),
+          });
+          taskSlotOverrides.set(task.id, { start: newStart, end: newEnd });
+        }
+      } else {
+        feedback.push(`Could not place "${task.title}" within the next 7 days.`);
+      }
+    }
+  }
+
+  return { movedTasks, pushedToDays };
+}
+
+/**
+ * Find the next calendar day (after dayStr) that has working hours configured.
+ */
+function findNextValidDayForGroup(
+  dayStr: string,
+  hours: GroupScheduleHours | null,
+  maxDays: number,
+): string | null {
+  let current = dayStr;
+  for (let i = 0; i < maxDays; i++) {
+    current = getNextDayString(current);
+    const dow = getDayOfWeekForDate(current);
+    const dayHours = getWorkingHoursForDay(dow, hours);
+    if (dayHours) return current;
+  }
+  return null;
+}
+
+/**
+ * Find the first available slot within a time window, avoiding obstacles.
+ */
+function findSlotInWindow(
+  windowStart: Date,
+  windowEnd: Date,
+  durationMs: number,
+  obstacles: Array<{ start: Date; end: Date }>,
+): { start: Date; end: Date } | null {
+  let candidateStart = roundUpTo15Min(windowStart);
+
+  while (candidateStart.getTime() + durationMs <= windowEnd.getTime()) {
+    const candidateEnd = new Date(candidateStart.getTime() + durationMs);
+
+    // Check against all obstacles
+    let conflict: { start: Date; end: Date } | null = null;
+    for (const obs of obstacles) {
+      if (candidateStart.getTime() < obs.end.getTime() && candidateEnd.getTime() > obs.start.getTime()) {
+        // Overlap found - pick the obstacle that ends latest
+        if (!conflict || obs.end.getTime() > conflict.end.getTime()) {
+          conflict = obs;
+        }
+      }
+    }
+
+    if (!conflict) {
+      return { start: candidateStart, end: candidateEnd };
+    }
+
+    // Jump past the conflict
+    candidateStart = roundUpTo15Min(conflict.end);
+  }
+
+  return null; // No space in this window
+}

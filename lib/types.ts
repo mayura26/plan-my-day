@@ -179,6 +179,7 @@ export interface CreateTaskRequest {
   due_date?: string; // when task must be completed by
   auto_schedule?: boolean; // If true, automatically schedule to next available slot for today
   schedule_mode?: "now" | "today" | "next-week" | "next-month" | "asap"; // Scheduling mode when auto_schedule is enabled
+  locked?: boolean; // Lock task to prevent shuffle/auto-scheduling from moving it
 }
 
 export interface UpdateTaskRequest extends Partial<CreateTaskRequest> {
