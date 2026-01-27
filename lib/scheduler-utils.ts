@@ -1,5 +1,5 @@
 import { createDateInTimezone } from "@/lib/timezone-utils";
-import type { GroupScheduleHours, Task, TaskGroup } from "@/lib/types";
+import type { GroupScheduleHours, SchedulingMode, Task, TaskGroup } from "@/lib/types";
 
 interface TimeSlot {
   start: Date;
@@ -1030,8 +1030,9 @@ export function rescheduleTaskWithShuffling(
 
 /**
  * Scheduling mode types
+ * @deprecated Import from @/lib/types instead. This export is kept for backward compatibility.
  */
-export type SchedulingMode = "now" | "today" | "tomorrow" | "next-week" | "next-month" | "asap" | "due-date";
+export type { SchedulingMode } from "@/lib/types";
 
 /**
  * Scheduling result with feedback messages
@@ -1529,9 +1530,7 @@ export function scheduleTaskUnified(options: UnifiedSchedulingOptions): Scheduli
       break;
 
     case "tomorrow": {
-      reportProgress(
-        "Mode: Schedule Tomorrow - Task will be scheduled tomorrow"
-      );
+      reportProgress("Mode: Schedule Tomorrow - Task will be scheduled tomorrow");
       // Get tomorrow's date in user's timezone
       const tomorrowMidnight = getStartOfTomorrow(nowUTC, timezone);
       const tomorrowTzTime = getTimeInTimezone(tomorrowMidnight, timezone);
@@ -1539,9 +1538,10 @@ export function scheduleTaskUnified(options: UnifiedSchedulingOptions): Scheduli
       // Get the working hours for tomorrow's day of week
       // Use group hours if available, otherwise awake hours, otherwise default 9-17
       const tomorrowDayOfWeek = tomorrowTzTime.dayOfWeek;
-      const groupHoursForTomorrow = taskGroup?.auto_schedule_enabled && taskGroup?.auto_schedule_hours
-        ? taskGroup.auto_schedule_hours[tomorrowDayOfWeek as keyof GroupScheduleHours]
-        : null;
+      const groupHoursForTomorrow =
+        taskGroup?.auto_schedule_enabled && taskGroup?.auto_schedule_hours
+          ? taskGroup.auto_schedule_hours[tomorrowDayOfWeek as keyof GroupScheduleHours]
+          : null;
       const awakeHoursForTomorrow = awakeHours?.[tomorrowDayOfWeek as keyof GroupScheduleHours];
       const tomorrowHours = groupHoursForTomorrow || awakeHoursForTomorrow || { start: 9, end: 17 };
 
@@ -1828,11 +1828,7 @@ export function scheduleTaskUnified(options: UnifiedSchedulingOptions): Scheduli
           // Jump past conflict
           if (latestConflictEnd) {
             currentTimeUTC = new Date(latestConflictEnd);
-            currentTimeUTC.setUTCMinutes(
-              Math.ceil(currentTimeUTC.getUTCMinutes() / 15) * 15,
-              0,
-              0
-            );
+            currentTimeUTC.setUTCMinutes(Math.ceil(currentTimeUTC.getUTCMinutes() / 15) * 15, 0, 0);
             if (currentTimeUTC.getUTCMinutes() >= 60) {
               currentTimeUTC.setUTCHours(currentTimeUTC.getUTCHours() + 1, 0, 0, 0);
             }
@@ -2515,14 +2511,7 @@ export interface ShuffleResult {
  * which triggers a cascade shuffle on that day too.
  */
 export function shuffleTasksForDay(options: ShuffleOptions): ShuffleResult {
-  const {
-    targetDate,
-    allTasks,
-    allGroups,
-    awakeHours,
-    timezone,
-    maxCascadeDays = 7,
-  } = options;
+  const { targetDate, allTasks, allGroups, awakeHours, timezone, maxCascadeDays = 7 } = options;
 
   const feedback: string[] = [];
   const movedTasks: Array<{ taskId: string; newStart: string; newEnd: string }> = [];
@@ -2558,7 +2547,7 @@ export function shuffleTasksForDay(options: ShuffleOptions): ShuffleResult {
       awakeHours,
       timezone,
       taskSlotOverrides,
-      feedback,
+      feedback
     );
 
     for (const moved of result.movedTasks) {
@@ -2591,7 +2580,7 @@ export function shuffleTasksForDay(options: ShuffleOptions): ShuffleResult {
  */
 function getEffectiveSlot(
   task: Task,
-  overrides: Map<string, { start: Date; end: Date }>,
+  overrides: Map<string, { start: Date; end: Date }>
 ): { start: Date; end: Date } | null {
   const override = overrides.get(task.id);
   if (override) return override;
@@ -2617,7 +2606,7 @@ function isOnDay(
   targetYear: number,
   targetMonth: number,
   targetDay: number,
-  timezone: string,
+  timezone: string
 ): boolean {
   const tz = getTimeInTimezone(utcDate, timezone);
   return tz.year === targetYear && tz.month === targetMonth && tz.day === targetDay;
@@ -2642,7 +2631,13 @@ function getDayOfWeekForDate(dateStr: string): keyof GroupScheduleHours {
   const { year, month, day } = parseDateString(dateStr);
   const d = new Date(year, month, day);
   const days: (keyof GroupScheduleHours)[] = [
-    "sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday",
+    "sunday",
+    "monday",
+    "tuesday",
+    "wednesday",
+    "thursday",
+    "friday",
+    "saturday",
   ];
   return days[d.getDay()];
 }
@@ -2654,7 +2649,7 @@ function getUtcForTimezoneTime(
   dateStr: string,
   hour: number,
   minute: number,
-  timezone: string,
+  timezone: string
 ): Date {
   const { year, month, day } = parseDateString(dateStr);
   return createDateInTimezone(new Date(year, month, day), hour, minute, timezone);
@@ -2687,7 +2682,7 @@ function shuffleSingleDay(
   awakeHours: GroupScheduleHours | null,
   timezone: string,
   taskSlotOverrides: Map<string, { start: Date; end: Date }>,
-  feedback: string[],
+  feedback: string[]
 ): SingleDayShuffleResult {
   const movedTasks: Array<{ taskId: string; newStart: string; newEnd: string }> = [];
   const pushedToDays: string[] = [];
@@ -2701,7 +2696,9 @@ function shuffleSingleDay(
     return isOnDay(slot.start, tYear, tMonth, tDay, timezone);
   });
 
-  feedback.push(`[${dayStr}] Found ${dayTasks.length} task(s) on this day (from ${allTasks.length} total).`);
+  feedback.push(
+    `[${dayStr}] Found ${dayTasks.length} task(s) on this day (from ${allTasks.length} total).`
+  );
 
   // Separate into fixed and moveable
   const fixedTasks: Task[] = [];
@@ -2724,7 +2721,9 @@ function shuffleSingleDay(
   }
 
   if (moveableTasks.length === 0) {
-    feedback.push(`[${dayStr}] ${fixedTasks.length} fixed, 0 moveable. Statuses: ${dayTasks.map((t) => `${t.title.slice(0, 20)}=${t.status}/${t.locked ? "locked" : "unlocked"}`).join(", ")}`);
+    feedback.push(
+      `[${dayStr}] ${fixedTasks.length} fixed, 0 moveable. Statuses: ${dayTasks.map((t) => `${t.title.slice(0, 20)}=${t.status}/${t.locked ? "locked" : "unlocked"}`).join(", ")}`
+    );
     return { movedTasks, pushedToDays };
   }
 
@@ -2751,8 +2750,7 @@ function shuffleSingleDay(
   // Determine cursor start
   const nowUTC = new Date();
   const nowTz = getTimeInTimezone(nowUTC, timezone);
-  const isToday =
-    nowTz.year === tYear && nowTz.month === tMonth && nowTz.day === tDay;
+  const isToday = nowTz.year === tYear && nowTz.month === tMonth && nowTz.day === tDay;
 
   let cursor: Date;
   if (isToday) {
@@ -2773,14 +2771,9 @@ function shuffleSingleDay(
     const durationMs = task.duration! * 60 * 1000;
 
     // Determine this task's working hours (group hours > awake hours > default)
-    const taskGroup = task.group_id
-      ? allGroups.find((g) => g.id === task.group_id)
-      : null;
-    const useGroupHours =
-      taskGroup?.auto_schedule_enabled && taskGroup?.auto_schedule_hours;
-    const effectiveHours = useGroupHours
-      ? taskGroup!.auto_schedule_hours!
-      : awakeHours;
+    const taskGroup = task.group_id ? allGroups.find((g) => g.id === task.group_id) : null;
+    const useGroupHours = taskGroup?.auto_schedule_enabled && taskGroup?.auto_schedule_hours;
+    const effectiveHours = useGroupHours ? taskGroup!.auto_schedule_hours! : awakeHours;
 
     const dayOfWeek = getDayOfWeekForDate(dayStr);
     const dayHours = getWorkingHoursForDay(dayOfWeek, effectiveHours);
@@ -2817,18 +2810,12 @@ function shuffleSingleDay(
     const effectiveCursor = new Date(Math.max(cursor.getTime(), windowStart.getTime()));
 
     // Find a slot in today's window
-    const slot = findSlotInWindow(
-      effectiveCursor,
-      windowEnd,
-      durationMs,
-      obstacles,
-    );
+    const slot = findSlotInWindow(effectiveCursor, windowEnd, durationMs, obstacles);
 
     if (slot) {
       const currentSlot = getEffectiveSlot(task, taskSlotOverrides);
       const changed =
-        !currentSlot ||
-        Math.abs(currentSlot.start.getTime() - slot.start.getTime()) > 60000;
+        !currentSlot || Math.abs(currentSlot.start.getTime() - slot.start.getTime()) > 60000;
 
       if (changed) {
         movedTasks.push({
@@ -2879,7 +2866,7 @@ function shuffleSingleDay(
 function findNextValidDayForGroup(
   dayStr: string,
   hours: GroupScheduleHours | null,
-  maxDays: number,
+  maxDays: number
 ): string | null {
   let current = dayStr;
   for (let i = 0; i < maxDays; i++) {
@@ -2898,7 +2885,7 @@ function findSlotInWindow(
   windowStart: Date,
   windowEnd: Date,
   durationMs: number,
-  obstacles: Array<{ start: Date; end: Date }>,
+  obstacles: Array<{ start: Date; end: Date }>
 ): { start: Date; end: Date } | null {
   let candidateStart = roundUpTo15Min(windowStart);
 
@@ -2908,7 +2895,10 @@ function findSlotInWindow(
     // Check against all obstacles
     let conflict: { start: Date; end: Date } | null = null;
     for (const obs of obstacles) {
-      if (candidateStart.getTime() < obs.end.getTime() && candidateEnd.getTime() > obs.start.getTime()) {
+      if (
+        candidateStart.getTime() < obs.end.getTime() &&
+        candidateEnd.getTime() > obs.start.getTime()
+      ) {
         // Overlap found - pick the obstacle that ends latest
         if (!conflict || obs.end.getTime() > conflict.end.getTime()) {
           conflict = obs;
@@ -3014,13 +3004,17 @@ export function pullForwardTasksForGroup(options: PullForwardOptions): PullForwa
     .filter((t) => {
       if (t.group_id !== groupId) return false;
       if (t.locked) return false;
-      if (t.status === "completed" || t.status === "in_progress" || t.status === "cancelled") return false;
+      if (t.status === "completed" || t.status === "in_progress" || t.status === "cancelled")
+        return false;
       if (!t.duration || t.duration <= 0) return false;
       if (!t.scheduled_start || !t.scheduled_end) return false;
       // Must be scheduled AFTER the target day
       const slot = getEffectiveSlot(t, emptyOverrides);
       if (!slot) return false;
-      return !isOnDay(slot.start, tYear, tMonth, tDay, timezone) && slot.start.getTime() > windowStart.getTime();
+      return (
+        !isOnDay(slot.start, tYear, tMonth, tDay, timezone) &&
+        slot.start.getTime() > windowStart.getTime()
+      );
     })
     .sort((a, b) => {
       const startA = new Date(a.scheduled_start!).getTime();

@@ -36,7 +36,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useUserTimezone } from "@/hooks/use-user-timezone";
 import { getOverdueTasks } from "@/lib/task-utils";
 import { formatDateTimeLocalForTimezone, parseDateTimeLocalToUTC } from "@/lib/timezone-utils";
-import type { Task } from "@/lib/types";
+import type { SchedulingMode, Task } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 interface ProcessOverdueDialogProps {
@@ -57,15 +57,13 @@ type TaskAction =
   | "mark-complete"
   | null;
 
-type ScheduleMode = "now" | "today" | "tomorrow" | "next-week" | "next-month" | "asap";
-
 interface TaskActionState {
   action: TaskAction;
   additionalDuration?: number;
   notes?: string;
   newDueDate?: string;
   autoSchedule?: boolean;
-  scheduleMode?: ScheduleMode;
+  scheduleMode?: SchedulingMode;
 }
 
 export function ProcessOverdueDialog({
@@ -127,7 +125,7 @@ export function ProcessOverdueDialog({
         // Set default schedule mode if action is reschedule
         const defaultState =
           action === "reschedule" && !preservedState.scheduleMode
-            ? { scheduleMode: "now" as ScheduleMode }
+            ? { scheduleMode: "now" as SchedulingMode }
             : {};
         newActions.set(taskId, { action, ...preservedState, ...defaultState });
         setSelectedTaskId(taskId);
@@ -218,13 +216,14 @@ export function ProcessOverdueDialog({
         } else if (actionState.action === "reschedule") {
           // Reschedule task using the selected schedule mode
           const mode = actionState.scheduleMode || "now";
-          const endpointMap: Record<ScheduleMode, string> = {
+          const endpointMap: Record<SchedulingMode, string> = {
             now: "schedule-now",
             today: "schedule-today",
             tomorrow: "schedule-tomorrow",
             "next-week": "schedule-next-week",
             "next-month": "schedule-next-month",
             asap: "schedule-asap",
+            "due-date": "schedule-due-date",
           };
           const promise = fetch(`/api/tasks/${taskId}/${endpointMap[mode]}`, {
             method: "POST",
@@ -694,7 +693,7 @@ export function ProcessOverdueDialog({
                             <Label>Schedule To</Label>
                             <Select
                               value={actionState.scheduleMode || "now"}
-                              onValueChange={(value: ScheduleMode) =>
+                              onValueChange={(value: SchedulingMode) =>
                                 updateTaskAction(task.id, { scheduleMode: value })
                               }
                               disabled={processingTaskId === task.id}
@@ -709,19 +708,21 @@ export function ProcessOverdueDialog({
                                 <SelectItem value="next-week">Schedule Next Week</SelectItem>
                                 <SelectItem value="next-month">Schedule Next Month</SelectItem>
                                 <SelectItem value="asap">Schedule ASAP (with shuffling)</SelectItem>
+                                <SelectItem value="due-date">Schedule to Due Date</SelectItem>
                               </SelectContent>
                             </Select>
                           </div>
                           <Button
                             onClick={async () => {
                               const mode = actionState.scheduleMode || "now";
-                              const endpointMap: Record<ScheduleMode, string> = {
+                              const endpointMap: Record<SchedulingMode, string> = {
                                 now: "schedule-now",
                                 today: "schedule-today",
                                 tomorrow: "schedule-tomorrow",
                                 "next-week": "schedule-next-week",
                                 "next-month": "schedule-next-month",
                                 asap: "schedule-asap",
+                                "due-date": "schedule-due-date",
                               };
 
                               setProcessingTaskId(task.id);
@@ -796,7 +797,9 @@ export function ProcessOverdueDialog({
                         Now
                       </Button>
                       <Button
-                        variant={actionState?.action === "schedule-tomorrow" ? "default" : "outline"}
+                        variant={
+                          actionState?.action === "schedule-tomorrow" ? "default" : "outline"
+                        }
                         size="sm"
                         onClick={(e) => handleSelectAction(task.id, "schedule-tomorrow", e)}
                         className="text-xs"

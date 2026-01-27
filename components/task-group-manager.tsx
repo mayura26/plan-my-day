@@ -3,7 +3,6 @@
 import {
   AlertCircle,
   AlertTriangle,
-  Magnet,
   Calendar,
   CheckSquare,
   ChevronDown,
@@ -15,6 +14,7 @@ import {
   EyeOff,
   Folder,
   ListTodo,
+  Magnet,
   Plus,
   Trash2,
 } from "lucide-react";
@@ -445,7 +445,7 @@ function GroupCard({
               <Magnet
                 className={cn(
                   "h-3.5 w-3.5 transition-transform duration-300",
-                  isPullingForward && "animate-bounce",
+                  isPullingForward && "animate-bounce"
                 )}
               />
             </Button>
@@ -578,7 +578,7 @@ function GroupCard({
                 <Magnet
                   className={cn(
                     "h-3.5 w-3.5 transition-transform duration-300",
-                    isPullingForward && "animate-bounce",
+                    isPullingForward && "animate-bounce"
                   )}
                 />
               </Button>

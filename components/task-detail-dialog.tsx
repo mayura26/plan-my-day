@@ -42,7 +42,7 @@ import {
 import { useUserTimezone } from "@/hooks/use-user-timezone";
 import { ENERGY_LABELS, TASK_TYPE_LABELS } from "@/lib/task-utils";
 import { formatDateTimeFull } from "@/lib/timezone-utils";
-import type { Task, TaskDependency, TaskStatus } from "@/lib/types";
+import type { SchedulingMode, Task, TaskDependency, TaskStatus } from "@/lib/types";
 
 interface TaskDetailDialogProps {
   task: Task | null;
@@ -369,9 +369,7 @@ export function TaskDetailDialog({
     }
   };
 
-  const handleSchedule = async (
-    mode: "now" | "today" | "tomorrow" | "next-week" | "next-month" | "asap" | "due-date"
-  ) => {
+  const handleSchedule = async (mode: SchedulingMode) => {
     if (!task) return;
 
     setIsScheduling(true);
@@ -846,7 +844,9 @@ export function TaskDetailDialog({
                                 <Flag className="h-4 w-4 mr-2" />
                                 Schedule to Due Date
                                 {!task.due_date && (
-                                  <span className="ml-2 text-xs text-muted-foreground">(no due date)</span>
+                                  <span className="ml-2 text-xs text-muted-foreground">
+                                    (no due date)
+                                  </span>
                                 )}
                               </DropdownMenuItem>
                               <DropdownMenuItem onClick={() => handleSchedule("asap")}>

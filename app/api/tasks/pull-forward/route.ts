@@ -79,7 +79,8 @@ export async function POST(request: NextRequest) {
     const userResult = await db.execute("SELECT timezone, awake_hours FROM users WHERE id = ?", [
       session.user.id,
     ]);
-    const userTimezone = clientTimezone ||
+    const userTimezone =
+      clientTimezone ||
       (userResult.rows.length > 0
         ? getUserTimezone(userResult.rows[0].timezone as string | null)
         : "UTC");
@@ -102,7 +103,7 @@ export async function POST(request: NextRequest) {
     // Fetch all user task groups
     const allGroupsResult = await db.execute(
       "SELECT * FROM task_groups WHERE user_id = ? ORDER BY name ASC",
-      [session.user.id],
+      [session.user.id]
     );
     const allGroups = allGroupsResult.rows.map(mapRowToGroup);
 
@@ -117,10 +118,7 @@ export async function POST(request: NextRequest) {
     });
 
     if (result.error) {
-      return NextResponse.json(
-        { error: result.error, feedback: result.feedback },
-        { status: 422 },
-      );
+      return NextResponse.json({ error: result.error, feedback: result.feedback }, { status: 422 });
     }
 
     // Update all moved tasks in the database
@@ -128,7 +126,7 @@ export async function POST(request: NextRequest) {
     for (const moved of result.movedTasks) {
       await db.execute(
         `UPDATE tasks SET scheduled_start = ?, scheduled_end = ?, updated_at = ? WHERE id = ? AND user_id = ?`,
-        [moved.newStart, moved.newEnd, now, moved.taskId, session.user.id],
+        [moved.newStart, moved.newEnd, now, moved.taskId, session.user.id]
       );
     }
 
@@ -139,7 +137,7 @@ export async function POST(request: NextRequest) {
       const placeholders = updatedTaskIds.map(() => "?").join(", ");
       const updatedResult = await db.execute(
         `SELECT * FROM tasks WHERE id IN (${placeholders}) AND user_id = ?`,
-        [...updatedTaskIds, session.user.id],
+        [...updatedTaskIds, session.user.id]
       );
       updatedTasks = updatedResult.rows.map(mapRowToTask);
     }

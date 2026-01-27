@@ -290,7 +290,10 @@ export async function POST(request: NextRequest) {
       scheduled_start: body.scheduled_start || null,
       scheduled_end: body.scheduled_end || null,
       due_date: dueDate,
-      locked: body.locked !== undefined ? Boolean(body.locked) : (taskType === "event" || taskType === "todo"),
+      locked:
+        body.locked !== undefined
+          ? Boolean(body.locked)
+          : taskType === "event" || taskType === "todo",
       group_id: groupId,
       template_id: body.template_id || null,
       task_type: taskType,
@@ -459,7 +462,7 @@ export async function POST(request: NextRequest) {
         // Use unified scheduler with the selected mode (default to "now" if not specified)
         const scheduleMode = body.schedule_mode || "now";
         const result = scheduleTaskUnified({
-          mode: scheduleMode as "now" | "today" | "next-week" | "next-month" | "asap",
+          mode: scheduleMode,
           task,
           allTasks,
           taskGroup,

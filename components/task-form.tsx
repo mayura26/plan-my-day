@@ -68,7 +68,10 @@ export function TaskForm({
     due_date: formatDateTimeLocalForTimezone(initialData?.due_date, timezone),
     auto_schedule: initialData?.auto_schedule || false,
     schedule_mode: (initialData as any)?.schedule_mode || "now",
-    locked: initialData?.locked !== undefined ? initialData.locked : (initialTaskType === "event" || initialTaskType === "todo"),
+    locked:
+      initialData?.locked !== undefined
+        ? initialData.locked
+        : initialTaskType === "event" || initialTaskType === "todo",
   } as CreateTaskRequest & { schedule_mode?: string });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -131,7 +134,10 @@ export function TaskForm({
         scheduled_end: formatDateTimeLocalForTimezone(initialData.scheduled_end, timezone),
         due_date: formatDateTimeLocalForTimezone(initialData.due_date, timezone),
         auto_schedule: initialData.auto_schedule || false,
-        locked: initialData.locked !== undefined ? initialData.locked : (taskType === "event" || taskType === "todo"),
+        locked:
+          initialData.locked !== undefined
+            ? initialData.locked
+            : taskType === "event" || taskType === "todo",
       }));
       setShowDescription(!!initialData.description);
     }
@@ -653,6 +659,7 @@ export function TaskForm({
                         const labels: Record<string, string> = {
                           now: "Schedule Now",
                           today: "Schedule Today",
+                          tomorrow: "Schedule Tomorrow",
                           "next-week": "Schedule Next Week",
                           "next-month": "Schedule Next Month",
                           asap: "Schedule ASAP",
@@ -670,6 +677,12 @@ export function TaskForm({
                     <DropdownMenuItem onClick={() => handleInputChange("schedule_mode", "today")}>
                       <CalendarClock className="h-4 w-4 mr-2" />
                       Schedule Today
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => handleInputChange("schedule_mode", "tomorrow")}
+                    >
+                      <CalendarClock className="h-4 w-4 mr-2" />
+                      Schedule Tomorrow
                     </DropdownMenuItem>
                     <DropdownMenuItem
                       onClick={() => handleInputChange("schedule_mode", "next-week")}
@@ -750,11 +763,7 @@ export function TaskForm({
           htmlFor="locked"
           className="text-sm font-normal cursor-pointer flex items-center gap-1.5"
         >
-          {formData.locked ? (
-            <Lock className="w-3.5 h-3.5" />
-          ) : (
-            <Unlock className="w-3.5 h-3.5" />
-          )}
+          {formData.locked ? <Lock className="w-3.5 h-3.5" /> : <Unlock className="w-3.5 h-3.5" />}
           <span>{formData.locked ? "Locked" : "Unlocked"}</span>
         </Label>
         <span className="text-xs text-muted-foreground ml-auto">

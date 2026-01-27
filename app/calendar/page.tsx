@@ -12,11 +12,11 @@ import {
   useSensors,
 } from "@dnd-kit/core";
 import { format, startOfMonth } from "date-fns";
-import { toast } from "sonner";
 import { CheckSquare, ChevronDown, ChevronRight, Plus, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { toast } from "sonner";
 import { CalendarSkeleton } from "@/components/calendar-skeleton";
 import { DayCalendar } from "@/components/day-calendar";
 import { DayNoteDialog } from "@/components/day-note-dialog";
@@ -235,7 +235,7 @@ export default function CalendarPage() {
 
           const dayCount = 1 + (data.cascadedDays?.length || 0);
           toast.success(
-            `Shuffled ${data.movedCount} task${data.movedCount !== 1 ? "s" : ""}${dayCount > 1 ? ` across ${dayCount} days` : ""}`,
+            `Shuffled ${data.movedCount} task${data.movedCount !== 1 ? "s" : ""}${dayCount > 1 ? ` across ${dayCount} days` : ""}`
           );
         } else {
           toast.info("No tasks needed shuffling.");
@@ -250,41 +250,44 @@ export default function CalendarPage() {
     }
   }, [currentDate, timezone]);
 
-  const handlePullForward = useCallback(async (groupId: string) => {
-    try {
-      const dateKey = format(currentDate, "yyyy-MM-dd");
-      const response = await fetch("/api/tasks/pull-forward", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ date: dateKey, groupId, timezone }),
-      });
+  const handlePullForward = useCallback(
+    async (groupId: string) => {
+      try {
+        const dateKey = format(currentDate, "yyyy-MM-dd");
+        const response = await fetch("/api/tasks/pull-forward", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ date: dateKey, groupId, timezone }),
+        });
 
-      if (response.ok) {
-        const data = await response.json();
-        if (data.updatedTasks && data.updatedTasks.length > 0) {
-          setTasks((prev) => {
-            const updatedMap = new Map<string, Task>();
-            for (const task of data.updatedTasks) {
-              updatedMap.set(task.id, task);
-            }
-            return prev.map((t) => updatedMap.get(t.id) || t);
-          });
+        if (response.ok) {
+          const data = await response.json();
+          if (data.updatedTasks && data.updatedTasks.length > 0) {
+            setTasks((prev) => {
+              const updatedMap = new Map<string, Task>();
+              for (const task of data.updatedTasks) {
+                updatedMap.set(task.id, task);
+              }
+              return prev.map((t) => updatedMap.get(t.id) || t);
+            });
 
-          toast.success(
-            `Pulled forward ${data.movedCount} task${data.movedCount !== 1 ? "s" : ""} to today`,
-          );
+            toast.success(
+              `Pulled forward ${data.movedCount} task${data.movedCount !== 1 ? "s" : ""} to today`
+            );
+          } else {
+            toast.info("No future tasks available to pull forward for this group.");
+          }
         } else {
-          toast.info("No future tasks available to pull forward for this group.");
+          const error = await response.json();
+          toast.error(error.error || "Failed to pull forward tasks");
         }
-      } else {
-        const error = await response.json();
-        toast.error(error.error || "Failed to pull forward tasks");
+      } catch (error) {
+        console.error("Error pulling forward tasks:", error);
+        toast.error("Failed to pull forward tasks");
       }
-    } catch (error) {
-      console.error("Error pulling forward tasks:", error);
-      toast.error("Failed to pull forward tasks");
-    }
-  }, [currentDate, timezone]);
+    },
+    [currentDate, timezone]
+  );
 
   useEffect(() => {
     if (status === "unauthenticated") {

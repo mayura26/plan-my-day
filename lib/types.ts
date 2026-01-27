@@ -42,6 +42,19 @@ export interface Task {
 export type TaskStatus = "pending" | "in_progress" | "completed" | "cancelled" | "rescheduled";
 export type TaskType = "task" | "event" | "todo" | "subtask";
 
+/**
+ * Scheduling modes available in the UI and API
+ * All modes are user-facing and can be selected from various dialogs
+ */
+export type SchedulingMode =
+  | "now"
+  | "today"
+  | "tomorrow"
+  | "next-week"
+  | "next-month"
+  | "asap"
+  | "due-date";
+
 // Task with additional computed properties for UI
 export interface TaskWithSubtasks extends Task {
   subtasks?: Task[];
@@ -178,7 +191,7 @@ export interface CreateTaskRequest {
   scheduled_end?: string;
   due_date?: string; // when task must be completed by
   auto_schedule?: boolean; // If true, automatically schedule to next available slot for today
-  schedule_mode?: "now" | "today" | "next-week" | "next-month" | "asap"; // Scheduling mode when auto_schedule is enabled
+  schedule_mode?: SchedulingMode; // Scheduling mode when auto_schedule is enabled
   locked?: boolean; // Lock task to prevent shuffle/auto-scheduling from moving it
 }
 
