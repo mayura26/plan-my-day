@@ -250,6 +250,42 @@ export default function CalendarPage() {
     }
   }, [currentDate, timezone]);
 
+  const handlePullForward = useCallback(async (groupId: string) => {
+    try {
+      const dateKey = format(currentDate, "yyyy-MM-dd");
+      const response = await fetch("/api/tasks/pull-forward", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ date: dateKey, groupId, timezone }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.updatedTasks && data.updatedTasks.length > 0) {
+          setTasks((prev) => {
+            const updatedMap = new Map<string, Task>();
+            for (const task of data.updatedTasks) {
+              updatedMap.set(task.id, task);
+            }
+            return prev.map((t) => updatedMap.get(t.id) || t);
+          });
+
+          toast.success(
+            `Pulled forward ${data.movedCount} task${data.movedCount !== 1 ? "s" : ""} to today`,
+          );
+        } else {
+          toast.info("No future tasks available to pull forward for this group.");
+        }
+      } else {
+        const error = await response.json();
+        toast.error(error.error || "Failed to pull forward tasks");
+      }
+    } catch (error) {
+      console.error("Error pulling forward tasks:", error);
+      toast.error("Failed to pull forward tasks");
+    }
+  }, [currentDate, timezone]);
+
   useEffect(() => {
     if (status === "unauthenticated") {
       router.push("/auth/signin");
@@ -1233,6 +1269,7 @@ export default function CalendarPage() {
                       });
                       setShowCreateForm(true);
                     }}
+                    onPullForwardTasks={handlePullForward}
                   />
                 </div>
               )}

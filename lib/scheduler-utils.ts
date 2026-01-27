@@ -2701,6 +2701,8 @@ function shuffleSingleDay(
     return isOnDay(slot.start, tYear, tMonth, tDay, timezone);
   });
 
+  feedback.push(`[${dayStr}] Found ${dayTasks.length} task(s) on this day (from ${allTasks.length} total).`);
+
   // Separate into fixed and moveable
   const fixedTasks: Task[] = [];
   const moveableTasks: Task[] = [];
@@ -2714,7 +2716,7 @@ function shuffleSingleDay(
 
     if (isFixed) {
       fixedTasks.push(task);
-    } else if (task.status === "pending" && task.duration && task.duration > 0) {
+    } else if (task.duration && task.duration > 0) {
       moveableTasks.push(task);
     } else if (!task.duration || task.duration <= 0) {
       feedback.push(`Skipped "${task.title}" (no duration set).`);
@@ -2722,6 +2724,7 @@ function shuffleSingleDay(
   }
 
   if (moveableTasks.length === 0) {
+    feedback.push(`[${dayStr}] ${fixedTasks.length} fixed, 0 moveable. Statuses: ${dayTasks.map((t) => `${t.title.slice(0, 20)}=${t.status}/${t.locked ? "locked" : "unlocked"}`).join(", ")}`);
     return { movedTasks, pushedToDays };
   }
 
@@ -2922,4 +2925,151 @@ function findSlotInWindow(
   }
 
   return null; // No space in this window
+}
+
+// ============================================================================
+// PULL FORWARD TASKS FOR A GROUP
+// ============================================================================
+
+export interface PullForwardOptions {
+  targetDate: string; // YYYY-MM-DD - the day to pull tasks INTO
+  groupId: string;
+  allTasks: Task[];
+  allGroups: TaskGroup[];
+  awakeHours: GroupScheduleHours | null;
+  timezone: string;
+  maxLookAheadDays?: number; // Default: 14
+}
+
+export interface PullForwardResult {
+  movedTasks: Array<{ taskId: string; newStart: string; newEnd: string }>;
+  feedback: string[];
+  error?: string;
+}
+
+/**
+ * Pull forward tasks from future days into available slots on the target day
+ * for a specific group. Used when you're ahead on a group and want to
+ * bring future work into today's schedule.
+ */
+export function pullForwardTasksForGroup(options: PullForwardOptions): PullForwardResult {
+  const {
+    targetDate,
+    groupId,
+    allTasks,
+    allGroups,
+    awakeHours,
+    timezone,
+    maxLookAheadDays = 14,
+  } = options;
+
+  const feedback: string[] = [];
+  const movedTasks: Array<{ taskId: string; newStart: string; newEnd: string }> = [];
+
+  const { year: tYear, month: tMonth, day: tDay } = parseDateString(targetDate);
+  const emptyOverrides = new Map<string, { start: Date; end: Date }>();
+
+  // Find the group
+  const group = allGroups.find((g) => g.id === groupId);
+  if (!group) {
+    feedback.push("Group not found.");
+    return { movedTasks, feedback, error: "Group not found" };
+  }
+
+  // Determine working hours for the target day
+  const useGroupHours = group.auto_schedule_enabled && group.auto_schedule_hours;
+  const effectiveHours = useGroupHours ? group.auto_schedule_hours! : awakeHours;
+  const dayOfWeek = getDayOfWeekForDate(targetDate);
+  const dayHours = getWorkingHoursForDay(dayOfWeek, effectiveHours);
+
+  if (!dayHours) {
+    feedback.push(`No working hours configured for ${dayOfWeek}.`);
+    return { movedTasks, feedback };
+  }
+
+  const windowStart = getUtcForTimezoneTime(targetDate, dayHours.start, 0, timezone);
+  const windowEnd = getUtcForTimezoneTime(targetDate, dayHours.end, 0, timezone);
+
+  // For today, don't place tasks before now
+  const nowUTC = new Date();
+  const nowTz = getTimeInTimezone(nowUTC, timezone);
+  const isToday = nowTz.year === tYear && nowTz.month === tMonth && nowTz.day === tDay;
+  const effectiveWindowStart = isToday
+    ? new Date(Math.max(roundUpTo15Min(nowUTC).getTime(), windowStart.getTime()))
+    : windowStart;
+
+  // Gather all tasks scheduled on the target day (regardless of group) as obstacles
+  const obstacles: Array<{ start: Date; end: Date }> = [];
+  for (const t of allTasks) {
+    const slot = getEffectiveSlot(t, emptyOverrides);
+    if (!slot) continue;
+    if (!isOnDay(slot.start, tYear, tMonth, tDay, timezone)) continue;
+    obstacles.push({ start: slot.start, end: slot.end });
+  }
+  obstacles.sort((a, b) => a.start.getTime() - b.start.getTime());
+
+  // Find future tasks for this group that can be pulled forward
+  // Sort by scheduled_start ASC (pull nearest future tasks first)
+  const futureTasks = allTasks
+    .filter((t) => {
+      if (t.group_id !== groupId) return false;
+      if (t.locked) return false;
+      if (t.status === "completed" || t.status === "in_progress" || t.status === "cancelled") return false;
+      if (!t.duration || t.duration <= 0) return false;
+      if (!t.scheduled_start || !t.scheduled_end) return false;
+      // Must be scheduled AFTER the target day
+      const slot = getEffectiveSlot(t, emptyOverrides);
+      if (!slot) return false;
+      return !isOnDay(slot.start, tYear, tMonth, tDay, timezone) && slot.start.getTime() > windowStart.getTime();
+    })
+    .sort((a, b) => {
+      const startA = new Date(a.scheduled_start!).getTime();
+      const startB = new Date(b.scheduled_start!).getTime();
+      return startA - startB;
+    });
+
+  // Cap the look-ahead: only pull from the next N days
+  const maxDate = new Date(windowEnd);
+  maxDate.setUTCDate(maxDate.getUTCDate() + maxLookAheadDays);
+  const eligibleTasks = futureTasks.filter((t) => {
+    const start = new Date(t.scheduled_start!);
+    return start.getTime() <= maxDate.getTime();
+  });
+
+  if (eligibleTasks.length === 0) {
+    feedback.push(`No future tasks found for "${group.name}" to pull forward.`);
+    return { movedTasks, feedback };
+  }
+
+  feedback.push(`Found ${eligibleTasks.length} future task(s) for "${group.name}".`);
+
+  // Try to place each future task into today's available slots
+  for (const task of eligibleTasks) {
+    const durationMs = task.duration! * 60 * 1000;
+
+    const slot = findSlotInWindow(effectiveWindowStart, windowEnd, durationMs, obstacles);
+
+    if (slot) {
+      movedTasks.push({
+        taskId: task.id,
+        newStart: slot.start.toISOString(),
+        newEnd: slot.end.toISOString(),
+      });
+      // Add this as an obstacle so subsequent tasks don't overlap
+      obstacles.push(slot);
+      obstacles.sort((a, b) => a.start.getTime() - b.start.getTime());
+    } else {
+      // No more room today
+      feedback.push(`No more room today. Pulled ${movedTasks.length} task(s).`);
+      break;
+    }
+  }
+
+  if (movedTasks.length === 0) {
+    feedback.push("No available slots on this day to fit future tasks.");
+  } else {
+    feedback.push(`Pulled ${movedTasks.length} task(s) forward to ${targetDate}.`);
+  }
+
+  return { movedTasks, feedback };
 }

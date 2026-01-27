@@ -3,6 +3,7 @@
 import {
   AlertCircle,
   AlertTriangle,
+  Magnet,
   Calendar,
   CheckSquare,
   ChevronDown,
@@ -60,6 +61,7 @@ interface TaskGroupManagerProps {
   onShowAllTasksChange?: (show: boolean) => void;
   onHiddenGroupsChange?: (hiddenGroups: Set<string>) => void;
   onQuickAddTask?: (groupId: string | null) => void;
+  onPullForwardTasks?: (groupId: string) => void | Promise<void>;
 }
 
 const defaultColors = [
@@ -209,6 +211,7 @@ interface GroupCardProps {
   onEdit?: () => void;
   onDelete?: () => void;
   onQuickAddTask?: (groupId: string | null, taskType?: TaskType) => void;
+  onPullForwardTasks?: (groupId: string) => void | Promise<void>;
   groupId?: string | null;
   isUngrouped?: boolean;
   isParent?: boolean;
@@ -235,6 +238,7 @@ function GroupCard({
   onEdit,
   onDelete,
   onQuickAddTask,
+  onPullForwardTasks,
   groupId,
   isUngrouped = false,
   isParent = false,
@@ -243,6 +247,7 @@ function GroupCard({
   isDeleting = false,
   subtasksMap = new Map(),
 }: GroupCardProps) {
+  const [isPullingForward, setIsPullingForward] = useState(false);
   const textColor = getContrastColor(groupColor);
 
   // Calculate critical task counts
@@ -419,6 +424,32 @@ function GroupCard({
               </DropdownMenuContent>
             </DropdownMenu>
           )}
+          {!isUngrouped && !isParent && onPullForwardTasks && groupId && (
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-7 w-7 p-0 flex-shrink-0"
+              disabled={isPullingForward}
+              onClick={async (e) => {
+                e.stopPropagation();
+                if (isPullingForward) return;
+                setIsPullingForward(true);
+                try {
+                  await onPullForwardTasks(groupId);
+                } finally {
+                  setTimeout(() => setIsPullingForward(false), 300);
+                }
+              }}
+              title="Pull forward tasks from future days"
+            >
+              <Magnet
+                className={cn(
+                  "h-3.5 w-3.5 transition-transform duration-300",
+                  isPullingForward && "animate-bounce",
+                )}
+              />
+            </Button>
+          )}
           <Button
             size="sm"
             variant="ghost"
@@ -526,6 +557,32 @@ function GroupCard({
                 </DropdownMenuContent>
               </DropdownMenu>
             )}
+            {!isUngrouped && !isParent && onPullForwardTasks && groupId && (
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-6 w-6 p-0"
+                disabled={isPullingForward}
+                onClick={async (e) => {
+                  e.stopPropagation();
+                  if (isPullingForward) return;
+                  setIsPullingForward(true);
+                  try {
+                    await onPullForwardTasks(groupId);
+                  } finally {
+                    setTimeout(() => setIsPullingForward(false), 300);
+                  }
+                }}
+                title="Pull forward tasks from future days"
+              >
+                <Magnet
+                  className={cn(
+                    "h-3.5 w-3.5 transition-transform duration-300",
+                    isPullingForward && "animate-bounce",
+                  )}
+                />
+              </Button>
+            )}
             <div className="flex-1" />
             <Button
               size="sm"
@@ -582,6 +639,7 @@ export function TaskGroupManager({
   onShowAllTasksChange,
   onHiddenGroupsChange,
   onQuickAddTask,
+  onPullForwardTasks,
 }: TaskGroupManagerProps) {
   const { confirm } = useConfirmDialog();
   const [groups, setGroups] = useState<TaskGroup[]>([]);
@@ -982,6 +1040,7 @@ export function TaskGroupManager({
             onEdit={() => handleEditGroup(group)}
             onDelete={() => deleteGroup(group.id)}
             onQuickAddTask={onQuickAddTask}
+            onPullForwardTasks={onPullForwardTasks}
             groupId={group.id}
             isParent={isParentGroup}
             indentLevel={level}
@@ -1024,6 +1083,7 @@ export function TaskGroupManager({
           onEdit={() => handleEditGroup(group)}
           onDelete={() => deleteGroup(group.id)}
           onQuickAddTask={onQuickAddTask}
+          onPullForwardTasks={onPullForwardTasks}
           groupId={group.id}
           isParent={isParentGroup}
           indentLevel={level}
