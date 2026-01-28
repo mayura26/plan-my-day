@@ -2705,9 +2705,11 @@ function shuffleSingleDay(
   const moveableTasks: Task[] = [];
 
   for (const task of dayTasks) {
+    // Completed tasks don't block scheduling - their time slots are free
+    if (task.status === "completed") continue;
+
     const isFixed =
       task.locked ||
-      task.status === "completed" ||
       task.status === "in_progress" ||
       task.status === "cancelled";
 
@@ -3011,8 +3013,10 @@ export function pullForwardTasksForGroup(options: PullForwardOptions): PullForwa
     : windowStart;
 
   // Gather all tasks scheduled on the target day (regardless of group) as obstacles
+  // Completed tasks don't block scheduling - their time slots are free
   const obstacles: Array<{ start: Date; end: Date }> = [];
   for (const t of allTasks) {
+    if (t.status === "completed") continue;
     const slot = getEffectiveSlot(t, emptyOverrides);
     if (!slot) continue;
     if (!isOnDay(slot.start, tYear, tMonth, tDay, timezone)) continue;
