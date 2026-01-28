@@ -2713,10 +2713,24 @@ function shuffleSingleDay(
 
     if (isFixed) {
       fixedTasks.push(task);
-    } else if (task.duration && task.duration > 0) {
-      moveableTasks.push(task);
-    } else if (!task.duration || task.duration <= 0) {
-      feedback.push(`Skipped "${task.title}" (no duration set).`);
+    } else {
+      // Use explicit duration, or compute from scheduled start/end
+      let effectiveDuration = task.duration;
+      if ((!effectiveDuration || effectiveDuration <= 0) && task.scheduled_start && task.scheduled_end) {
+        const start = new Date(task.scheduled_start);
+        const end = new Date(task.scheduled_end);
+        effectiveDuration = Math.round((end.getTime() - start.getTime()) / 60000);
+      }
+
+      if (effectiveDuration && effectiveDuration > 0) {
+        // Temporarily patch duration so the placement logic can use it
+        if (!task.duration || task.duration <= 0) {
+          (task as any).duration = effectiveDuration;
+        }
+        moveableTasks.push(task);
+      } else {
+        feedback.push(`Skipped "${task.title}" (no duration set).`);
+      }
     }
   }
 

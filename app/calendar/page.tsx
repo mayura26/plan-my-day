@@ -947,6 +947,7 @@ export default function CalendarPage() {
         body: JSON.stringify({
           scheduled_start: startDate.toISOString(),
           scheduled_end: endDate.toISOString(),
+          duration,
         }),
       });
 
@@ -994,6 +995,7 @@ export default function CalendarPage() {
         body: JSON.stringify({
           scheduled_start: startDate.toISOString(),
           scheduled_end: endDate.toISOString(),
+          duration: Math.round(duration),
         }),
       });
 
