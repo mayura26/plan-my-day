@@ -158,7 +158,6 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     }
 
     const now = new Date().toISOString();
-    let updatedTask: Task;
     const shuffledTasks: Array<{ taskId: string; task: Task }> = [];
 
     // Use unified scheduler with appropriate mode
@@ -225,7 +224,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       id,
       session.user.id,
     ]);
-    updatedTask = mapRowToTask(updatedResult.rows[0]);
+    const updatedTask = mapRowToTask(updatedResult.rows[0]);
 
     // Note: We don't mark the task as "rescheduled" - that status is only for tasks that have been
     // carried over. A rescheduled task remains in its current status (typically "pending") since

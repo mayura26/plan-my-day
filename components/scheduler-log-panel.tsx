@@ -52,17 +52,61 @@ const operationConfig: Record<
   SchedulerOperation,
   { label: string; icon: typeof Shuffle; color: string }
 > = {
-  shuffle: { label: "Shuffle", icon: Shuffle, color: "bg-blue-500/10 text-blue-600 dark:text-blue-400" },
-  "pull-forward": { label: "Pull Forward", icon: Magnet, color: "bg-purple-500/10 text-purple-600 dark:text-purple-400" },
-  "schedule-now": { label: "Now", icon: CalendarClock, color: "bg-green-500/10 text-green-600 dark:text-green-400" },
-  "schedule-today": { label: "Today", icon: CalendarClock, color: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400" },
-  "schedule-tomorrow": { label: "Tomorrow", icon: CalendarClock, color: "bg-teal-500/10 text-teal-600 dark:text-teal-400" },
-  "schedule-next-week": { label: "Next Week", icon: CalendarClock, color: "bg-cyan-500/10 text-cyan-600 dark:text-cyan-400" },
-  "schedule-next-month": { label: "Next Month", icon: CalendarClock, color: "bg-sky-500/10 text-sky-600 dark:text-sky-400" },
-  "schedule-asap": { label: "ASAP", icon: Zap, color: "bg-amber-500/10 text-amber-600 dark:text-amber-400" },
-  "schedule-due-date": { label: "Due Date", icon: CalendarClock, color: "bg-orange-500/10 text-orange-600 dark:text-orange-400" },
-  reschedule: { label: "Reschedule", icon: CalendarClock, color: "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400" },
-  carryover: { label: "Carryover", icon: RotateCcw, color: "bg-rose-500/10 text-rose-600 dark:text-rose-400" },
+  shuffle: {
+    label: "Shuffle",
+    icon: Shuffle,
+    color: "bg-blue-500/10 text-blue-600 dark:text-blue-400",
+  },
+  "pull-forward": {
+    label: "Pull Forward",
+    icon: Magnet,
+    color: "bg-purple-500/10 text-purple-600 dark:text-purple-400",
+  },
+  "schedule-now": {
+    label: "Now",
+    icon: CalendarClock,
+    color: "bg-green-500/10 text-green-600 dark:text-green-400",
+  },
+  "schedule-today": {
+    label: "Today",
+    icon: CalendarClock,
+    color: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
+  },
+  "schedule-tomorrow": {
+    label: "Tomorrow",
+    icon: CalendarClock,
+    color: "bg-teal-500/10 text-teal-600 dark:text-teal-400",
+  },
+  "schedule-next-week": {
+    label: "Next Week",
+    icon: CalendarClock,
+    color: "bg-cyan-500/10 text-cyan-600 dark:text-cyan-400",
+  },
+  "schedule-next-month": {
+    label: "Next Month",
+    icon: CalendarClock,
+    color: "bg-sky-500/10 text-sky-600 dark:text-sky-400",
+  },
+  "schedule-asap": {
+    label: "ASAP",
+    icon: Zap,
+    color: "bg-amber-500/10 text-amber-600 dark:text-amber-400",
+  },
+  "schedule-due-date": {
+    label: "Due Date",
+    icon: CalendarClock,
+    color: "bg-orange-500/10 text-orange-600 dark:text-orange-400",
+  },
+  reschedule: {
+    label: "Reschedule",
+    icon: CalendarClock,
+    color: "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400",
+  },
+  carryover: {
+    label: "Carryover",
+    icon: RotateCcw,
+    color: "bg-rose-500/10 text-rose-600 dark:text-rose-400",
+  },
 };
 
 export function SchedulerLogPanel({
@@ -144,7 +188,10 @@ export function SchedulerLogPanel({
                         {config.label}
                       </Badge>
                       {entry.taskName ? (
-                        <span className="text-foreground text-[10px] font-medium truncate max-w-[120px]" title={entry.taskName}>
+                        <span
+                          className="text-foreground text-[10px] font-medium truncate max-w-[120px]"
+                          title={entry.taskName}
+                        >
                           {entry.taskName}
                         </span>
                       ) : (

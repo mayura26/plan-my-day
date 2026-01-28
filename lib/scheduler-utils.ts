@@ -2532,8 +2532,8 @@ export function shuffleTasksForDay(options: ShuffleOptions): ShuffleResult {
       break;
     }
 
-    const currentDay = daysQueue.shift()!;
-    if (processedDays.has(currentDay)) continue;
+    const currentDay = daysQueue.shift();
+    if (!currentDay || processedDays.has(currentDay)) continue;
     processedDays.add(currentDay);
 
     if (currentDay !== targetDate) {
@@ -2716,7 +2716,11 @@ function shuffleSingleDay(
     } else {
       // Use explicit duration, or compute from scheduled start/end
       let effectiveDuration = task.duration;
-      if ((!effectiveDuration || effectiveDuration <= 0) && task.scheduled_start && task.scheduled_end) {
+      if (
+        (!effectiveDuration || effectiveDuration <= 0) &&
+        task.scheduled_start &&
+        task.scheduled_end
+      ) {
         const start = new Date(task.scheduled_start);
         const end = new Date(task.scheduled_end);
         effectiveDuration = Math.round((end.getTime() - start.getTime()) / 60000);
@@ -2782,12 +2786,15 @@ function shuffleSingleDay(
 
   // Place each moveable task
   for (const task of moveableTasks) {
-    const durationMs = task.duration! * 60 * 1000;
+    // moveableTasks are filtered to only include tasks with duration > 0
+    if (!task.duration || task.duration <= 0) continue;
+    const durationMs = task.duration * 60 * 1000;
 
     // Determine this task's working hours (group hours > awake hours > default)
     const taskGroup = task.group_id ? allGroups.find((g) => g.id === task.group_id) : null;
     const useGroupHours = taskGroup?.auto_schedule_enabled && taskGroup?.auto_schedule_hours;
-    const effectiveHours = useGroupHours ? taskGroup!.auto_schedule_hours! : awakeHours;
+    const effectiveHours =
+      useGroupHours && taskGroup?.auto_schedule_hours ? taskGroup.auto_schedule_hours : awakeHours;
 
     const dayOfWeek = getDayOfWeekForDate(dayStr);
     const dayHours = getWorkingHoursForDay(dayOfWeek, effectiveHours);
@@ -2982,7 +2989,8 @@ export function pullForwardTasksForGroup(options: PullForwardOptions): PullForwa
 
   // Determine working hours for the target day
   const useGroupHours = group.auto_schedule_enabled && group.auto_schedule_hours;
-  const effectiveHours = useGroupHours ? group.auto_schedule_hours! : awakeHours;
+  const effectiveHours =
+    useGroupHours && group.auto_schedule_hours ? group.auto_schedule_hours : awakeHours;
   const dayOfWeek = getDayOfWeekForDate(targetDate);
   const dayHours = getWorkingHoursForDay(dayOfWeek, effectiveHours);
 
@@ -3031,8 +3039,10 @@ export function pullForwardTasksForGroup(options: PullForwardOptions): PullForwa
       );
     })
     .sort((a, b) => {
-      const startA = new Date(a.scheduled_start!).getTime();
-      const startB = new Date(b.scheduled_start!).getTime();
+      // futureTasks are filtered to only include tasks with scheduled_start
+      if (!a.scheduled_start || !b.scheduled_start) return 0;
+      const startA = new Date(a.scheduled_start).getTime();
+      const startB = new Date(b.scheduled_start).getTime();
       return startA - startB;
     });
 
@@ -3040,7 +3050,9 @@ export function pullForwardTasksForGroup(options: PullForwardOptions): PullForwa
   const maxDate = new Date(windowEnd);
   maxDate.setUTCDate(maxDate.getUTCDate() + maxLookAheadDays);
   const eligibleTasks = futureTasks.filter((t) => {
-    const start = new Date(t.scheduled_start!);
+    // futureTasks are filtered to only include tasks with scheduled_start
+    if (!t.scheduled_start) return false;
+    const start = new Date(t.scheduled_start);
     return start.getTime() <= maxDate.getTime();
   });
 
@@ -3053,7 +3065,9 @@ export function pullForwardTasksForGroup(options: PullForwardOptions): PullForwa
 
   // Try to place each future task into today's available slots
   for (const task of eligibleTasks) {
-    const durationMs = task.duration! * 60 * 1000;
+    // eligibleTasks are filtered from futureTasks which only include tasks with duration > 0
+    if (!task.duration || task.duration <= 0) continue;
+    const durationMs = task.duration * 60 * 1000;
 
     const slot = findSlotInWindow(effectiveWindowStart, windowEnd, durationMs, obstacles);
 

@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
+import type { SchedulerLogEntry } from "@/components/scheduler-log-panel";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -38,7 +39,6 @@ import { getOverdueTasks } from "@/lib/task-utils";
 import { formatDateTimeLocalForTimezone, parseDateTimeLocalToUTC } from "@/lib/timezone-utils";
 import type { SchedulingMode, Task } from "@/lib/types";
 import { cn } from "@/lib/utils";
-import type { SchedulerLogEntry } from "@/components/scheduler-log-panel";
 
 interface ProcessOverdueDialogProps {
   tasks: Task[];
@@ -697,7 +697,9 @@ export function ProcessOverdueDialog({
                                 onSchedulerLog?.({
                                   operation: "carryover",
                                   targetDate: "",
-                                  feedback: [responseData.message || `Carryover created for "${task.title}"`],
+                                  feedback: [
+                                    responseData.message || `Carryover created for "${task.title}"`,
+                                  ],
                                   movedCount: 1,
                                   success: true,
                                   taskName: task.title,
@@ -814,7 +816,8 @@ export function ProcessOverdueDialog({
                                   "due-date": "schedule-due-date",
                                 };
                                 onSchedulerLog?.({
-                                  operation: (modeToOp[mode] || "reschedule") as SchedulerLogEntry["operation"],
+                                  operation: (modeToOp[mode] ||
+                                    "reschedule") as SchedulerLogEntry["operation"],
                                   targetDate: "",
                                   feedback: responseData.feedback || [],
                                   movedCount: responseData.shuffledTasks?.length || 0,

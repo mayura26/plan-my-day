@@ -26,6 +26,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import { toast } from "sonner";
 import { NotesManager } from "@/components/notes-manager";
+import type { SchedulerLogEntry } from "@/components/scheduler-log-panel";
 import { SchedulingErrorDialog } from "@/components/scheduling-error-dialog";
 import { SubtaskManager } from "@/components/subtask-manager";
 import { Badge } from "@/components/ui/badge";
@@ -43,7 +44,6 @@ import { useUserTimezone } from "@/hooks/use-user-timezone";
 import { ENERGY_LABELS, TASK_TYPE_LABELS } from "@/lib/task-utils";
 import { formatDateTimeFull } from "@/lib/timezone-utils";
 import type { SchedulingMode, Task, TaskDependency, TaskStatus } from "@/lib/types";
-import type { SchedulerLogEntry } from "@/components/scheduler-log-panel";
 
 interface TaskDetailDialogProps {
   task: Task | null;

@@ -24,7 +24,7 @@ import { DayNotesSection } from "@/components/day-notes-section";
 import { MonthCalendar } from "@/components/month-calendar";
 import { ProcessOverdueDialog } from "@/components/process-overdue-dialog";
 import { RefreshButton } from "@/components/refresh-button";
-import { SchedulerLogPanel, type SchedulerLogEntry } from "@/components/scheduler-log-panel";
+import { type SchedulerLogEntry, SchedulerLogPanel } from "@/components/scheduler-log-panel";
 import { SlimTaskCard } from "@/components/slim-task-card";
 import { TaskDetailDialog } from "@/components/task-detail-dialog";
 import { TaskForm } from "@/components/task-form";
