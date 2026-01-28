@@ -24,6 +24,7 @@ import { DayNotesSection } from "@/components/day-notes-section";
 import { MonthCalendar } from "@/components/month-calendar";
 import { ProcessOverdueDialog } from "@/components/process-overdue-dialog";
 import { RefreshButton } from "@/components/refresh-button";
+import { SchedulerLogPanel, type SchedulerLogEntry } from "@/components/scheduler-log-panel";
 import { SlimTaskCard } from "@/components/slim-task-card";
 import { TaskDetailDialog } from "@/components/task-detail-dialog";
 import { TaskForm } from "@/components/task-form";
@@ -90,6 +91,7 @@ export default function CalendarPage() {
   const [isResizing, setIsResizing] = useState(false);
   const [subtasksMap, setSubtasksMap] = useState<Map<string, Task[]>>(new Map());
   const [parentTasksMap, setParentTasksMap] = useState<Map<string, string>>(new Map());
+  const [schedulerLog, setSchedulerLog] = useState<SchedulerLogEntry[]>([]);
   const fetchedGroupsUserIdRef = useRef<string | null>(null);
   const isFetchingGroupsRef = useRef<boolean>(false);
   const hasFetchedInitialDataRef = useRef<boolean>(false);
@@ -212,9 +214,33 @@ export default function CalendarPage() {
     }
   }, []);
 
+  // Helper function to format date to YYYY-MM-DD in user's timezone
+  const formatDateKey = useCallback(
+    (date: Date): string => {
+      const dateInTimezone = getDateInTimezone(date, timezone);
+      return format(dateInTimezone, "yyyy-MM-dd");
+    },
+    [timezone]
+  );
+
+  const addSchedulerLogEntry = useCallback((entry: Omit<SchedulerLogEntry, "id" | "timestamp">) => {
+    const newEntry: SchedulerLogEntry = {
+      ...entry,
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      timestamp: new Date(),
+    };
+    setSchedulerLog((prev) => [newEntry, ...prev].slice(0, 50));
+    // Auto-expand the scheduler log section
+    setExpandedSections((prev) => {
+      const next = new Set(prev);
+      next.add("scheduler-log");
+      return next;
+    });
+  }, []);
+
   const handleShuffle = useCallback(async () => {
     try {
-      const dateKey = format(currentDate, "yyyy-MM-dd");
+      const dateKey = formatDateKey(currentDate);
       const response = await fetch("/api/tasks/shuffle", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -223,8 +249,18 @@ export default function CalendarPage() {
 
       if (response.ok) {
         const data = await response.json();
+        const movedCount = data.movedCount || 0;
+        const feedback: string[] = data.feedback || [];
+
+        addSchedulerLogEntry({
+          operation: "shuffle",
+          targetDate: dateKey,
+          feedback,
+          movedCount,
+          success: movedCount > 0,
+        });
+
         if (data.updatedTasks && data.updatedTasks.length > 0) {
-          // Update local task state with the returned tasks
           setTasks((prev) => {
             const updatedMap = new Map<string, Task>();
             for (const task of data.updatedTasks) {
@@ -235,10 +271,10 @@ export default function CalendarPage() {
 
           const dayCount = 1 + (data.cascadedDays?.length || 0);
           toast.success(
-            `Shuffled ${data.movedCount} task${data.movedCount !== 1 ? "s" : ""}${dayCount > 1 ? ` across ${dayCount} days` : ""}`
+            `Shuffled ${movedCount} task${movedCount !== 1 ? "s" : ""}${dayCount > 1 ? ` across ${dayCount} days` : ""}`
           );
         } else {
-          toast.info("No tasks needed shuffling.");
+          toast.info("No tasks needed shuffling. Check Scheduler Log for details.");
         }
       } else {
         const error = await response.json();
@@ -248,12 +284,12 @@ export default function CalendarPage() {
       console.error("Error shuffling tasks:", error);
       toast.error("Failed to shuffle tasks");
     }
-  }, [currentDate, timezone]);
+  }, [currentDate, timezone, formatDateKey, addSchedulerLogEntry]);
 
   const handlePullForward = useCallback(
     async (groupId: string) => {
       try {
-        const dateKey = format(currentDate, "yyyy-MM-dd");
+        const dateKey = formatDateKey(currentDate);
         const response = await fetch("/api/tasks/pull-forward", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -262,6 +298,17 @@ export default function CalendarPage() {
 
         if (response.ok) {
           const data = await response.json();
+          const movedCount = data.movedCount || 0;
+          const feedback: string[] = data.feedback || [];
+
+          addSchedulerLogEntry({
+            operation: "pull-forward",
+            targetDate: dateKey,
+            feedback,
+            movedCount,
+            success: movedCount > 0,
+          });
+
           if (data.updatedTasks && data.updatedTasks.length > 0) {
             setTasks((prev) => {
               const updatedMap = new Map<string, Task>();
@@ -272,10 +319,10 @@ export default function CalendarPage() {
             });
 
             toast.success(
-              `Pulled forward ${data.movedCount} task${data.movedCount !== 1 ? "s" : ""} to today`
+              `Pulled forward ${movedCount} task${movedCount !== 1 ? "s" : ""} to today`
             );
           } else {
-            toast.info("No future tasks available to pull forward for this group.");
+            toast.info("No future tasks to pull forward. Check Scheduler Log for details.");
           }
         } else {
           const error = await response.json();
@@ -286,7 +333,7 @@ export default function CalendarPage() {
         toast.error("Failed to pull forward tasks");
       }
     },
-    [currentDate, timezone]
+    [currentDate, timezone, formatDateKey, addSchedulerLogEntry]
   );
 
   useEffect(() => {
@@ -331,15 +378,6 @@ export default function CalendarPage() {
     router.push,
     session?.user?.id,
   ]);
-
-  // Helper function to format date to YYYY-MM-DD in user's timezone
-  const formatDateKey = useCallback(
-    (date: Date): string => {
-      const dateInTimezone = getDateInTimezone(date, timezone);
-      return format(dateInTimezone, "yyyy-MM-dd");
-    },
-    [timezone]
-  );
 
   // Fetch day note for a specific date
   const fetchDayNote = useCallback(
@@ -1355,6 +1393,22 @@ export default function CalendarPage() {
                 )}
               </Card>
             )}
+
+            {/* Scheduler Log */}
+            <SchedulerLogPanel
+              entries={schedulerLog}
+              isExpanded={expandedSections.has("scheduler-log")}
+              onToggleExpand={() => {
+                const newSet = new Set(expandedSections);
+                if (newSet.has("scheduler-log")) {
+                  newSet.delete("scheduler-log");
+                } else {
+                  newSet.add("scheduler-log");
+                }
+                setExpandedSections(newSet);
+              }}
+              onClear={() => setSchedulerLog([])}
+            />
           </div>
 
           {/* Resize handle - only visible on desktop */}
@@ -1475,6 +1529,7 @@ export default function CalendarPage() {
           // Also update the task in the tasks array
           setTasks((prev) => prev.map((task) => (task.id === updatedTask.id ? updatedTask : task)));
         }}
+        onSchedulerLog={addSchedulerLogEntry}
       />
 
       {/* Completed Task Detail Dialog (for overlap indicator clicks) */}
@@ -1502,6 +1557,7 @@ export default function CalendarPage() {
           // Also update the task in the tasks array
           setTasks((prev) => prev.map((task) => (task.id === updatedTask.id ? updatedTask : task)));
         }}
+        onSchedulerLog={addSchedulerLogEntry}
       />
 
       {/* Day Note Dialog */}
@@ -1605,6 +1661,7 @@ export default function CalendarPage() {
             setSelectedTask(updatedTask);
           }
         }}
+        onSchedulerLog={addSchedulerLogEntry}
       />
 
       {/* Drag Overlay - renders dragged item in a portal to avoid overflow clipping */}

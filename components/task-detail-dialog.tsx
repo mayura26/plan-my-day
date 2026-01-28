@@ -43,6 +43,7 @@ import { useUserTimezone } from "@/hooks/use-user-timezone";
 import { ENERGY_LABELS, TASK_TYPE_LABELS } from "@/lib/task-utils";
 import { formatDateTimeFull } from "@/lib/timezone-utils";
 import type { SchedulingMode, Task, TaskDependency, TaskStatus } from "@/lib/types";
+import type { SchedulerLogEntry } from "@/components/scheduler-log-panel";
 
 interface TaskDetailDialogProps {
   task: Task | null;
@@ -54,6 +55,7 @@ interface TaskDetailDialogProps {
   onUnschedule?: (taskId: string) => void;
   onTaskUpdate?: () => void | Promise<void>;
   onTaskRefresh?: (task: Task) => void; // Callback to refresh the task prop from parent
+  onSchedulerLog?: (entry: Omit<SchedulerLogEntry, "id" | "timestamp">) => void;
 }
 
 interface DependencyInfo extends TaskDependency {
@@ -71,6 +73,7 @@ export function TaskDetailDialog({
   onUnschedule,
   onTaskUpdate,
   onTaskRefresh,
+  onSchedulerLog,
 }: TaskDetailDialogProps) {
   const { confirm } = useConfirmDialog();
   const [isDeleting, setIsDeleting] = useState(false);
@@ -407,6 +410,25 @@ export function TaskDetailDialog({
         setErrorDialogFeedback(feedback);
         setErrorDialogOpen(true);
 
+        // Log failure to scheduler log
+        const modeToOp: Record<SchedulingMode, string> = {
+          now: "schedule-now",
+          today: "schedule-today",
+          tomorrow: "schedule-tomorrow",
+          "next-week": "schedule-next-week",
+          "next-month": "schedule-next-month",
+          asap: "schedule-asap",
+          "due-date": "schedule-due-date",
+        };
+        onSchedulerLog?.({
+          operation: modeToOp[mode] as SchedulerLogEntry["operation"],
+          targetDate: "",
+          feedback: [errorData.error || `Failed to schedule task (${mode})`, ...feedback],
+          movedCount: 0,
+          success: false,
+          taskName: task.title,
+        });
+
         throw new Error(errorData.error || `Failed to schedule task (${mode})`);
       }
 
@@ -434,7 +456,7 @@ export function TaskDetailDialog({
       }
 
       // Show success message
-      const modeLabels = {
+      const modeLabels: Record<SchedulingMode, string> = {
         now: "Schedule Now",
         today: "Schedule Today",
         tomorrow: "Schedule Tomorrow",
@@ -443,6 +465,25 @@ export function TaskDetailDialog({
         asap: "Schedule ASAP",
         "due-date": "Schedule to Due Date",
       };
+
+      // Log to scheduler log panel
+      const modeToOperation: Record<SchedulingMode, string> = {
+        now: "schedule-now",
+        today: "schedule-today",
+        tomorrow: "schedule-tomorrow",
+        "next-week": "schedule-next-week",
+        "next-month": "schedule-next-month",
+        asap: "schedule-asap",
+        "due-date": "schedule-due-date",
+      };
+      onSchedulerLog?.({
+        operation: modeToOperation[mode] as SchedulerLogEntry["operation"],
+        targetDate: "",
+        feedback,
+        movedCount: shuffledTasks.length + scheduledSubtasks.length,
+        success: true,
+        taskName: task.title,
+      });
 
       // Show feedback messages as toasts
       if (feedback.length > 0) {

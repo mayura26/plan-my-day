@@ -38,6 +38,7 @@ import { getOverdueTasks } from "@/lib/task-utils";
 import { formatDateTimeLocalForTimezone, parseDateTimeLocalToUTC } from "@/lib/timezone-utils";
 import type { SchedulingMode, Task } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import type { SchedulerLogEntry } from "@/components/scheduler-log-panel";
 
 interface ProcessOverdueDialogProps {
   tasks: Task[];
@@ -45,6 +46,7 @@ interface ProcessOverdueDialogProps {
   onOpenChange: (open: boolean) => void;
   onTasksUpdated: () => void;
   onTaskUpdate?: (taskId: string, updatedTask: Task) => void;
+  onSchedulerLog?: (entry: Omit<SchedulerLogEntry, "id" | "timestamp">) => void;
 }
 
 type TaskAction =
@@ -72,6 +74,7 @@ export function ProcessOverdueDialog({
   onOpenChange,
   onTasksUpdated,
   onTaskUpdate,
+  onSchedulerLog,
 }: ProcessOverdueDialogProps) {
   const { timezone } = useUserTimezone();
   const { confirm } = useConfirmDialog();
@@ -210,6 +213,15 @@ export function ProcessOverdueDialog({
               const data = await response.json();
               throw new Error(data.error || `Failed to process ${task.title}`);
             }
+            const carryoverData = await response.json();
+            onSchedulerLog?.({
+              operation: "carryover",
+              targetDate: "",
+              feedback: [carryoverData.message || `Carryover created for "${task.title}"`],
+              movedCount: 1,
+              success: true,
+              taskName: task.title,
+            });
           };
 
           promises.push(createCarryover());
@@ -225,6 +237,15 @@ export function ProcessOverdueDialog({
             asap: "schedule-asap",
             "due-date": "schedule-due-date",
           };
+          const modeToOp: Record<SchedulingMode, string> = {
+            now: "schedule-now",
+            today: "schedule-today",
+            tomorrow: "schedule-tomorrow",
+            "next-week": "schedule-next-week",
+            "next-month": "schedule-next-month",
+            asap: "schedule-asap",
+            "due-date": "schedule-due-date",
+          };
           const promise = fetch(`/api/tasks/${taskId}/${endpointMap[mode]}`, {
             method: "POST",
           }).then(async (res) => {
@@ -232,6 +253,15 @@ export function ProcessOverdueDialog({
               const data = await res.json();
               throw new Error(data.error || `Failed to reschedule ${task.title}`);
             }
+            const resData = await res.json();
+            onSchedulerLog?.({
+              operation: (modeToOp[mode] || "reschedule") as SchedulerLogEntry["operation"],
+              targetDate: "",
+              feedback: resData.feedback || [],
+              movedCount: resData.shuffledTasks?.length || 0,
+              success: true,
+              taskName: task.title,
+            });
           });
           promises.push(promise);
         } else if (actionState.action === "schedule-now") {
@@ -243,6 +273,15 @@ export function ProcessOverdueDialog({
               const data = await res.json();
               throw new Error(data.error || `Failed to schedule ${task.title}`);
             }
+            const resData = await res.json();
+            onSchedulerLog?.({
+              operation: "schedule-now",
+              targetDate: "",
+              feedback: resData.feedback || [],
+              movedCount: resData.shuffledTasks?.length || 0,
+              success: true,
+              taskName: task.title,
+            });
           });
           promises.push(promise);
         } else if (actionState.action === "schedule-tomorrow") {
@@ -254,6 +293,15 @@ export function ProcessOverdueDialog({
               const data = await res.json();
               throw new Error(data.error || `Failed to schedule ${task.title} for tomorrow`);
             }
+            const resData = await res.json();
+            onSchedulerLog?.({
+              operation: "schedule-tomorrow",
+              targetDate: "",
+              feedback: resData.feedback || [],
+              movedCount: resData.shuffledTasks?.length || 0,
+              success: true,
+              taskName: task.title,
+            });
           });
           promises.push(promise);
         } else if (actionState.action === "update-due-date") {
@@ -643,7 +691,17 @@ export function ProcessOverdueDialog({
                                   );
                                 }
 
-                                const _responseData = await response.json();
+                                const responseData = await response.json();
+
+                                // Log to scheduler log panel
+                                onSchedulerLog?.({
+                                  operation: "carryover",
+                                  targetDate: "",
+                                  feedback: [responseData.message || `Carryover created for "${task.title}"`],
+                                  movedCount: 1,
+                                  success: true,
+                                  taskName: task.title,
+                                });
 
                                 // Remove this task from the actions map
                                 const newActions = new Map(taskActions);
@@ -744,6 +802,25 @@ export function ProcessOverdueDialog({
                                 }
 
                                 const responseData = await response.json();
+
+                                // Log to scheduler log panel
+                                const modeToOp: Record<SchedulingMode, string> = {
+                                  now: "schedule-now",
+                                  today: "schedule-today",
+                                  tomorrow: "schedule-tomorrow",
+                                  "next-week": "schedule-next-week",
+                                  "next-month": "schedule-next-month",
+                                  asap: "schedule-asap",
+                                  "due-date": "schedule-due-date",
+                                };
+                                onSchedulerLog?.({
+                                  operation: (modeToOp[mode] || "reschedule") as SchedulerLogEntry["operation"],
+                                  targetDate: "",
+                                  feedback: responseData.feedback || [],
+                                  movedCount: responseData.shuffledTasks?.length || 0,
+                                  success: true,
+                                  taskName: task.title,
+                                });
 
                                 // Remove this task from the actions map
                                 const newActions = new Map(taskActions);
