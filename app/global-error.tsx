@@ -9,7 +9,14 @@ export default function GlobalError({
 }) {
   return (
     <html lang="en">
-      <body style={{ margin: 0, fontFamily: "system-ui, sans-serif", backgroundColor: "#111", color: "#eee" }}>
+      <body
+        style={{
+          margin: 0,
+          fontFamily: "system-ui, sans-serif",
+          backgroundColor: "#111",
+          color: "#eee",
+        }}
+      >
         <div style={{ padding: 20, maxWidth: 600 }}>
           <h2 style={{ color: "#f87171" }}>Something went wrong</h2>
           <pre
@@ -28,9 +35,7 @@ export default function GlobalError({
             {"\n\n"}
             {error.stack}
           </pre>
-          {error.digest && (
-            <p style={{ fontSize: 12, color: "#888" }}>Digest: {error.digest}</p>
-          )}
+          {error.digest && <p style={{ fontSize: 12, color: "#888" }}>Digest: {error.digest}</p>}
           <button
             type="button"
             onClick={reset}
