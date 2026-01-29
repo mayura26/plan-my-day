@@ -20,6 +20,7 @@ import { cn } from "@/lib/utils";
 export type SchedulerOperation =
   | "shuffle"
   | "pull-forward"
+  | "auto-schedule-group"
   | "schedule-now"
   | "schedule-today"
   | "schedule-tomorrow"
@@ -61,6 +62,11 @@ const operationConfig: Record<
     label: "Pull Forward",
     icon: Magnet,
     color: "bg-purple-500/10 text-purple-600 dark:text-purple-400",
+  },
+  "auto-schedule-group": {
+    label: "Auto Schedule",
+    icon: Zap,
+    color: "bg-amber-500/10 text-amber-600 dark:text-amber-400",
   },
   "schedule-now": {
     label: "Now",

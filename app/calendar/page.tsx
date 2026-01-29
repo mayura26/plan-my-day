@@ -38,7 +38,14 @@ import { WeeklyCalendar } from "@/components/weekly-calendar";
 import { useUserTimezone } from "@/hooks/use-user-timezone";
 import { sortTasksByCreatedTimeDesc } from "@/lib/task-utils";
 import { createDateInTimezone, getDateInTimezone } from "@/lib/timezone-utils";
-import type { CreateTaskRequest, DayNote, Task, TaskGroup, TaskType } from "@/lib/types";
+import type {
+  CreateTaskRequest,
+  DayNote,
+  SchedulingMode,
+  Task,
+  TaskGroup,
+  TaskType,
+} from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 type ViewMode = "day" | "week" | "month";
@@ -334,6 +341,65 @@ export default function CalendarPage() {
       }
     },
     [currentDate, timezone, formatDateKey, addSchedulerLogEntry]
+  );
+
+  const handleAutoScheduleGroup = useCallback(
+    async (groupId: string, mode: SchedulingMode, maxTasks: number) => {
+      try {
+        const response = await fetch("/api/tasks/auto-schedule-group", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ groupId, mode, maxTasks, timezone }),
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          const scheduledCount = data.scheduledCount || 0;
+          const feedback: string[] = data.feedback || [];
+
+          addSchedulerLogEntry({
+            operation: "auto-schedule-group",
+            targetDate: "",
+            feedback,
+            movedCount: scheduledCount,
+            success: scheduledCount > 0,
+          });
+
+          if (data.updatedTasks && data.updatedTasks.length > 0) {
+            setTasks((prev) => {
+              const updatedMap = new Map<string, Task>();
+              for (const task of data.updatedTasks) {
+                updatedMap.set(task.id, task);
+              }
+              return prev.map((t) => updatedMap.get(t.id) || t);
+            });
+
+            toast.success(
+              `Auto-scheduled ${scheduledCount} task${scheduledCount !== 1 ? "s" : ""}`
+            );
+          } else {
+            toast.info("No tasks were scheduled. Check Scheduler Log for details.");
+          }
+        } else {
+          const error = await response.json();
+          const feedback: string[] = error.feedback || [];
+
+          addSchedulerLogEntry({
+            operation: "auto-schedule-group",
+            targetDate: "",
+            feedback: [error.error || "Failed to auto-schedule", ...feedback],
+            movedCount: 0,
+            success: false,
+          });
+
+          toast.error(error.error || "Failed to auto-schedule group tasks");
+        }
+      } catch (error) {
+        console.error("Error auto-scheduling group tasks:", error);
+        toast.error("Failed to auto-schedule group tasks");
+      }
+    },
+    [timezone, addSchedulerLogEntry]
   );
 
   useEffect(() => {
@@ -1313,6 +1379,7 @@ export default function CalendarPage() {
                       setShowCreateForm(true);
                     }}
                     onPullForwardTasks={handlePullForward}
+                    onAutoScheduleGroup={handleAutoScheduleGroup}
                   />
                 </div>
               )}

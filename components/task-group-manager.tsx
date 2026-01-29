@@ -17,6 +17,7 @@ import {
   Magnet,
   Plus,
   Trash2,
+  Zap,
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -37,6 +38,8 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
@@ -48,7 +51,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { TASK_TYPE_LABELS } from "@/lib/task-utils";
-import type { CreateTaskGroupRequest, Task, TaskGroup, TaskType } from "@/lib/types";
+import type {
+  CreateTaskGroupRequest,
+  SchedulingMode,
+  Task,
+  TaskGroup,
+  TaskType,
+} from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { EditGroupDialog } from "./edit-group-dialog";
 
@@ -62,6 +71,11 @@ interface TaskGroupManagerProps {
   onHiddenGroupsChange?: (hiddenGroups: Set<string>) => void;
   onQuickAddTask?: (groupId: string | null) => void;
   onPullForwardTasks?: (groupId: string) => void | Promise<void>;
+  onAutoScheduleGroup?: (
+    groupId: string,
+    mode: SchedulingMode,
+    maxTasks: number
+  ) => void | Promise<void>;
 }
 
 const defaultColors = [
@@ -212,6 +226,11 @@ interface GroupCardProps {
   onDelete?: () => void;
   onQuickAddTask?: (groupId: string | null, taskType?: TaskType) => void;
   onPullForwardTasks?: (groupId: string) => void | Promise<void>;
+  onAutoScheduleGroup?: (
+    groupId: string,
+    mode: SchedulingMode,
+    maxTasks: number
+  ) => void | Promise<void>;
   groupId?: string | null;
   isUngrouped?: boolean;
   isParent?: boolean;
@@ -239,6 +258,7 @@ function GroupCard({
   onDelete,
   onQuickAddTask,
   onPullForwardTasks,
+  onAutoScheduleGroup,
   groupId,
   isUngrouped = false,
   isParent = false,
@@ -248,6 +268,8 @@ function GroupCard({
   subtasksMap = new Map(),
 }: GroupCardProps) {
   const [isPullingForward, setIsPullingForward] = useState(false);
+  const [isAutoScheduling, setIsAutoScheduling] = useState(false);
+  const [autoScheduleTaskCount, setAutoScheduleTaskCount] = useState(5);
   const textColor = getContrastColor(groupColor);
 
   // Calculate critical task counts
@@ -450,6 +472,76 @@ function GroupCard({
               />
             </Button>
           )}
+          {!isUngrouped && !isParent && onAutoScheduleGroup && groupId && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-7 w-7 p-0 flex-shrink-0"
+                  disabled={isAutoScheduling}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                  }}
+                  title="Auto schedule top tasks"
+                >
+                  <Zap
+                    className={cn(
+                      "h-3.5 w-3.5 transition-transform duration-300",
+                      isAutoScheduling && "animate-pulse"
+                    )}
+                  />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" onClick={(e) => e.stopPropagation()}>
+                <DropdownMenuLabel className="text-xs font-normal text-muted-foreground pb-1">
+                  Tasks to schedule
+                </DropdownMenuLabel>
+                <div className="flex items-center gap-1 px-2 pb-2">
+                  {[3, 5, 10].map((count) => (
+                    <Button
+                      key={count}
+                      size="sm"
+                      variant={autoScheduleTaskCount === count ? "default" : "outline"}
+                      className="h-6 px-2 text-xs"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setAutoScheduleTaskCount(count);
+                      }}
+                    >
+                      {count}
+                    </Button>
+                  ))}
+                </div>
+                <DropdownMenuSeparator />
+                {[
+                  { mode: "now" as SchedulingMode, label: "Schedule Now" },
+                  { mode: "today" as SchedulingMode, label: "Schedule Today" },
+                  { mode: "tomorrow" as SchedulingMode, label: "Schedule Tomorrow" },
+                  { mode: "next-week" as SchedulingMode, label: "Schedule Next Week" },
+                  { mode: "next-month" as SchedulingMode, label: "Schedule Next Month" },
+                  { mode: "asap" as SchedulingMode, label: "Schedule ASAP" },
+                ].map(({ mode, label }) => (
+                  <DropdownMenuItem
+                    key={mode}
+                    onClick={async (e) => {
+                      e.stopPropagation();
+                      if (isAutoScheduling) return;
+                      setIsAutoScheduling(true);
+                      try {
+                        await onAutoScheduleGroup(groupId, mode, autoScheduleTaskCount);
+                      } finally {
+                        setTimeout(() => setIsAutoScheduling(false), 300);
+                      }
+                    }}
+                  >
+                    <Zap className="h-4 w-4" />
+                    {label}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
           <Button
             size="sm"
             variant="ghost"
@@ -583,6 +675,76 @@ function GroupCard({
                 />
               </Button>
             )}
+            {!isUngrouped && !isParent && onAutoScheduleGroup && groupId && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-6 w-6 p-0"
+                    disabled={isAutoScheduling}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                    }}
+                    title="Auto schedule top tasks"
+                  >
+                    <Zap
+                      className={cn(
+                        "h-3.5 w-3.5 transition-transform duration-300",
+                        isAutoScheduling && "animate-pulse"
+                      )}
+                    />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" onClick={(e) => e.stopPropagation()}>
+                  <DropdownMenuLabel className="text-xs font-normal text-muted-foreground pb-1">
+                    Tasks to schedule
+                  </DropdownMenuLabel>
+                  <div className="flex items-center gap-1 px-2 pb-2">
+                    {[3, 5, 10].map((count) => (
+                      <Button
+                        key={count}
+                        size="sm"
+                        variant={autoScheduleTaskCount === count ? "default" : "outline"}
+                        className="h-6 px-2 text-xs"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setAutoScheduleTaskCount(count);
+                        }}
+                      >
+                        {count}
+                      </Button>
+                    ))}
+                  </div>
+                  <DropdownMenuSeparator />
+                  {[
+                    { mode: "now" as SchedulingMode, label: "Schedule Now" },
+                    { mode: "today" as SchedulingMode, label: "Schedule Today" },
+                    { mode: "tomorrow" as SchedulingMode, label: "Schedule Tomorrow" },
+                    { mode: "next-week" as SchedulingMode, label: "Schedule Next Week" },
+                    { mode: "next-month" as SchedulingMode, label: "Schedule Next Month" },
+                    { mode: "asap" as SchedulingMode, label: "Schedule ASAP" },
+                  ].map(({ mode, label }) => (
+                    <DropdownMenuItem
+                      key={mode}
+                      onClick={async (e) => {
+                        e.stopPropagation();
+                        if (isAutoScheduling) return;
+                        setIsAutoScheduling(true);
+                        try {
+                          await onAutoScheduleGroup(groupId, mode, autoScheduleTaskCount);
+                        } finally {
+                          setTimeout(() => setIsAutoScheduling(false), 300);
+                        }
+                      }}
+                    >
+                      <Zap className="h-4 w-4" />
+                      {label}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
             <div className="flex-1" />
             <Button
               size="sm"
@@ -640,6 +802,7 @@ export function TaskGroupManager({
   onHiddenGroupsChange,
   onQuickAddTask,
   onPullForwardTasks,
+  onAutoScheduleGroup,
 }: TaskGroupManagerProps) {
   const { confirm } = useConfirmDialog();
   const [groups, setGroups] = useState<TaskGroup[]>([]);
@@ -1041,6 +1204,7 @@ export function TaskGroupManager({
             onDelete={() => deleteGroup(group.id)}
             onQuickAddTask={onQuickAddTask}
             onPullForwardTasks={onPullForwardTasks}
+            onAutoScheduleGroup={onAutoScheduleGroup}
             groupId={group.id}
             isParent={isParentGroup}
             indentLevel={level}
@@ -1084,6 +1248,7 @@ export function TaskGroupManager({
           onDelete={() => deleteGroup(group.id)}
           onQuickAddTask={onQuickAddTask}
           onPullForwardTasks={onPullForwardTasks}
+          onAutoScheduleGroup={onAutoScheduleGroup}
           groupId={group.id}
           isParent={isParentGroup}
           indentLevel={level}

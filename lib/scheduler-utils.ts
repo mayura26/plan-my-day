@@ -155,7 +155,8 @@ export function findNearestAvailableSlot(
         t.scheduled_start && // Must have a scheduled start
         t.scheduled_end && // Must have a scheduled end
         t.status !== "completed" && // Don't check conflicts with completed tasks
-        t.status !== "cancelled" // Don't check conflicts with cancelled tasks
+        t.status !== "cancelled" && // Don't check conflicts with cancelled tasks
+        t.status !== "rescheduled" // Don't check conflicts with rescheduled (carried over) tasks
     )
     .map((t) => {
       if (!t.scheduled_start || !t.scheduled_end) {
@@ -814,14 +815,15 @@ export function rescheduleTaskWithShuffling(
     end: nextWorkingSlotEnd,
   };
 
-  // Get all scheduled tasks (excluding the one being rescheduled, completed, and cancelled)
+  // Get all scheduled tasks (excluding the one being rescheduled, completed, cancelled, and rescheduled)
   const scheduledTasks = allTasks.filter(
     (t) =>
       t.id !== task.id &&
       t.scheduled_start &&
       t.scheduled_end &&
       t.status !== "completed" &&
-      t.status !== "cancelled"
+      t.status !== "cancelled" &&
+      t.status !== "rescheduled"
   );
 
   // Track shuffled tasks to prevent infinite loops
@@ -897,7 +899,8 @@ export function rescheduleTaskWithShuffling(
         otherTask.id === conflictingTask.id ||
         shuffledTaskIds.has(otherTask.id) ||
         otherTask.status === "completed" ||
-        otherTask.status === "cancelled"
+        otherTask.status === "cancelled" ||
+        otherTask.status === "rescheduled"
       ) {
         continue;
       }
@@ -984,6 +987,7 @@ export function rescheduleTaskWithShuffling(
     if (
       scheduledTask.status === "completed" ||
       scheduledTask.status === "cancelled" ||
+      scheduledTask.status === "rescheduled" ||
       !scheduledTask.scheduled_start ||
       !scheduledTask.scheduled_end
     ) {
@@ -1208,7 +1212,8 @@ export function findAvailableSlotBeforeDeadline(
         t.scheduled_start &&
         t.scheduled_end &&
         t.status !== "completed" &&
-        t.status !== "cancelled"
+        t.status !== "cancelled" &&
+        t.status !== "rescheduled"
     )
     .map((t) => {
       if (!t.scheduled_start || !t.scheduled_end) {
@@ -1672,7 +1677,8 @@ export function scheduleTaskUnified(options: UnifiedSchedulingOptions): Scheduli
         t.scheduled_start &&
         t.scheduled_end &&
         t.status !== "completed" &&
-        t.status !== "cancelled"
+        t.status !== "cancelled" &&
+        t.status !== "rescheduled"
     )
     .map((t) => {
       if (!t.scheduled_start || !t.scheduled_end) {
@@ -2261,7 +2267,8 @@ function scheduleTaskASAPWithShuffling(
       t.scheduled_start &&
       t.scheduled_end &&
       t.status !== "completed" &&
-      t.status !== "cancelled"
+      t.status !== "cancelled" &&
+      t.status !== "rescheduled"
   );
 
   // Create a map of task groups for quick lookup
@@ -2353,7 +2360,8 @@ function scheduleTaskASAPWithShuffling(
         otherTask.id === conflictingTask.id ||
         shuffledTaskIds.has(otherTask.id) ||
         otherTask.status === "completed" ||
-        otherTask.status === "cancelled"
+        otherTask.status === "cancelled" ||
+        otherTask.status === "rescheduled"
       ) {
         continue;
       }
@@ -2441,6 +2449,7 @@ function scheduleTaskASAPWithShuffling(
     if (
       scheduledTask.status === "completed" ||
       scheduledTask.status === "cancelled" ||
+      scheduledTask.status === "rescheduled" ||
       !scheduledTask.scheduled_start ||
       !scheduledTask.scheduled_end
     ) {
@@ -2705,13 +2714,10 @@ function shuffleSingleDay(
   const moveableTasks: Task[] = [];
 
   for (const task of dayTasks) {
-    // Completed tasks don't block scheduling - their time slots are free
-    if (task.status === "completed") continue;
+    // Completed/rescheduled tasks don't block scheduling - their time slots are free
+    if (task.status === "completed" || task.status === "rescheduled") continue;
 
-    const isFixed =
-      task.locked ||
-      task.status === "in_progress" ||
-      task.status === "cancelled";
+    const isFixed = task.locked || task.status === "in_progress" || task.status === "cancelled";
 
     if (isFixed) {
       fixedTasks.push(task);
@@ -3013,10 +3019,10 @@ export function pullForwardTasksForGroup(options: PullForwardOptions): PullForwa
     : windowStart;
 
   // Gather all tasks scheduled on the target day (regardless of group) as obstacles
-  // Completed tasks don't block scheduling - their time slots are free
+  // Completed/rescheduled tasks don't block scheduling - their time slots are free
   const obstacles: Array<{ start: Date; end: Date }> = [];
   for (const t of allTasks) {
-    if (t.status === "completed") continue;
+    if (t.status === "completed" || t.status === "rescheduled") continue;
     const slot = getEffectiveSlot(t, emptyOverrides);
     if (!slot) continue;
     if (!isOnDay(slot.start, tYear, tMonth, tDay, timezone)) continue;
@@ -3030,7 +3036,12 @@ export function pullForwardTasksForGroup(options: PullForwardOptions): PullForwa
     .filter((t) => {
       if (t.group_id !== groupId) return false;
       if (t.locked) return false;
-      if (t.status === "completed" || t.status === "in_progress" || t.status === "cancelled")
+      if (
+        t.status === "completed" ||
+        t.status === "in_progress" ||
+        t.status === "cancelled" ||
+        t.status === "rescheduled"
+      )
         return false;
       if (!t.duration || t.duration <= 0) return false;
       if (!t.scheduled_start || !t.scheduled_end) return false;
