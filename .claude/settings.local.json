@@ -7,7 +7,8 @@
       "Bash(npm run build:*)",
       "Bash(git push:*)",
       "Bash(find:*)",
-      "Bash(dir:*)"
+      "Bash(dir:*)",
+      "Bash(git status:*)"
     ]
   }
 }

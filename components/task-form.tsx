@@ -25,8 +25,11 @@ import { useUserTimezone } from "@/hooks/use-user-timezone";
 import { ENERGY_LABELS, PRIORITY_LABELS, TASK_TYPE_LABELS } from "@/lib/task-utils";
 import {
   createDateInTimezone,
+  type DueDatePreset,
   formatDateTimeLocalForTimezone,
   getDateInTimezone,
+  getDueDatePresetDateTimeLocal,
+  getDueDatePresetTooltip,
   parseDateTimeLocalToUTC,
 } from "@/lib/timezone-utils";
 import type { CreateTaskRequest, TaskGroup, TaskType } from "@/lib/types";
@@ -591,6 +594,32 @@ export function TaskForm({
             className={`h-10 ${errors.due_date ? "border-red-500" : ""}`}
             placeholder={isTodo ? "Required for todos" : undefined}
           />
+          <div className="flex flex-wrap gap-1.5">
+            {(
+              [
+                { preset: "today" as DueDatePreset, label: "Today" },
+                { preset: "tomorrow" as DueDatePreset, label: "Tomorrow" },
+                { preset: "eow" as DueDatePreset, label: "EOW" },
+                { preset: "next-eow" as DueDatePreset, label: "Next EOW" },
+                { preset: "eom" as DueDatePreset, label: "EOM" },
+                { preset: "next-eom" as DueDatePreset, label: "Next EOM" },
+              ] as const
+            ).map(({ preset, label }) => (
+              <Button
+                key={preset}
+                type="button"
+                variant="outline"
+                size="sm"
+                title={getDueDatePresetTooltip(preset, timezone)}
+                onClick={() => {
+                  const value = getDueDatePresetDateTimeLocal(preset, timezone);
+                  handleInputChange("due_date", value);
+                }}
+              >
+                {label}
+              </Button>
+            ))}
+          </div>
           {errors.due_date && <p className="text-xs text-red-500">{errors.due_date}</p>}
           {isTodo && !formData.due_date && !errors.due_date && (
             <p className="text-xs text-muted-foreground">Due date is required for todos</p>

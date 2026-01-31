@@ -341,6 +341,131 @@ export function createDateInTimezone(
   return fallbackUTC;
 }
 
+/** Preset keys for quick due date selection (today, tomorrow, EOW, etc.) */
+export type DueDatePreset = "today" | "tomorrow" | "eow" | "next-eow" | "eom" | "next-eom";
+
+const PRESET_HOUR = 17;
+const PRESET_MINUTE = 0;
+const FRIDAY_DOW = 5;
+
+/**
+ * Get the weekday (0=Sunday, 5=Friday, 6=Saturday) for a date in the given timezone.
+ */
+function getDayOfWeekInTimezone(date: Date, timezone: string): number {
+  const formatter = new Intl.DateTimeFormat("en-US", {
+    timeZone: timezone,
+    weekday: "short",
+  });
+  const parts = formatter.formatToParts(date);
+  const weekday = parts.find((p) => p.type === "weekday")?.value;
+  const map: Record<string, number> = {
+    Sun: 0,
+    Mon: 1,
+    Tue: 2,
+    Wed: 3,
+    Thu: 4,
+    Fri: 5,
+    Sat: 6,
+  };
+  return map[weekday ?? "Sun"] ?? 0;
+}
+
+/**
+ * Add calendar days to a date (uses local date parts; caller should pass a date
+ * whose calendar day is already correct for the timezone).
+ */
+function addDays(day: Date, days: number): Date {
+  const y = day.getFullYear();
+  const m = day.getMonth();
+  const d = day.getDate();
+  return new Date(y, m, d + days);
+}
+
+/**
+ * Return the datetime-local string for a quick due date preset in the given timezone.
+ * All presets use 17:00 (5 PM) in the user's timezone.
+ * EOW = end of week (Friday 17:00); EOM = last day of month 17:00.
+ */
+export function getDueDatePresetDateTimeLocal(preset: DueDatePreset, timezone: string): string {
+  const now = new Date();
+  const today = getDateInTimezone(now, timezone);
+  const nowInTz = getCurrentTimeInTimezone(timezone);
+
+  let targetDay: Date;
+
+  switch (preset) {
+    case "today":
+      targetDay = today;
+      break;
+    case "tomorrow":
+      targetDay = addDays(today, 1);
+      break;
+    case "eow": {
+      const dow = getDayOfWeekInTimezone(now, timezone);
+      let daysToFriday = (FRIDAY_DOW - dow + 7) % 7;
+      if (daysToFriday === 0) {
+        const hour = nowInTz.getHours();
+        const minute = nowInTz.getMinutes();
+        if (hour < PRESET_HOUR || (hour === PRESET_HOUR && minute <= PRESET_MINUTE)) {
+          daysToFriday = 0;
+        } else {
+          daysToFriday = 7;
+        }
+      }
+      targetDay = addDays(today, daysToFriday);
+      break;
+    }
+    case "next-eow": {
+      const dow = getDayOfWeekInTimezone(now, timezone);
+      let daysToThisFriday = (FRIDAY_DOW - dow + 7) % 7;
+      if (daysToThisFriday === 0) daysToThisFriday = 7;
+      targetDay = addDays(today, daysToThisFriday + 7);
+      break;
+    }
+    case "eom": {
+      const y = today.getFullYear();
+      const m = today.getMonth();
+      const lastDay = new Date(y, m + 1, 0);
+      targetDay = lastDay;
+      break;
+    }
+    case "next-eom": {
+      const y = today.getFullYear();
+      const m = today.getMonth();
+      const lastDayNextMonth = new Date(y, m + 2, 0);
+      targetDay = lastDayNextMonth;
+      break;
+    }
+    default:
+      targetDay = today;
+  }
+
+  const utcDate = createDateInTimezone(targetDay, PRESET_HOUR, PRESET_MINUTE, timezone);
+  return formatDateTimeLocalForTimezone(utcDate.toISOString(), timezone);
+}
+
+/**
+ * Return a human-readable tooltip for a due date preset (e.g. "End of week (Fri, Jan 31, 5:00 PM)").
+ */
+export function getDueDatePresetTooltip(preset: DueDatePreset, timezone: string): string {
+  const value = getDueDatePresetDateTimeLocal(preset, timezone);
+  if (!value) return "";
+  const labels: Record<DueDatePreset, string> = {
+    today: "Today, 5:00 PM",
+    tomorrow: "Tomorrow, 5:00 PM",
+    eow: "End of week",
+    "next-eow": "End of next week",
+    eom: "End of month",
+    "next-eom": "End of next month",
+  };
+  if (preset === "today" || preset === "tomorrow") {
+    return labels[preset];
+  }
+  const utcIso = parseDateTimeLocalToUTC(value, timezone);
+  const formatted = utcIso ? formatDateTime(utcIso, timezone) : "";
+  return formatted ? `${labels[preset]} (${formatted})` : labels[preset];
+}
+
 /**
  * Convert a UTC ISO datetime string to datetime-local format in a specific timezone
  * This is used for displaying dates in HTML datetime-local inputs

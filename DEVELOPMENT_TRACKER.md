@@ -1,9 +1,7 @@
 - [ ] quick due dates
-- [ ] process overdue usenew sys an also handle subtask shift
 - [ ] Auto shuffle tasks when they clash
 - [ ] Add AI task create function
 - [ ] Add voice support
-- [ ] Group schedule button, max 10 task
 
 ### ⏳ Pending
 - [ ] AI-powered task scheduling engine
