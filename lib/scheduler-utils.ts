@@ -169,60 +169,6 @@ export function findNearestAvailableSlot(
     })
     .sort((a, b) => a.start.getTime() - b.start.getTime()); // Sort by start time for easier debugging
 
-  // Helper: Get what day/time a UTC timestamp represents in the user's timezone
-  const getTimeInTimezone = (
-    utcDate: Date
-  ): {
-    year: number;
-    month: number;
-    day: number;
-    hour: number;
-    minute: number;
-    dayOfWeek: "monday" | "tuesday" | "wednesday" | "thursday" | "friday" | "saturday" | "sunday";
-  } => {
-    const formatter = new Intl.DateTimeFormat("en-US", {
-      timeZone: timezone,
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit",
-      weekday: "long",
-      hour12: false,
-    });
-    const parts = formatter.formatToParts(utcDate);
-    const weekday = parts.find((p) => p.type === "weekday")?.value?.toLowerCase() || "monday";
-    return {
-      year: parseInt(parts.find((p) => p.type === "year")?.value || "0", 10),
-      month: parseInt(parts.find((p) => p.type === "month")?.value || "0", 10) - 1,
-      day: parseInt(parts.find((p) => p.type === "day")?.value || "0", 10),
-      hour: parseInt(parts.find((p) => p.type === "hour")?.value || "0", 10),
-      minute: parseInt(parts.find((p) => p.type === "minute")?.value || "0", 10),
-      dayOfWeek: weekday as
-        | "monday"
-        | "tuesday"
-        | "wednesday"
-        | "thursday"
-        | "friday"
-        | "saturday"
-        | "sunday",
-    };
-  };
-
-  // Helper: Get working hours for a specific day (defaults to 9-17 if not configured)
-  const getWorkingHoursForDay = (day: string): { start: number; end: number } | null => {
-    const daySchedule = workingHours?.[day as keyof GroupScheduleHours];
-    if (daySchedule && daySchedule !== null) {
-      return daySchedule;
-    }
-    // Default to 9 AM - 5 PM if not configured
-    if (!workingHours || Object.keys(workingHours).length === 0) {
-      return { start: 9, end: 17 };
-    }
-    // If working hours are configured but this day is not, skip this day
-    return null;
-  };
-
   // Start searching from adjustedStartFrom (UTC), but not before now
   // Round to next 15-minute interval in UTC
   let currentTimeUTC = new Date(Math.max(adjustedStartFrom.getTime(), nowUTC.getTime()));
@@ -241,8 +187,8 @@ export function findNearestAvailableSlot(
     const slotEndUTC = new Date(slotStartUTC.getTime() + durationMs);
 
     // Get what day/time this slot represents in user's timezone
-    const slotTzTime = getTimeInTimezone(slotStartUTC);
-    const dayHours = getWorkingHoursForDay(slotTzTime.dayOfWeek);
+    const slotTzTime = getTimeInTimezone(slotStartUTC, timezone);
+    const dayHours = getWorkingHoursForDay(slotTzTime.dayOfWeek, workingHours);
 
     // Skip this day if it has no working hours configured
     if (!dayHours) {
@@ -253,7 +199,7 @@ export function findNearestAvailableSlot(
       // Search around this time for midnight in the timezone
       for (let offsetHours = -12; offsetHours <= 12; offsetHours++) {
         const candidate = new Date(nextDay.getTime() + offsetHours * 60 * 60 * 1000);
-        const candidateTz = getTimeInTimezone(candidate);
+        const candidateTz = getTimeInTimezone(candidate, timezone);
         if (candidateTz.hour === 0 && candidateTz.minute === 0) {
           currentTimeUTC = candidate;
           break;
@@ -268,7 +214,7 @@ export function findNearestAvailableSlot(
     }
 
     // Check if the slot start is within working hours (or after hours on today)
-    const nowTzTime = getTimeInTimezone(nowUTC);
+    const nowTzTime = getTimeInTimezone(nowUTC, timezone);
     const isToday =
       slotTzTime.year === nowTzTime.year &&
       slotTzTime.month === nowTzTime.month &&
@@ -291,13 +237,13 @@ export function findNearestAvailableSlot(
         for (let dayOffset = 0; dayOffset < 7; dayOffset++) {
           const candidateDay = new Date(nextDay);
           candidateDay.setUTCDate(candidateDay.getUTCDate() + dayOffset);
-          const candidateTz = getTimeInTimezone(candidateDay);
-          const candidateDayHours = getWorkingHoursForDay(candidateTz.dayOfWeek);
+          const candidateTz = getTimeInTimezone(candidateDay, timezone);
+          const candidateDayHours = getWorkingHoursForDay(candidateTz.dayOfWeek, workingHours);
           if (candidateDayHours) {
             // Found a working day, set to start of working hours
             for (let offsetHours = -12; offsetHours <= 12; offsetHours++) {
               const candidate = new Date(candidateDay.getTime() + offsetHours * 60 * 60 * 1000);
-              const candidateTzTime = getTimeInTimezone(candidate);
+              const candidateTzTime = getTimeInTimezone(candidate, timezone);
               if (
                 candidateTzTime.year === candidateTz.year &&
                 candidateTzTime.month === candidateTz.month &&
@@ -310,7 +256,7 @@ export function findNearestAvailableSlot(
               }
             }
             // Check if we successfully moved
-            const checkTzTime = getTimeInTimezone(currentTimeUTC);
+            const checkTzTime = getTimeInTimezone(currentTimeUTC, timezone);
             if (
               checkTzTime.year === candidateTz.year &&
               checkTzTime.month === candidateTz.month &&
@@ -334,7 +280,7 @@ export function findNearestAvailableSlot(
         // Find start of next day in timezone
         for (let offsetHours = -12; offsetHours <= 12; offsetHours++) {
           const candidate = new Date(nextDay.getTime() + offsetHours * 60 * 60 * 1000);
-          const candidateTz = getTimeInTimezone(candidate);
+          const candidateTz = getTimeInTimezone(candidate, timezone);
           if (candidateTz.hour === dayHours.start && candidateTz.minute === 0) {
             currentTimeUTC = candidate;
             currentTimeUTC.setUTCMinutes(
@@ -356,7 +302,7 @@ export function findNearestAvailableSlot(
     }
 
     // Check if slot end is within working hours (or same day if after hours today)
-    const slotEndTzTime = getTimeInTimezone(slotEndUTC);
+    const slotEndTzTime = getTimeInTimezone(slotEndUTC, timezone);
     const slotEndTimeInMinutes = slotEndTzTime.hour * 60 + slotEndTzTime.minute;
     const endIsInWorkingHours =
       slotEndTimeInMinutes >= startInMinutes && slotEndTimeInMinutes <= endInMinutes;
@@ -372,7 +318,7 @@ export function findNearestAvailableSlot(
       // Find start of next day in timezone
       for (let offsetHours = -12; offsetHours <= 12; offsetHours++) {
         const candidate = new Date(nextDay.getTime() + offsetHours * 60 * 60 * 1000);
-        const candidateTz = getTimeInTimezone(candidate);
+        const candidateTz = getTimeInTimezone(candidate, timezone);
         if (candidateTz.hour === dayHours.start && candidateTz.minute === 0) {
           currentTimeUTC = candidate;
           currentTimeUTC.setUTCMinutes(Math.floor(currentTimeUTC.getUTCMinutes() / 15) * 15, 0, 0);
@@ -516,6 +462,30 @@ export function scheduleTask(
 }
 
 /**
+ * Module-level formatter cache keyed by timezone string.
+ * Avoids creating a new Intl.DateTimeFormat on every getTimeInTimezone call.
+ */
+const formatterCache = new Map<string, Intl.DateTimeFormat>();
+
+function getCachedFormatter(timezone: string): Intl.DateTimeFormat {
+  let fmt = formatterCache.get(timezone);
+  if (!fmt) {
+    fmt = new Intl.DateTimeFormat("en-US", {
+      timeZone: timezone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      weekday: "long",
+      hour12: false,
+    });
+    formatterCache.set(timezone, fmt);
+  }
+  return fmt;
+}
+
+/**
  * Helper: Get what day/time a UTC timestamp represents in the user's timezone
  */
 function getTimeInTimezone(
@@ -529,16 +499,7 @@ function getTimeInTimezone(
   minute: number;
   dayOfWeek: "monday" | "tuesday" | "wednesday" | "thursday" | "friday" | "saturday" | "sunday";
 } {
-  const formatter = new Intl.DateTimeFormat("en-US", {
-    timeZone: timezone,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    weekday: "long",
-    hour12: false,
-  });
+  const formatter = getCachedFormatter(timezone);
   const parts = formatter.formatToParts(utcDate);
   const weekday = parts.find((p) => p.type === "weekday")?.value?.toLowerCase() || "monday";
   return {
@@ -590,115 +551,51 @@ export function findNextWorkingHoursSlot(
   let currentTimeUTC = new Date(Math.max(startFrom.getTime(), nowUTC.getTime()));
 
   // Round to next 15-minute interval
-  const currentMinutes = currentTimeUTC.getUTCMinutes();
-  const roundedMinutes = Math.ceil(currentMinutes / 15) * 15;
-  if (roundedMinutes >= 60) {
-    currentTimeUTC.setUTCHours(currentTimeUTC.getUTCHours() + 1, 0, 0, 0);
-  } else {
-    currentTimeUTC.setUTCMinutes(roundedMinutes, 0, 0);
-  }
+  currentTimeUTC = roundUpTo15Min(currentTimeUTC);
 
-  // Find next working hours slot
-  const maxSearchTime = new Date(currentTimeUTC);
-  maxSearchTime.setUTCDate(maxSearchTime.getUTCDate() + 7); // Search up to 7 days ahead
-
-  while (currentTimeUTC < maxSearchTime) {
+  // Search up to 7 days ahead
+  for (let dayOffset = 0; dayOffset <= 7; dayOffset++) {
     const tzTime = getTimeInTimezone(currentTimeUTC, timezone);
     const dayHours = getWorkingHoursForDay(tzTime.dayOfWeek, workingHours);
 
-    if (!dayHours) {
-      // No working hours for this day, move to next day
-      const nextDay = new Date(currentTimeUTC);
-      nextDay.setUTCDate(nextDay.getUTCDate() + 1);
-      for (let offsetHours = -12; offsetHours <= 12; offsetHours++) {
-        const candidate = new Date(nextDay.getTime() + offsetHours * 60 * 60 * 1000);
-        const candidateTz = getTimeInTimezone(candidate, timezone);
-        if (candidateTz.hour === 0 && candidateTz.minute === 0) {
-          currentTimeUTC = candidate;
-          break;
-        }
+    if (dayHours) {
+      const timeInMinutes = tzTime.hour * 60 + tzTime.minute;
+      const startInMinutes = dayHours.start * 60;
+      const endInMinutes = dayHours.end * 60;
+
+      if (timeInMinutes >= startInMinutes && timeInMinutes < endInMinutes) {
+        // Already within working hours
+        return currentTimeUTC;
       }
-      if (currentTimeUTC.getTime() === nextDay.getTime() - 12 * 60 * 60 * 1000) {
-        currentTimeUTC = new Date(currentTimeUTC.getTime() + 24 * 60 * 60 * 1000);
-        currentTimeUTC.setUTCMinutes(Math.floor(currentTimeUTC.getUTCMinutes() / 15) * 15, 0, 0);
-      }
-      continue;
-    }
 
-    const timeInMinutes = tzTime.hour * 60 + tzTime.minute;
-    const startInMinutes = dayHours.start * 60;
-    const endInMinutes = dayHours.end * 60;
-
-    if (timeInMinutes >= startInMinutes && timeInMinutes < endInMinutes) {
-      // Within working hours
-      return currentTimeUTC;
-    }
-
-    // Not in working hours, move to start of working hours for this day or next day
-    if (timeInMinutes < startInMinutes) {
-      // Before working hours today, move to start of working hours
-      const nowTzTime = getTimeInTimezone(nowUTC, timezone);
-      const isToday =
-        tzTime.year === nowTzTime.year &&
-        tzTime.month === nowTzTime.month &&
-        tzTime.day === nowTzTime.day;
-
-      if (isToday) {
-        // Set to start of working hours today
-        for (let offsetHours = -12; offsetHours <= 12; offsetHours++) {
-          const candidate = new Date(currentTimeUTC.getTime() + offsetHours * 60 * 60 * 1000);
-          const candidateTz = getTimeInTimezone(candidate, timezone);
-          if (
-            candidateTz.year === tzTime.year &&
-            candidateTz.month === tzTime.month &&
-            candidateTz.day === tzTime.day &&
-            candidateTz.hour === dayHours.start &&
-            candidateTz.minute === 0
-          ) {
-            return candidate;
-          }
+      if (timeInMinutes < startInMinutes) {
+        // Before working hours on this day — jump to start of working hours
+        const startOfHours = createDateInTimezone(currentTimeUTC, dayHours.start, 0, timezone);
+        if (startOfHours >= nowUTC) {
+          return startOfHours;
         }
       }
     }
 
-    // After working hours or couldn't find today's start, move to next working day
-    // Start from tomorrow and iterate through the next 7 days to find a working day
-    for (let dayOffset = 1; dayOffset <= 7; dayOffset++) {
-      // Create a date for the target day at noon UTC (to avoid timezone edge cases)
-      const targetDayUTC = new Date(currentTimeUTC);
-      targetDayUTC.setUTCDate(targetDayUTC.getUTCDate() + dayOffset);
-      targetDayUTC.setUTCHours(12, 0, 0, 0); // Set to noon to get the date in timezone
+    // After working hours or no hours for this day — move to next day
+    // Use noon UTC of the next day as anchor for timezone-safe day detection
+    const nextDayNoon = new Date(currentTimeUTC);
+    nextDayNoon.setUTCDate(nextDayNoon.getUTCDate() + 1);
+    nextDayNoon.setUTCHours(12, 0, 0, 0);
 
-      // Get what date this represents in the user's timezone
-      const candidateTz = getTimeInTimezone(targetDayUTC, timezone);
-      const candidateDayHours = getWorkingHoursForDay(candidateTz.dayOfWeek, workingHours);
+    const nextDayTz = getTimeInTimezone(nextDayNoon, timezone);
+    const nextDayHours = getWorkingHoursForDay(nextDayTz.dayOfWeek, workingHours);
 
-      if (candidateDayHours) {
-        // Found a working day, find the UTC time that represents start of working hours on this day
-        // Search from 24 hours before to 24 hours after noon UTC to find the right time
-        for (let offsetHours = -24; offsetHours <= 24; offsetHours++) {
-          const candidate = new Date(targetDayUTC.getTime() + offsetHours * 60 * 60 * 1000);
-          const candidateTzTime = getTimeInTimezone(candidate, timezone);
-          if (
-            candidateTzTime.year === candidateTz.year &&
-            candidateTzTime.month === candidateTz.month &&
-            candidateTzTime.day === candidateTz.day &&
-            candidateTzTime.hour === candidateDayHours.start &&
-            candidateTzTime.minute === 0
-          ) {
-            return candidate;
-          }
-        }
-      }
+    if (nextDayHours) {
+      currentTimeUTC = createDateInTimezone(nextDayNoon, nextDayHours.start, 0, timezone);
+    } else {
+      // No hours on next day either, advance to that day and loop
+      currentTimeUTC = createDateInTimezone(nextDayNoon, 0, 0, timezone);
     }
-
-    // Fallback: add 24 hours
-    currentTimeUTC = new Date(currentTimeUTC.getTime() + 24 * 60 * 60 * 1000);
-    currentTimeUTC.setUTCMinutes(Math.floor(currentTimeUTC.getUTCMinutes() / 15) * 15, 0, 0);
   }
 
   // Fallback: return current time rounded
-  return currentTimeUTC;
+  return roundUpTo15Min(new Date());
 }
 
 /**
@@ -752,291 +649,25 @@ export function getStartOfNextWorkingDay(
 ): Date {
   // Start from tomorrow and iterate through the next 7 days to find a working day
   for (let dayOffset = 1; dayOffset <= 7; dayOffset++) {
-    // Create a date for the target day at noon UTC (to avoid timezone edge cases)
+    // Use noon UTC as anchor for timezone-safe day detection
     const targetDayUTC = new Date(currentDate);
     targetDayUTC.setUTCDate(targetDayUTC.getUTCDate() + dayOffset);
-    targetDayUTC.setUTCHours(12, 0, 0, 0); // Set to noon to get the date in timezone
+    targetDayUTC.setUTCHours(12, 0, 0, 0);
 
-    // Get what date this represents in the user's timezone
     const candidateTz = getTimeInTimezone(targetDayUTC, timezone);
     const candidateDayHours = getWorkingHoursForDay(candidateTz.dayOfWeek, workingHours);
 
     if (candidateDayHours) {
-      // Found a working day, find the UTC time that represents start of working hours on this day
-      // Search from 24 hours before to 24 hours after noon UTC to find the right time
-      for (let offsetHours = -24; offsetHours <= 24; offsetHours++) {
-        const candidate = new Date(targetDayUTC.getTime() + offsetHours * 60 * 60 * 1000);
-        const candidateTzTime = getTimeInTimezone(candidate, timezone);
-        if (
-          candidateTzTime.year === candidateTz.year &&
-          candidateTzTime.month === candidateTz.month &&
-          candidateTzTime.day === candidateTz.day &&
-          candidateTzTime.hour === candidateDayHours.start &&
-          candidateTzTime.minute === 0
-        ) {
-          return candidate;
-        }
-      }
+      // Found a working day — use createDateInTimezone for precise conversion
+      return createDateInTimezone(targetDayUTC, candidateDayHours.start, 0, timezone);
     }
   }
 
-  // Fallback: add 24 hours and set to 9 AM
-  const fallback = new Date(currentDate);
-  fallback.setUTCDate(fallback.getUTCDate() + 1);
-  fallback.setUTCHours(9, 0, 0, 0);
-  return fallback;
+  // Fallback: add 24 hours and set to 9 AM in timezone
+  const fallbackDay = new Date(currentDate);
+  fallbackDay.setUTCDate(fallbackDay.getUTCDate() + 1);
+  return createDateInTimezone(fallbackDay, 9, 0, timezone);
 }
-
-/**
- * Reschedule a task with ASAP shuffling - places task at next working hours slot
- * and recursively shuffles conflicting tasks forward
- */
-export function rescheduleTaskWithShuffling(
-  task: Task,
-  allTasks: Task[],
-  workingHours: GroupScheduleHours | null,
-  timezone: string
-): {
-  taskSlot: TimeSlot;
-  shuffledTasks: Array<{ taskId: string; newSlot: TimeSlot }>;
-} {
-  if (!task.duration || task.duration <= 0) {
-    throw new Error("Task must have a duration to be rescheduled");
-  }
-
-  const durationMs = task.duration * 60 * 1000;
-  const nowUTC = new Date();
-
-  // Find next working hours slot for the task
-  const nextWorkingSlotStart = findNextWorkingHoursSlot(nowUTC, workingHours, timezone);
-  const nextWorkingSlotEnd = new Date(nextWorkingSlotStart.getTime() + durationMs);
-  const taskSlot: TimeSlot = {
-    start: nextWorkingSlotStart,
-    end: nextWorkingSlotEnd,
-  };
-
-  // Get all scheduled tasks (excluding the one being rescheduled, completed, cancelled, and rescheduled)
-  const scheduledTasks = allTasks.filter(
-    (t) =>
-      t.id !== task.id &&
-      t.scheduled_start &&
-      t.scheduled_end &&
-      t.status !== "completed" &&
-      t.status !== "cancelled" &&
-      t.status !== "rescheduled"
-  );
-
-  // Track shuffled tasks to prevent infinite loops
-  const shuffledTasks: Array<{ taskId: string; newSlot: TimeSlot }> = [];
-  const shuffledTaskIds = new Set<string>();
-  const shuffledTaskSlots = new Map<string, TimeSlot>(); // Map of task ID to new slot
-  const maxRecursionDepth = 100; // Prevent infinite loops
-  const recursionDepth = 0;
-
-  // Helper function to check if two time slots overlap
-  const slotsOverlap = (slot1: TimeSlot, slot2: TimeSlot): boolean => {
-    return (
-      slot1.start.getTime() < slot2.end.getTime() && slot1.end.getTime() > slot2.start.getTime()
-    );
-  };
-
-  // Recursive function to shuffle a conflicting task
-  const shuffleTask = (
-    conflictingTask: Task,
-    newSlotStart: Date,
-    depth: number
-  ): TimeSlot | null => {
-    if (depth > maxRecursionDepth) {
-      console.error("Maximum recursion depth reached in shuffling algorithm");
-      return null;
-    }
-
-    if (shuffledTaskIds.has(conflictingTask.id)) {
-      // Already shuffled this task, skip to prevent circular dependencies
-      return null;
-    }
-
-    if (conflictingTask.locked) {
-      // Locked tasks cannot be shuffled - this will cause a conflict that we can't resolve
-      // For now, we'll skip locked tasks and let the caller handle it
-      return null;
-    }
-
-    const taskDuration = (conflictingTask.duration || 30) * 60 * 1000;
-    let candidateSlotStart = new Date(newSlotStart);
-
-    // Round to next 15-minute interval
-    const minutes = candidateSlotStart.getUTCMinutes();
-    const roundedMinutes = Math.ceil(minutes / 15) * 15;
-    if (roundedMinutes >= 60) {
-      candidateSlotStart.setUTCHours(candidateSlotStart.getUTCHours() + 1, 0, 0, 0);
-    } else {
-      candidateSlotStart.setUTCMinutes(roundedMinutes, 0, 0);
-    }
-
-    const candidateSlotEnd = new Date(candidateSlotStart.getTime() + taskDuration);
-    const candidateSlot: TimeSlot = {
-      start: candidateSlotStart,
-      end: candidateSlotEnd,
-    };
-
-    // Check if slot is within working hours
-    if (!isWithinWorkingHours(candidateSlot, workingHours, timezone)) {
-      // Move to start of next working day
-      candidateSlotStart = getStartOfNextWorkingDay(candidateSlotStart, workingHours, timezone);
-      candidateSlotEnd.setTime(candidateSlotStart.getTime() + taskDuration);
-      candidateSlot.start = candidateSlotStart;
-      candidateSlot.end = candidateSlotEnd;
-    }
-
-    // Check for conflicts with other scheduled tasks
-    // Must check against both original slots and new shuffled slots
-    const conflicts: Task[] = [];
-
-    // Check conflicts with original scheduled tasks (not yet shuffled)
-    for (const otherTask of scheduledTasks) {
-      if (
-        otherTask.id === conflictingTask.id ||
-        shuffledTaskIds.has(otherTask.id) ||
-        otherTask.status === "completed" ||
-        otherTask.status === "cancelled" ||
-        otherTask.status === "rescheduled"
-      ) {
-        continue;
-      }
-
-      if (!otherTask.scheduled_start || !otherTask.scheduled_end) {
-        continue;
-      }
-
-      const otherSlot: TimeSlot = {
-        start: new Date(otherTask.scheduled_start),
-        end: new Date(otherTask.scheduled_end),
-      };
-
-      if (slotsOverlap(candidateSlot, otherSlot)) {
-        conflicts.push(otherTask);
-      }
-    }
-
-    // Check conflicts with already-shuffled tasks (using their new slots)
-    for (const [taskId, shuffledSlot] of shuffledTaskSlots.entries()) {
-      if (taskId === conflictingTask.id) {
-        continue;
-      }
-
-      if (slotsOverlap(candidateSlot, shuffledSlot)) {
-        // Find the task from scheduledTasks to add to conflicts
-        const shuffledTask = scheduledTasks.find((t) => t.id === taskId);
-        if (shuffledTask && !conflicts.includes(shuffledTask)) {
-          conflicts.push(shuffledTask);
-        }
-      }
-    }
-
-    // If there are conflicts, recursively shuffle them first
-    if (conflicts.length > 0) {
-      // Sort conflicts chronologically by scheduled_start
-      conflicts.sort((a, b) => {
-        const aStart = a.scheduled_start ? new Date(a.scheduled_start).getTime() : 0;
-        const bStart = b.scheduled_start ? new Date(b.scheduled_start).getTime() : 0;
-        return aStart - bStart;
-      });
-
-      // Shuffle each conflicting task
-      let latestConflictEnd = candidateSlot.end;
-      for (const conflictTask of conflicts) {
-        const shuffledSlot = shuffleTask(conflictTask, latestConflictEnd, depth + 1);
-        if (shuffledSlot) {
-          shuffledTasks.push({ taskId: conflictTask.id, newSlot: shuffledSlot });
-          shuffledTaskIds.add(conflictTask.id);
-          shuffledTaskSlots.set(conflictTask.id, shuffledSlot); // Track new slot
-          latestConflictEnd = shuffledSlot.end;
-        }
-      }
-
-      // Update our slot to start after the last shuffled conflict
-      candidateSlotStart = new Date(latestConflictEnd);
-      // Round to next 15-minute interval
-      const newMinutes = candidateSlotStart.getUTCMinutes();
-      const newRoundedMinutes = Math.ceil(newMinutes / 15) * 15;
-      if (newRoundedMinutes >= 60) {
-        candidateSlotStart.setUTCHours(candidateSlotStart.getUTCHours() + 1, 0, 0, 0);
-      } else {
-        candidateSlotStart.setUTCMinutes(newRoundedMinutes, 0, 0);
-      }
-      candidateSlotEnd.setTime(candidateSlotStart.getTime() + taskDuration);
-      candidateSlot.start = candidateSlotStart;
-      candidateSlot.end = candidateSlotEnd;
-
-      // Check if still within working hours
-      if (!isWithinWorkingHours(candidateSlot, workingHours, timezone)) {
-        candidateSlotStart = getStartOfNextWorkingDay(candidateSlotStart, workingHours, timezone);
-        candidateSlotEnd.setTime(candidateSlotStart.getTime() + taskDuration);
-        candidateSlot.start = candidateSlotStart;
-        candidateSlot.end = candidateSlotEnd;
-      }
-    }
-
-    return candidateSlot;
-  };
-
-  // Check for conflicts with the task slot
-  const initialConflicts: Task[] = [];
-  for (const scheduledTask of scheduledTasks) {
-    if (
-      scheduledTask.status === "completed" ||
-      scheduledTask.status === "cancelled" ||
-      scheduledTask.status === "rescheduled" ||
-      !scheduledTask.scheduled_start ||
-      !scheduledTask.scheduled_end
-    ) {
-      continue;
-    }
-
-    const theirStart = new Date(scheduledTask.scheduled_start).getTime();
-    const theirEnd = new Date(scheduledTask.scheduled_end).getTime();
-    const ourStart = taskSlot.start.getTime();
-    const ourEnd = taskSlot.end.getTime();
-
-    if (ourStart < theirEnd && ourEnd > theirStart) {
-      initialConflicts.push(scheduledTask);
-    }
-  }
-
-  // Shuffle all conflicting tasks
-  if (initialConflicts.length > 0) {
-    // Sort conflicts chronologically
-    initialConflicts.sort((a, b) => {
-      const aStart = a.scheduled_start ? new Date(a.scheduled_start).getTime() : 0;
-      const bStart = b.scheduled_start ? new Date(b.scheduled_start).getTime() : 0;
-      return aStart - bStart;
-    });
-
-    // Shuffle each conflict
-    let latestConflictEnd = taskSlot.end;
-    for (const conflictTask of initialConflicts) {
-      const shuffledSlot = shuffleTask(conflictTask, latestConflictEnd, recursionDepth);
-      if (shuffledSlot) {
-        shuffledTasks.push({ taskId: conflictTask.id, newSlot: shuffledSlot });
-        shuffledTaskIds.add(conflictTask.id);
-        shuffledTaskSlots.set(conflictTask.id, shuffledSlot); // Track new slot
-        latestConflictEnd = shuffledSlot.end;
-      }
-    }
-  }
-
-  return {
-    taskSlot,
-    shuffledTasks,
-  };
-}
-
-/**
- * Scheduling mode types
- * @deprecated Import from @/lib/types instead. This export is kept for backward compatibility.
- */
-export type { SchedulingMode } from "@/lib/types";
 
 /**
  * Scheduling result with feedback messages
@@ -1056,6 +687,7 @@ export interface UnifiedSchedulingOptions {
   task: Task;
   allTasks: Task[];
   taskGroup?: TaskGroup | null; // Task's group if it has one
+  allGroups?: TaskGroup[]; // All user's groups (needed for displaced task group lookups in ASAP)
   awakeHours: GroupScheduleHours | null; // User's awake hours
   timezone: string;
   onProgress?: (message: string) => void; // Optional progress callback
@@ -1226,66 +858,14 @@ export function findAvailableSlotBeforeDeadline(
     })
     .sort((a, b) => a.start.getTime() - b.start.getTime());
 
-  // Helper: Get what day/time a UTC timestamp represents in the user's timezone
-  const getTimeInTimezone = (
-    utcDate: Date
-  ): {
-    year: number;
-    month: number;
-    day: number;
-    hour: number;
-    minute: number;
-    dayOfWeek: "monday" | "tuesday" | "wednesday" | "thursday" | "friday" | "saturday" | "sunday";
-  } => {
-    const formatter = new Intl.DateTimeFormat("en-US", {
-      timeZone: timezone,
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit",
-      weekday: "long",
-      hour12: false,
-    });
-    const parts = formatter.formatToParts(utcDate);
-    const weekday = parts.find((p) => p.type === "weekday")?.value?.toLowerCase() || "monday";
-    return {
-      year: parseInt(parts.find((p) => p.type === "year")?.value || "0", 10),
-      month: parseInt(parts.find((p) => p.type === "month")?.value || "0", 10) - 1,
-      day: parseInt(parts.find((p) => p.type === "day")?.value || "0", 10),
-      hour: parseInt(parts.find((p) => p.type === "hour")?.value || "0", 10),
-      minute: parseInt(parts.find((p) => p.type === "minute")?.value || "0", 10),
-      dayOfWeek: weekday as
-        | "monday"
-        | "tuesday"
-        | "wednesday"
-        | "thursday"
-        | "friday"
-        | "saturday"
-        | "sunday",
-    };
-  };
-
-  // Helper: Get working hours for a specific day
-  const getWorkingHoursForDay = (day: string): { start: number; end: number } | null => {
-    const daySchedule = workingHours?.[day as keyof GroupScheduleHours];
-    if (daySchedule && daySchedule !== null) {
-      return daySchedule;
-    }
-    if (!workingHours || Object.keys(workingHours).length === 0) {
-      return { start: 9, end: 17 };
-    }
-    return null;
-  };
-
   // Start from deadline and work backwards day by day
   for (let dayOffset = 0; dayOffset <= maxDaysBack; dayOffset++) {
     // Calculate the day we're checking (0 = due date day, 1 = day before, etc.)
     const checkDay = new Date(deadline);
     checkDay.setUTCDate(checkDay.getUTCDate() - dayOffset);
 
-    const checkDayTz = getTimeInTimezone(checkDay);
-    const dayHours = getWorkingHoursForDay(checkDayTz.dayOfWeek);
+    const checkDayTz = getTimeInTimezone(checkDay, timezone);
+    const dayHours = getWorkingHoursForDay(checkDayTz.dayOfWeek, workingHours);
 
     // Skip days with no working hours
     if (!dayHours) {
@@ -1361,7 +941,7 @@ export function findAvailableSlotBeforeDeadline(
       }
 
       // Get what day/time this slot represents in user's timezone
-      const slotTzTime = getTimeInTimezone(slotStartUTC);
+      const slotTzTime = getTimeInTimezone(slotStartUTC, timezone);
       const slotTimeInMinutes = slotTzTime.hour * 60 + slotTzTime.minute;
       const startInMinutes = dayHours.start * 60;
       const endInMinutes = dayHours.end * 60;
@@ -1374,7 +954,7 @@ export function findAvailableSlotBeforeDeadline(
       }
 
       // Check if slot end is within working hours
-      const slotEndTzTime = getTimeInTimezone(slotEndUTC);
+      const slotEndTzTime = getTimeInTimezone(slotEndUTC, timezone);
       const slotEndTimeInMinutes = slotEndTzTime.hour * 60 + slotEndTzTime.minute;
       if (slotEndTimeInMinutes < startInMinutes || slotEndTimeInMinutes > endInMinutes) {
         // Move back 15 minutes
@@ -1457,6 +1037,7 @@ export function scheduleTaskUnified(options: UnifiedSchedulingOptions): Scheduli
     task,
     allTasks,
     taskGroup,
+    allGroups,
     awakeHours,
     timezone,
     onProgress,
@@ -1496,6 +1077,7 @@ export function scheduleTaskUnified(options: UnifiedSchedulingOptions): Scheduli
   }
 
   const nowUTC = new Date();
+  const nowTzTimeCached = getTimeInTimezone(nowUTC, timezone); // Cache once, reuse in main loop
   const startTime = Date.now();
   const durationMs = task.duration * 60 * 1000;
 
@@ -1590,7 +1172,9 @@ export function scheduleTaskUnified(options: UnifiedSchedulingOptions): Scheduli
         awakeHours,
         timezone,
         reportProgress,
-        maxTimeout
+        maxTimeout,
+        dependencyMap,
+        allGroups
       );
 
     case "due-date": {
@@ -1693,16 +1277,39 @@ export function scheduleTaskUnified(options: UnifiedSchedulingOptions): Scheduli
 
   reportProgress(`Found ${scheduledSlots.length} scheduled tasks to check against`);
 
-  // Helper to get hours for a day
+  // Helper to get effective hours for a day.
+  // For today/tomorrow mode with preferGroupRules, widens to include awake hours
+  // so the main loop doesn't need separate fallback blocks with duplicated conflict checking.
   const getHoursForDay = (day: string): { start: number; end: number } | null => {
-    const daySchedule = scheduleHours?.[day as keyof GroupScheduleHours];
-    if (daySchedule && daySchedule !== null) {
-      return daySchedule;
-    }
-    // Default to 9 AM - 5 PM if not configured
+    // No group schedule configured at all - use default 9-17
     if (!scheduleHours || Object.keys(scheduleHours).length === 0) {
       return { start: 9, end: 17 };
     }
+
+    const daySchedule = scheduleHours?.[day as keyof GroupScheduleHours];
+
+    if (daySchedule) {
+      // Group hours exist for this day
+      if ((mustBeToday || mustBeTomorrow) && preferGroupRules) {
+        // For today/tomorrow: widen range to include awake hours as fallback
+        const awakeDayHours = awakeHours?.[day as keyof GroupScheduleHours];
+        if (awakeDayHours) {
+          return {
+            start: Math.min(daySchedule.start, awakeDayHours.start),
+            end: Math.max(daySchedule.end, awakeDayHours.end),
+          };
+        }
+      }
+      return daySchedule;
+    }
+
+    // Day has no group hours configured
+    if ((mustBeToday || mustBeTomorrow) && preferGroupRules) {
+      // Fallback: awake hours for this day, then default 9-17
+      const awakeDayHours = awakeHours?.[day as keyof GroupScheduleHours];
+      return awakeDayHours ?? { start: 9, end: 17 };
+    }
+
     return null;
   };
 
@@ -1744,11 +1351,10 @@ export function scheduleTaskUnified(options: UnifiedSchedulingOptions): Scheduli
     // Check if we're past today for "today" mode
     if (mustBeToday) {
       const slotTzTime = getTimeInTimezone(slotStartUTC, timezone);
-      const nowTzTime = getTimeInTimezone(nowUTC, timezone);
       const isToday =
-        slotTzTime.year === nowTzTime.year &&
-        slotTzTime.month === nowTzTime.month &&
-        slotTzTime.day === nowTzTime.day;
+        slotTzTime.year === nowTzTimeCached.year &&
+        slotTzTime.month === nowTzTimeCached.month &&
+        slotTzTime.day === nowTzTimeCached.day;
 
       if (!isToday) {
         reportProgress("No available slot found today");
@@ -1762,9 +1368,8 @@ export function scheduleTaskUnified(options: UnifiedSchedulingOptions): Scheduli
 
     if (mustBeTomorrow) {
       const slotTzTime = getTimeInTimezone(slotStartUTC, timezone);
-      const nowTzTime = getTimeInTimezone(nowUTC, timezone);
-      // Tomorrow is nowTzTime.day + 1
-      const tomorrowDate = new Date(Date.UTC(nowTzTime.year, nowTzTime.month, nowTzTime.day + 1));
+      // Tomorrow is nowTzTimeCached.day + 1
+      const tomorrowDate = new Date(Date.UTC(nowTzTimeCached.year, nowTzTimeCached.month, nowTzTimeCached.day + 1));
       const isTomorrow =
         slotTzTime.year === tomorrowDate.getUTCFullYear() &&
         slotTzTime.month === tomorrowDate.getUTCMonth() &&
@@ -1784,91 +1389,12 @@ export function scheduleTaskUnified(options: UnifiedSchedulingOptions): Scheduli
     const slotTzTime = getTimeInTimezone(slotStartUTC, timezone);
     const dayHours = getHoursForDay(slotTzTime.dayOfWeek);
 
-    // Skip days with no hours configured (unless today/tomorrow mode with preferGroupRules)
+    // Skip days with no hours configured (getHoursForDay handles today/tomorrow fallbacks)
     if (!dayHours) {
-      if ((mustBeToday || mustBeTomorrow) && preferGroupRules) {
-        // For today/tomorrow mode with preferGroupRules, fall back to awake hours or default hours
-        const awakeDayHours = awakeHours?.[slotTzTime.dayOfWeek as keyof GroupScheduleHours];
-        // Use awake hours if available, otherwise use default 9-17 for today/tomorrow mode
-        const fallbackHours = awakeDayHours ?? { start: 9, end: 17 };
-
-        const timeInMinutes = slotTzTime.hour * 60 + slotTzTime.minute;
-        const fallbackStart = fallbackHours.start * 60;
-        const fallbackEnd = fallbackHours.end * 60;
-
-        // Check if within fallback hours
-        if (timeInMinutes >= fallbackStart && timeInMinutes < fallbackEnd) {
-          // Check conflicts
-          let hasConflict = false;
-          let latestConflictEnd: Date | null = null;
-
-          for (const scheduledSlot of scheduledSlots) {
-            const ourStart = slotStartUTC.getTime();
-            const ourEnd = slotEndUTC.getTime();
-            const theirStart = scheduledSlot.start.getTime();
-            const theirEnd = scheduledSlot.end.getTime();
-
-            if (ourStart < theirEnd && ourEnd > theirStart) {
-              hasConflict = true;
-              if (!latestConflictEnd || theirEnd > latestConflictEnd.getTime()) {
-                latestConflictEnd = new Date(scheduledSlot.end);
-              }
-            }
-          }
-
-          if (!hasConflict) {
-            reportProgress(
-              awakeDayHours
-                ? "Found available slot using awake hours"
-                : "Found available slot using default hours (9am-5pm)"
-            );
-            return {
-              slot: {
-                start: slotStartUTC,
-                end: slotEndUTC,
-              },
-              feedback,
-            };
-          }
-
-          // Jump past conflict
-          if (latestConflictEnd) {
-            currentTimeUTC = new Date(latestConflictEnd);
-            currentTimeUTC.setUTCMinutes(Math.ceil(currentTimeUTC.getUTCMinutes() / 15) * 15, 0, 0);
-            if (currentTimeUTC.getUTCMinutes() >= 60) {
-              currentTimeUTC.setUTCHours(currentTimeUTC.getUTCHours() + 1, 0, 0, 0);
-            }
-            continue;
-          }
-        } else if (timeInMinutes < fallbackStart) {
-          // Before fallback hours start, jump to the start
-          currentTimeUTC = createDateInTimezone(slotStartUTC, fallbackHours.start, 0, timezone);
-          continue;
-        }
-        // If past fallback hours end, will fall through to "move to next day" which triggers tomorrow check
-      }
-
-      // Move to next day - but check if this would skip past our target day
-      if (mustBeTomorrow) {
-        reportProgress("No available slot found tomorrow within configured hours");
-        return {
-          slot: null,
-          feedback,
-          error: "Unable to schedule task tomorrow. No available time within working hours.",
-        };
-      }
-
-      // Move to next day
+      // Move to next day (only triggers for non-today/tomorrow modes)
       const nextDay = new Date(slotStartUTC);
       nextDay.setUTCDate(nextDay.getUTCDate() + 1);
-      for (let offsetHours = -12; offsetHours <= 12; offsetHours++) {
-        const candidate = new Date(nextDay.getTime() + offsetHours * 60 * 60 * 1000);
-        const candidateTz = getTimeInTimezone(candidate, timezone);
-        if (candidateTz.hour === 0 && candidateTz.minute === 0) {
-          currentTimeUTC = candidate;
-          break;
-        }
-      }
+      currentTimeUTC = createDateInTimezone(nextDay, 0, 0, timezone);
       if (currentTimeUTC.getTime() <= slotStartUTC.getTime()) {
         currentTimeUTC = new Date(slotStartUTC.getTime() + 24 * 60 * 60 * 1000);
         currentTimeUTC.setUTCMinutes(Math.floor(currentTimeUTC.getUTCMinutes() / 15) * 15, 0, 0);
@@ -1882,69 +1408,12 @@ export function scheduleTaskUnified(options: UnifiedSchedulingOptions): Scheduli
     const endInMinutes = dayHours.end * 60;
     const isInHours = slotTimeInMinutes >= startInMinutes && slotTimeInMinutes < endInMinutes;
 
-    // For today/tomorrow mode with preferGroupRules, allow outside group hours but check awake hours
+    // Not in effective hours - jump to next valid time
     if (!isInHours) {
-      if ((mustBeToday || mustBeTomorrow) && preferGroupRules && useGroupRules) {
-        // Check awake hours as fallback
-        const awakeDayHours = awakeHours?.[slotTzTime.dayOfWeek as keyof GroupScheduleHours];
-        if (awakeDayHours && awakeDayHours !== null) {
-          const awakeStart = awakeDayHours.start * 60;
-          const awakeEnd = awakeDayHours.end * 60;
-          const isInAwakeHours = slotTimeInMinutes >= awakeStart && slotTimeInMinutes < awakeEnd;
-
-          if (isInAwakeHours) {
-            // Check conflicts
-            let hasConflict = false;
-            let latestConflictEnd: Date | null = null;
-
-            for (const scheduledSlot of scheduledSlots) {
-              const ourStart = slotStartUTC.getTime();
-              const ourEnd = slotEndUTC.getTime();
-              const theirStart = scheduledSlot.start.getTime();
-              const theirEnd = scheduledSlot.end.getTime();
-
-              if (ourStart < theirEnd && ourEnd > theirStart) {
-                hasConflict = true;
-                if (!latestConflictEnd || theirEnd > latestConflictEnd.getTime()) {
-                  latestConflictEnd = new Date(scheduledSlot.end);
-                }
-              }
-            }
-
-            if (!hasConflict) {
-              reportProgress("Found available slot outside group hours but within awake hours");
-              return {
-                slot: {
-                  start: slotStartUTC,
-                  end: slotEndUTC,
-                },
-                feedback,
-              };
-            }
-
-            // Jump past conflict
-            if (latestConflictEnd) {
-              currentTimeUTC = new Date(latestConflictEnd);
-              currentTimeUTC.setUTCMinutes(
-                Math.ceil(currentTimeUTC.getUTCMinutes() / 15) * 15,
-                0,
-                0
-              );
-              if (currentTimeUTC.getUTCMinutes() >= 60) {
-                currentTimeUTC.setUTCHours(currentTimeUTC.getUTCHours() + 1, 0, 0, 0);
-              }
-              continue;
-            }
-          }
-        }
-      }
-
-      // Not in hours - jump to next valid time
-      const nowTzTime = getTimeInTimezone(nowUTC, timezone);
       const isToday =
-        slotTzTime.year === nowTzTime.year &&
-        slotTzTime.month === nowTzTime.month &&
-        slotTzTime.day === nowTzTime.day;
+        slotTzTime.year === nowTzTimeCached.year &&
+        slotTzTime.month === nowTzTimeCached.month &&
+        slotTzTime.day === nowTzTimeCached.day;
 
       // If before hours on current day, jump to start of current day's hours
       if (slotTimeInMinutes < startInMinutes) {
@@ -2087,65 +1556,29 @@ export function scheduleTaskUnified(options: UnifiedSchedulingOptions): Scheduli
     const slotEndTimeInMinutes = slotEndTzTime.hour * 60 + slotEndTzTime.minute;
     const endIsInHours =
       slotEndTimeInMinutes >= startInMinutes && slotEndTimeInMinutes <= endInMinutes;
-    const nowTzTime = getTimeInTimezone(nowUTC, timezone);
     const endIsToday =
-      slotEndTzTime.year === nowTzTime.year &&
-      slotEndTzTime.month === nowTzTime.month &&
-      slotEndTzTime.day === nowTzTime.day;
+      slotEndTzTime.year === nowTzTimeCached.year &&
+      slotEndTzTime.month === nowTzTimeCached.month &&
+      slotEndTzTime.day === nowTzTimeCached.day;
 
     if (!endIsInHours && (!endIsToday || slotEndTzTime.hour >= 23)) {
-      // Can't fit, move to next day
+      // Can't fit, move to next day with configured hours
       const nextDay = new Date(slotStartUTC);
       nextDay.setUTCDate(nextDay.getUTCDate() + 1);
-      // Get the next day's hours (not the current day's)
-      const nextDayTz = getTimeInTimezone(nextDay, timezone);
-      const nextDayHours = getHoursForDay(nextDayTz.dayOfWeek);
-      if (nextDayHours) {
-        for (let offsetHours = -12; offsetHours <= 12; offsetHours++) {
-          const candidate = new Date(nextDay.getTime() + offsetHours * 60 * 60 * 1000);
-          const candidateTz = getTimeInTimezone(candidate, timezone);
-          if (candidateTz.hour === nextDayHours.start && candidateTz.minute === 0) {
-            currentTimeUTC = candidate;
-            currentTimeUTC.setUTCMinutes(
-              Math.floor(currentTimeUTC.getUTCMinutes() / 15) * 15,
-              0,
-              0
-            );
-            break;
-          }
+      nextDay.setUTCHours(12, 0, 0, 0); // Use noon as anchor for day resolution
+      for (let dayOffset = 0; dayOffset < 7; dayOffset++) {
+        const candidateDay = new Date(nextDay);
+        candidateDay.setUTCDate(candidateDay.getUTCDate() + dayOffset);
+        const candidateTz = getTimeInTimezone(candidateDay, timezone);
+        const candidateDayHours = getHoursForDay(candidateTz.dayOfWeek);
+        if (candidateDayHours) {
+          currentTimeUTC = createDateInTimezone(candidateDay, candidateDayHours.start, 0, timezone);
+          break;
         }
       }
       if (currentTimeUTC.getTime() <= slotStartUTC.getTime()) {
-        // Fallback: just move forward and find next day with hours
-        for (let dayOffset = 1; dayOffset <= 7; dayOffset++) {
-          const candidateDay = new Date(slotStartUTC);
-          candidateDay.setUTCDate(candidateDay.getUTCDate() + dayOffset);
-          const candidateDayTz = getTimeInTimezone(candidateDay, timezone);
-          const candidateDayHours = getHoursForDay(candidateDayTz.dayOfWeek);
-          if (candidateDayHours) {
-            for (let offsetHours = -12; offsetHours <= 12; offsetHours++) {
-              const candidate = new Date(candidateDay.getTime() + offsetHours * 60 * 60 * 1000);
-              const candidateTz = getTimeInTimezone(candidate, timezone);
-              if (
-                candidateTz.year === candidateDayTz.year &&
-                candidateTz.month === candidateDayTz.month &&
-                candidateTz.day === candidateDayTz.day &&
-                candidateTz.hour === candidateDayHours.start &&
-                candidateTz.minute === 0
-              ) {
-                currentTimeUTC = candidate;
-                break;
-              }
-            }
-            if (currentTimeUTC.getTime() > slotStartUTC.getTime()) {
-              break;
-            }
-          }
-        }
-        if (currentTimeUTC.getTime() <= slotStartUTC.getTime()) {
-          currentTimeUTC = new Date(slotStartUTC.getTime() + 24 * 60 * 60 * 1000);
-          currentTimeUTC.setUTCMinutes(Math.floor(currentTimeUTC.getUTCMinutes() / 15) * 15, 0, 0);
-        }
+        currentTimeUTC = new Date(slotStartUTC.getTime() + 24 * 60 * 60 * 1000);
+        currentTimeUTC.setUTCMinutes(Math.floor(currentTimeUTC.getUTCMinutes() / 15) * 15, 0, 0);
       }
       continue;
     }
@@ -2213,7 +1646,8 @@ function scheduleTaskASAPWithShuffling(
   timezone: string,
   reportProgress: (message: string) => void,
   maxTimeout: number,
-  dependencyMap?: DependencyMap
+  dependencyMap?: DependencyMap,
+  allGroups?: TaskGroup[]
 ): SchedulingResult {
   reportProgress("Finding next available slot for task...");
 
@@ -2242,16 +1676,13 @@ function scheduleTaskASAPWithShuffling(
     }
   }
 
-  // Find next slot for the task - adjust for dependency constraints
+  // ASAP: place at current time (rounded up to 15 min), ignoring working hours
+  // Only displaced tasks will respect working hours via schedule-now logic
   let startFromTime = nowUTC;
   if (dependencyConstraint) {
     startFromTime = new Date(Math.max(nowUTC.getTime(), dependencyConstraint.getTime()));
   }
-  const nextSlotStart = findNextWorkingHoursSlot(
-    startFromTime,
-    scheduleHours || awakeHours,
-    timezone
-  );
+  const nextSlotStart = roundUpTo15Min(startFromTime);
   const nextSlotEnd = new Date(nextSlotStart.getTime() + durationMs);
   const taskSlot: TimeSlot = {
     start: nextSlotStart,
@@ -2271,21 +1702,28 @@ function scheduleTaskASAPWithShuffling(
       t.status !== "rescheduled"
   );
 
-  // Create a map of task groups for quick lookup
-  // Note: In a real implementation, you'd pass groups as a parameter
-  // For now, we'll use the scheduleHours from the task's group
+  // Build groups map for quick lookup when displacing tasks
+  const groupsMap = new Map<string, TaskGroup>();
+  if (allGroups) {
+    for (const g of allGroups) {
+      groupsMap.set(g.id, g);
+    }
+  }
 
   const shuffledTasks: Array<{ taskId: string; newSlot: TimeSlot }> = [];
   const shuffledTaskIds = new Set<string>();
   const shuffledTaskSlots = new Map<string, TimeSlot>();
   const maxRecursionDepth = 100;
 
-  // Helper to get group for a task (simplified - in real implementation, pass groups map)
-  const getTaskGroupHours = (_t: Task): GroupScheduleHours | null => {
-    // This is a simplified version - in the real implementation,
-    // you'd look up the task's group from a groups map
-    // For now, we'll use awake hours as fallback
-    return scheduleHours || awakeHours;
+  // Look up a displaced task's own group hours (not the scheduling task's group)
+  const getTaskGroupHours = (t: Task): GroupScheduleHours | null => {
+    if (t.group_id) {
+      const group = groupsMap.get(t.group_id);
+      if (group?.auto_schedule_enabled && group.auto_schedule_hours) {
+        return group.auto_schedule_hours;
+      }
+    }
+    return awakeHours;
   };
 
   const slotsOverlap = (slot1: TimeSlot, slot2: TimeSlot): boolean => {
@@ -2329,6 +1767,17 @@ function scheduleTaskASAPWithShuffling(
       candidateSlotStart.setUTCHours(candidateSlotStart.getUTCHours() + 1, 0, 0, 0);
     } else {
       candidateSlotStart.setUTCMinutes(roundedMinutes, 0, 0);
+    }
+
+    // Check dependency constraints for the displaced task
+    if (dependencyMap) {
+      const depConstraint = getDependencyConstraint(conflictingTask, allTasks, dependencyMap);
+      if (depConstraint) {
+        const minStart = roundUpTo15Min(depConstraint);
+        if (candidateSlotStart.getTime() < minStart.getTime()) {
+          candidateSlotStart = minStart;
+        }
+      }
     }
 
     const candidateSlotEnd = new Date(candidateSlotStart.getTime() + taskDuration);
@@ -2411,33 +1860,7 @@ function scheduleTaskASAPWithShuffling(
           latestConflictEnd = shuffledSlot.end;
         }
       }
-
-      candidateSlotStart = new Date(latestConflictEnd);
-      const newMinutes = candidateSlotStart.getUTCMinutes();
-      const newRoundedMinutes = Math.ceil(newMinutes / 15) * 15;
-      if (newRoundedMinutes >= 60) {
-        candidateSlotStart.setUTCHours(candidateSlotStart.getUTCHours() + 1, 0, 0, 0);
-      } else {
-        candidateSlotStart.setUTCMinutes(newRoundedMinutes, 0, 0);
-      }
-      candidateSlotEnd.setTime(candidateSlotStart.getTime() + taskDuration);
-      candidateSlot = {
-        start: candidateSlotStart,
-        end: candidateSlotEnd,
-      };
-
-      if (!isWithinWorkingHours(candidateSlot, taskGroupHours || awakeHours, timezone)) {
-        candidateSlotStart = getStartOfNextWorkingDay(
-          candidateSlotStart,
-          taskGroupHours || awakeHours,
-          timezone
-        );
-        candidateSlotEnd.setTime(candidateSlotStart.getTime() + taskDuration);
-        candidateSlot = {
-          start: candidateSlotStart,
-          end: candidateSlotEnd,
-        };
-      }
+      // Conflicts have been displaced — candidateSlot stays in its original position
     }
 
     return candidateSlot;
@@ -2753,13 +2176,28 @@ function shuffleSingleDay(
     return { movedTasks, pushedToDays };
   }
 
-  // Sort moveable tasks by their current scheduled_start to preserve order
+  // Sort moveable tasks by due date (soonest first), then priority, then current position
   moveableTasks.sort((a, b) => {
+    // 1. Due date ASC (soonest deadlines first, nulls last)
+    if (a.due_date && b.due_date) {
+      const cmp = a.due_date.localeCompare(b.due_date);
+      if (cmp !== 0) return cmp;
+    } else if (a.due_date) {
+      return -1;
+    } else if (b.due_date) {
+      return 1;
+    }
+
+    // 2. Priority ASC (1 = highest priority)
+    if (a.priority !== b.priority) return a.priority - b.priority;
+
+    // 3. Current scheduled_start as tiebreaker
     const slotA = getEffectiveSlot(a, taskSlotOverrides);
     const slotB = getEffectiveSlot(b, taskSlotOverrides);
     const startA = slotA ? slotA.start.getTime() : 0;
     const startB = slotB ? slotB.start.getTime() : 0;
     if (startA !== startB) return startA - startB;
+
     return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
   });
 

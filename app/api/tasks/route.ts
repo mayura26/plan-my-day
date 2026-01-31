@@ -37,6 +37,31 @@ function mapRowToTask(row: any): Task {
   };
 }
 
+function mapRowToGroup(row: any): TaskGroup {
+  let autoScheduleHours = null;
+  if (row.auto_schedule_hours) {
+    try {
+      autoScheduleHours = JSON.parse(row.auto_schedule_hours as string);
+    } catch (e) {
+      console.error("Error parsing auto_schedule_hours JSON:", e);
+    }
+  }
+  return {
+    id: row.id as string,
+    user_id: row.user_id as string,
+    name: row.name as string,
+    color: row.color as string,
+    collapsed: Boolean(row.collapsed),
+    parent_group_id: (row.parent_group_id as string) || null,
+    is_parent_group: Boolean(row.is_parent_group),
+    auto_schedule_enabled: Boolean(row.auto_schedule_enabled ?? false),
+    auto_schedule_hours: autoScheduleHours,
+    priority: row.priority ? (row.priority as number) : undefined,
+    created_at: row.created_at as string,
+    updated_at: row.updated_at as string,
+  };
+}
+
 // GET /api/tasks - Get all tasks for the authenticated user
 export async function GET(request: NextRequest) {
   try {
@@ -459,6 +484,13 @@ export async function POST(request: NextRequest) {
           } as Task;
         });
 
+        // Fetch all user groups for displaced task group hour lookups
+        const allGroupsResult = await db.execute(
+          "SELECT * FROM task_groups WHERE user_id = ? ORDER BY name ASC",
+          [session.user.id]
+        );
+        const allGroups = allGroupsResult.rows.map(mapRowToGroup);
+
         // Use unified scheduler with the selected mode (default to "now" if not specified)
         const scheduleMode = body.schedule_mode || "now";
         const result = scheduleTaskUnified({
@@ -466,6 +498,7 @@ export async function POST(request: NextRequest) {
           task,
           allTasks,
           taskGroup,
+          allGroups,
           awakeHours,
           timezone: userTimezone,
         });

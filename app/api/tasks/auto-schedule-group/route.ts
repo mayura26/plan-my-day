@@ -118,6 +118,13 @@ export async function POST(request: NextRequest) {
     ]);
     let allTasks = allTasksResult.rows.map(mapRowToTask);
 
+    // Fetch all user groups for displaced task group hour lookups
+    const allGroupsResult = await db.execute(
+      "SELECT * FROM task_groups WHERE user_id = ? ORDER BY name ASC",
+      [session.user.id]
+    );
+    const allGroups = allGroupsResult.rows.map(mapRowToGroup);
+
     // Fetch the target group
     const groupResult = await db.execute("SELECT * FROM task_groups WHERE id = ? AND user_id = ?", [
       groupId,
@@ -196,6 +203,7 @@ export async function POST(request: NextRequest) {
         task,
         allTasks,
         taskGroup,
+        allGroups,
         awakeHours,
         timezone: userTimezone,
         dependencyMap,
