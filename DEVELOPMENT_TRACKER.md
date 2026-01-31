@@ -1,4 +1,3 @@
-- [ ] Auto shuffle tasks when they clash
 - [ ] Add AI task create function
 - [ ] Add voice support
 
@@ -12,7 +11,6 @@
 - [ ] Allow AI to optimise tasks lists, need space for one on one with AI
 - [ ] Allow open text mode which then geenrates into task/event
 - [ ] SUpport voice
-- [] each group has auto schedule rules. enable/disable schedule, time to schedule, and prioity 1-10 1 is highest
 - [ ] auto scheuleder- concept is you select for ad ay, and then you pick what groups you want to schedule, and it goes by due date into priotity into group pirior. we canset max stress level on a day
 
 ---

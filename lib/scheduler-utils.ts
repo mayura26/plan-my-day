@@ -1168,7 +1168,6 @@ export function scheduleTaskUnified(options: UnifiedSchedulingOptions): Scheduli
         task,
         allTasks,
         taskGroup,
-        scheduleHours ?? null,
         awakeHours,
         timezone,
         reportProgress,
@@ -1369,7 +1368,9 @@ export function scheduleTaskUnified(options: UnifiedSchedulingOptions): Scheduli
     if (mustBeTomorrow) {
       const slotTzTime = getTimeInTimezone(slotStartUTC, timezone);
       // Tomorrow is nowTzTimeCached.day + 1
-      const tomorrowDate = new Date(Date.UTC(nowTzTimeCached.year, nowTzTimeCached.month, nowTzTimeCached.day + 1));
+      const tomorrowDate = new Date(
+        Date.UTC(nowTzTimeCached.year, nowTzTimeCached.month, nowTzTimeCached.day + 1)
+      );
       const isTomorrow =
         slotTzTime.year === tomorrowDate.getUTCFullYear() &&
         slotTzTime.month === tomorrowDate.getUTCMonth() &&
@@ -1641,7 +1642,6 @@ function scheduleTaskASAPWithShuffling(
   task: Task,
   allTasks: Task[],
   _taskGroup: TaskGroup | null | undefined,
-  scheduleHours: GroupScheduleHours | null,
   awakeHours: GroupScheduleHours | null,
   timezone: string,
   reportProgress: (message: string) => void,
