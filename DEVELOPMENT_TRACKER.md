@@ -1,4 +1,3 @@
-- [ ] quick due dates
 - [ ] Auto shuffle tasks when they clash
 - [ ] Add AI task create function
 - [ ] Add voice support

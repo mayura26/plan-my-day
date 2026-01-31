@@ -597,8 +597,8 @@ export function TaskForm({
           <div className="flex flex-wrap gap-1.5">
             {(
               [
-                { preset: "today" as DueDatePreset, label: "Today" },
-                { preset: "tomorrow" as DueDatePreset, label: "Tomorrow" },
+                { preset: "today" as DueDatePreset, label: "TDY" },
+                { preset: "tomorrow" as DueDatePreset, label: "TMRW" },
                 { preset: "eow" as DueDatePreset, label: "EOW" },
                 { preset: "next-eow" as DueDatePreset, label: "Next EOW" },
                 { preset: "eom" as DueDatePreset, label: "EOM" },
