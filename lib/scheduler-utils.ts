@@ -2076,6 +2076,7 @@ function getDayOfWeekForDate(dateStr: string): keyof GroupScheduleHours {
 
 /**
  * Find the UTC Date that represents a specific hour:minute on a given calendar day in a timezone.
+ * Uses noon UTC for the calendar day so that in any user timezone the date is correct (server TZ must not affect the result).
  */
 function getUtcForTimezoneTime(
   dateStr: string,
@@ -2084,7 +2085,8 @@ function getUtcForTimezoneTime(
   timezone: string
 ): Date {
   const { year, month, day } = parseDateString(dateStr);
-  return createDateInTimezone(new Date(year, month, day), hour, minute, timezone);
+  const dayRef = new Date(Date.UTC(year, month, day, 12, 0, 0, 0));
+  return createDateInTimezone(dayRef, hour, minute, timezone);
 }
 
 /**
@@ -2211,26 +2213,27 @@ function shuffleSingleDay(
   }
   obstacles.sort((a, b) => a.start.getTime() - b.start.getTime());
 
-  // Determine cursor start
+  // Determine cursor start. For today, cursor is "now" in UTC; window is the same
+  // day in user's timezone (both end up comparable in UTC).
   const nowUTC = new Date();
   const nowTz = getTimeInTimezone(nowUTC, timezone);
   const isToday = nowTz.year === tYear && nowTz.month === tMonth && nowTz.day === tDay;
 
   let cursor: Date;
+  const dayOfWeek = getDayOfWeekForDate(dayStr);
+  const dayWorkingHours = getWorkingHoursForDay(dayOfWeek, awakeHours) ?? { start: 9, end: 17 };
+
   if (isToday) {
     cursor = roundUpTo15Min(nowUTC);
   } else {
-    // Start of working hours for this day (use awake hours as default)
-    const dayOfWeek = getDayOfWeekForDate(dayStr);
-    const dayHours = getWorkingHoursForDay(dayOfWeek, awakeHours);
-    if (dayHours) {
-      cursor = getUtcForTimezoneTime(dayStr, dayHours.start, 0, timezone);
-    } else {
-      cursor = getUtcForTimezoneTime(dayStr, 9, 0, timezone);
-    }
+    cursor = getUtcForTimezoneTime(dayStr, dayWorkingHours.start, 0, timezone);
   }
 
-  // Place each moveable task
+  // Single day window for packing: all tasks use this so we fill the day from start, then push overflow to next day
+  const dayWindowStart = getUtcForTimezoneTime(dayStr, dayWorkingHours.start, 0, timezone);
+  const dayWindowEnd = getUtcForTimezoneTime(dayStr, dayWorkingHours.end, 0, timezone);
+
+  // Pack from cursor; only push to next day when there's no slot.
   for (const task of moveableTasks) {
     // moveableTasks are filtered to only include tasks with duration > 0
     if (!task.duration || task.duration <= 0) continue;
@@ -2250,7 +2253,6 @@ function shuffleSingleDay(
       const nextDay = findNextValidDayForGroup(dayStr, effectiveHours, 7);
       if (nextDay) {
         pushedToDays.push(nextDay);
-        // Move task to start of working hours on that day
         const nextDayOfWeek = getDayOfWeekForDate(nextDay);
         const nextDayHours = getWorkingHoursForDay(nextDayOfWeek, effectiveHours);
         if (nextDayHours) {
@@ -2269,15 +2271,35 @@ function shuffleSingleDay(
       continue;
     }
 
-    // Window boundaries for this day
-    const windowStart = getUtcForTimezoneTime(dayStr, dayHours.start, 0, timezone);
-    const windowEnd = getUtcForTimezoneTime(dayStr, dayHours.end, 0, timezone);
+    // Use the single day window for placement so we pack from start of day and only push when day is full
+    const effectiveCursor = new Date(Math.max(cursor.getTime(), dayWindowStart.getTime()));
 
-    // Effective cursor: max of global cursor and window start
-    const effectiveCursor = new Date(Math.max(cursor.getTime(), windowStart.getTime()));
+    if (effectiveCursor.getTime() > dayWindowEnd.getTime()) {
+      feedback.push(`No slot for "${task.title.slice(0, 40)}": past working hours (day full).`);
+      const nextDay = findNextValidDayForGroup(dayStr, effectiveHours, 7);
+      if (nextDay) {
+        if (!pushedToDays.includes(nextDay)) {
+          pushedToDays.push(nextDay);
+        }
+        const nextDayOfWeek = getDayOfWeekForDate(nextDay);
+        const nextDayHours = getWorkingHoursForDay(nextDayOfWeek, effectiveHours);
+        if (nextDayHours) {
+          const newStart = getUtcForTimezoneTime(nextDay, nextDayHours.start, 0, timezone);
+          const newEnd = new Date(newStart.getTime() + durationMs);
+          movedTasks.push({
+            taskId: task.id,
+            newStart: newStart.toISOString(),
+            newEnd: newEnd.toISOString(),
+          });
+          taskSlotOverrides.set(task.id, { start: newStart, end: newEnd });
+        }
+      } else {
+        feedback.push(`Could not place "${task.title}" within the next 7 days.`);
+      }
+      continue;
+    }
 
-    // Find a slot in today's window
-    const slot = findSlotInWindow(effectiveCursor, windowEnd, durationMs, obstacles);
+    const slot = findSlotInWindow(effectiveCursor, dayWindowEnd, durationMs, obstacles);
 
     if (slot) {
       const currentSlot = getEffectiveSlot(task, taskSlotOverrides);
@@ -2301,6 +2323,10 @@ function shuffleSingleDay(
       cursor = new Date(Math.max(cursor.getTime(), slot.end.getTime()));
     } else {
       // No room today, push to next day
+      const durationMin = Math.round(durationMs / 60000);
+      feedback.push(
+        `No slot for "${task.title.slice(0, 40)}": cursor ${effectiveCursor.toISOString()} to dayEnd ${dayWindowEnd.toISOString()}, duration ${durationMin}min.`
+      );
       const nextDay = findNextValidDayForGroup(dayStr, effectiveHours, 7);
       if (nextDay) {
         if (!pushedToDays.includes(nextDay)) {
