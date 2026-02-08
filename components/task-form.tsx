@@ -692,6 +692,7 @@ export function TaskForm({
                           "next-week": "Schedule Next Week",
                           "next-month": "Schedule Next Month",
                           asap: "Schedule ASAP",
+                          "due-date": "Schedule to Due Date",
                         };
                         return labels[mode] || "Schedule Now";
                       })()}
@@ -728,6 +729,14 @@ export function TaskForm({
                     <DropdownMenuItem onClick={() => handleInputChange("schedule_mode", "asap")}>
                       <Zap className="h-4 w-4 mr-2" />
                       Schedule ASAP
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => formData.due_date && handleInputChange("schedule_mode", "due-date")}
+                      disabled={!formData.due_date}
+                      title={!formData.due_date ? "Set a due date first" : undefined}
+                    >
+                      <CalendarClock className="h-4 w-4 mr-2" />
+                      Schedule to Due Date
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
