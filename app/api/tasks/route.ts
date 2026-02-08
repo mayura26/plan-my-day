@@ -318,7 +318,7 @@ export async function POST(request: NextRequest) {
       locked:
         body.locked !== undefined
           ? Boolean(body.locked)
-          : taskType === "event" || taskType === "todo",
+          : taskType === "event",
       group_id: groupId,
       template_id: body.template_id || null,
       task_type: taskType,

@@ -315,7 +315,7 @@ export function TaskForm({
           if (!updated.duration) updated.duration = 30;
           // Reset the flag when switching to todo type
           setHasTriedSubmitWithoutDueDate(false);
-          updated.locked = true;
+          updated.locked = false;
         } else {
           if (!updated.priority) updated.priority = 3;
           if (!updated.energy_level_required) updated.energy_level_required = 3;

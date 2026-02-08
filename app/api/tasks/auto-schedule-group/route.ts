@@ -159,7 +159,6 @@ export async function POST(request: NextRequest) {
         t.group_id === groupId &&
         !t.scheduled_start &&
         (t.status === "pending" || t.status === "in_progress") &&
-        !t.locked &&
         t.duration &&
         t.duration > 0 &&
         !t.parent_task_id
@@ -181,7 +180,7 @@ export async function POST(request: NextRequest) {
         {
           error: "No eligible tasks to schedule in this group",
           feedback: [
-            "No unscheduled tasks found with a duration set. Tasks must be unscheduled, unlocked, have a duration, and not be completed/cancelled.",
+            "No unscheduled tasks found with a duration set. Tasks must be unscheduled, have a duration, and not be completed/cancelled.",
           ],
         },
         { status: 422 }
