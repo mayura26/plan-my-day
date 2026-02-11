@@ -1,6 +1,17 @@
 "use client";
 
-import { Calendar, CalendarClock, ChevronDown, Clock, Lock, Unlock, Zap } from "lucide-react";
+import {
+  Calendar,
+  CalendarClock,
+  ChevronDown,
+  ChevronRight,
+  Clock,
+  Lock,
+  Plus,
+  Trash2,
+  Unlock,
+  Zap,
+} from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { DependencySelector } from "@/components/dependency-selector";
 import { Button } from "@/components/ui/button";
@@ -34,8 +45,15 @@ import {
 } from "@/lib/timezone-utils";
 import type { CreateTaskRequest, TaskGroup, TaskType } from "@/lib/types";
 
+/** Form-only: optional subtasks and initial notes (todos) when creating a task. */
+export type CreateTaskRequestWithSubtasks = CreateTaskRequest & {
+  subtasks?: Array<{ title: string; duration?: number }>;
+  /** Note texts to create as task todos (same "Notes" as in task detail). */
+  initial_notes?: string[];
+};
+
 interface TaskFormProps {
-  onSubmit: (task: CreateTaskRequest) => Promise<void>;
+  onSubmit: (task: CreateTaskRequestWithSubtasks) => Promise<void>;
   onCancel?: () => void;
   initialData?: Partial<CreateTaskRequest> & { id?: string };
   isLoading?: boolean;
@@ -78,11 +96,15 @@ export function TaskForm({
   } as CreateTaskRequest & { schedule_mode?: string });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [showDescription, setShowDescription] = useState(!!initialData?.description);
   const [showDependencies, setShowDependencies] = useState(
     (initialData?.dependency_ids?.length ?? 0) > 0
   );
   const [hasTriedSubmitWithoutDueDate, setHasTriedSubmitWithoutDueDate] = useState(false);
+  const [subtaskDrafts, setSubtaskDrafts] = useState<Array<{ title: string; duration?: number }>>(
+    []
+  );
+  const [initialNoteTexts, setInitialNoteTexts] = useState<string[]>([]);
+  const [showExtraInfo, setShowExtraInfo] = useState(!!initialData?.description);
   const titleInputRef = useRef<HTMLInputElement>(null);
 
   // Fetch existing dependencies when editing a task
@@ -142,7 +164,7 @@ export function TaskForm({
             ? initialData.locked
             : taskType === "event" || taskType === "todo",
       }));
-      setShowDescription(!!initialData.description);
+      setShowExtraInfo(!!initialData.description);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialData, timezone]);
@@ -277,7 +299,20 @@ export function TaskForm({
         });
       }
 
-      await onSubmit(submissionData);
+      // Include optional subtasks and initial notes (todos) when creating a task/todo
+      const payload: CreateTaskRequestWithSubtasks = { ...submissionData };
+      const validSubtasks = subtaskDrafts.filter((s) => s.title.trim());
+      if (validSubtasks.length > 0) {
+        payload.subtasks = validSubtasks.map((s) => ({
+          title: s.title.trim(),
+          duration: s.duration ?? 30,
+        }));
+      }
+      const validNotes = initialNoteTexts.map((t) => t.trim()).filter(Boolean);
+      if (validNotes.length > 0) {
+        payload.initial_notes = validNotes;
+      }
+      await onSubmit(payload);
     } catch (error) {
       console.error("Error submitting task:", error);
     }
@@ -447,24 +482,161 @@ export function TaskForm({
         {errors.title && <p className="text-xs text-red-500">{errors.title}</p>}
       </div>
 
-      {/* Description toggle */}
-      {!showDescription ? (
+      {/* Extra Info - one collapsible: description, notes, subtasks (folded by default) */}
+      {!showExtraInfo ? (
         <button
           type="button"
-          onClick={() => setShowDescription(true)}
-          className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+          onClick={() => setShowExtraInfo(true)}
+          className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
         >
-          + Add description
+          <ChevronRight className="h-4 w-4 shrink-0" />
+          Extra Info
         </button>
       ) : (
-        <Textarea
-          id="description"
-          value={formData.description || ""}
-          onChange={(e) => handleInputChange("description", e.target.value)}
-          placeholder="Add details..."
-          rows={2}
-          className="min-h-[60px] text-sm resize-none"
-        />
+        <div className="space-y-4">
+          <button
+            type="button"
+            onClick={() => setShowExtraInfo(false)}
+            className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <ChevronDown className="h-4 w-4 shrink-0" />
+            Extra Info
+          </button>
+
+          {/* Description */}
+          <div className="space-y-1.5">
+            <Label htmlFor="description" className="text-xs text-muted-foreground">
+              Description
+            </Label>
+            <Textarea
+              id="description"
+              value={formData.description || ""}
+              onChange={(e) => handleInputChange("description", e.target.value)}
+              placeholder="Add task details..."
+              rows={2}
+              className="min-h-[60px] text-sm resize-none"
+            />
+          </div>
+
+          {/* Notes - create only, tick-box list when you open the task */}
+          {!initialData?.id && (
+            <div className="space-y-2">
+              <Label className="text-xs text-muted-foreground">Notes</Label>
+              <p className="text-xs text-muted-foreground">
+                Tick-box list when you open the task.
+              </p>
+              <div className="space-y-2">
+                {initialNoteTexts.map((text, index) => (
+                  <div key={index} className="flex gap-2 items-center">
+                    <Input
+                      value={text}
+                      onChange={(e) =>
+                        setInitialNoteTexts((prev) => {
+                          const next = [...prev];
+                          next[index] = e.target.value;
+                          return next;
+                        })
+                      }
+                      placeholder="Note item"
+                      className="flex-1 h-10 text-sm"
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-10 w-10 shrink-0 text-muted-foreground hover:text-destructive"
+                      onClick={() =>
+                        setInitialNoteTexts((prev) => prev.filter((_, i) => i !== index))
+                      }
+                      aria-label="Remove note"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-9"
+                  onClick={() => setInitialNoteTexts((prev) => [...prev, ""])}
+                >
+                  <Plus className="h-4 w-4 mr-1.5" />
+                  Add note
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {/* Subtasks - create only, task/todo only */}
+          {!initialData?.id &&
+            (formData.task_type === "task" || formData.task_type === "todo") && (
+              <div className="space-y-2">
+                <Label className="text-xs text-muted-foreground">Subtasks</Label>
+                <div className="space-y-2">
+                  {subtaskDrafts.map((subtask, index) => (
+                    <div key={index} className="flex gap-2 items-start">
+                      <Input
+                        value={subtask.title}
+                        onChange={(e) =>
+                          setSubtaskDrafts((prev) => {
+                            const next = [...prev];
+                            next[index] = { ...next[index], title: e.target.value };
+                            return next;
+                          })
+                        }
+                        placeholder="Subtask title"
+                        className="flex-1 h-10 text-sm"
+                      />
+                      <Input
+                        type="number"
+                        value={subtask.duration ?? 30}
+                        onChange={(e) =>
+                          setSubtaskDrafts((prev) => {
+                            const next = [...prev];
+                            next[index] = {
+                              ...next[index],
+                              duration: e.target.value
+                                ? parseInt(e.target.value, 10)
+                                : undefined,
+                            };
+                            return next;
+                          })
+                        }
+                        placeholder="mins"
+                        min={1}
+                        className="w-20 h-10 text-sm"
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="h-10 w-10 shrink-0 text-muted-foreground hover:text-destructive"
+                        onClick={() =>
+                          setSubtaskDrafts((prev) => prev.filter((_, i) => i !== index))
+                        }
+                        aria-label="Remove subtask"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="h-9"
+                    onClick={() =>
+                      setSubtaskDrafts((prev) => [...prev, { title: "", duration: 30 }])
+                    }
+                  >
+                    <Plus className="h-4 w-4 mr-1.5" />
+                    Add subtask
+                  </Button>
+                </div>
+              </div>
+            )}
+        </div>
       )}
 
       {/* Priority & Group Row */}

@@ -27,7 +27,10 @@ import { RefreshButton } from "@/components/refresh-button";
 import { type SchedulerLogEntry, SchedulerLogPanel } from "@/components/scheduler-log-panel";
 import { SlimTaskCard } from "@/components/slim-task-card";
 import { TaskDetailDialog } from "@/components/task-detail-dialog";
-import { TaskForm } from "@/components/task-form";
+import {
+  type CreateTaskRequestWithSubtasks,
+  TaskForm,
+} from "@/components/task-form";
 import { TaskGroupManager } from "@/components/task-group-manager";
 import { TaskMetrics } from "@/components/task-metrics";
 import { Badge } from "@/components/ui/badge";
@@ -724,26 +727,101 @@ export default function CalendarPage() {
     }
   };
 
-  const handleCreateTask = async (taskData: CreateTaskRequest) => {
+  const handleCreateTask = async (taskData: CreateTaskRequestWithSubtasks) => {
     setIsCreating(true);
     try {
+      const { subtasks, initial_notes, ...body } = taskData;
+      const hasSubtasks = (subtasks?.length ?? 0) > 0;
+      const wantsAutoSchedule = !!body.auto_schedule;
+      const scheduleMode = (body as { schedule_mode?: string }).schedule_mode || "now";
+
+      // When creating a task with subtasks + auto-schedule: create parent unscheduled, then
+      // call the schedule API (same as task detail dialog) so subtasks get scheduled, not the parent
+      const createBody =
+        hasSubtasks && wantsAutoSchedule
+          ? { ...body, auto_schedule: false }
+          : body;
+
       const response = await fetch("/api/tasks", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(taskData),
+        body: JSON.stringify(createBody),
       });
 
-      if (response.ok) {
-        const data = await response.json();
-        setTasks((prev) => [data.task, ...prev]);
-        setShowCreateForm(false);
-        setQuickAddInitialData(null); // Clear quick add data after successful creation
-      } else {
+      if (!response.ok) {
         const error = await response.json();
         console.error("Failed to create task:", error);
         throw new Error(error.error || "Failed to create task");
+      }
+
+      const data = await response.json();
+      let createdTask: Task = data.task;
+      const createdSubtasks: Task[] = [];
+
+      if (subtasks?.length) {
+        for (const st of subtasks) {
+          const subRes = await fetch(`/api/tasks/${createdTask.id}/subtasks`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              title: st.title,
+              duration: st.duration ?? 30,
+              extend_parent_duration: true,
+            }),
+          });
+          if (subRes.ok) {
+            const subData = await subRes.json();
+            createdSubtasks.push(subData.task);
+          }
+        }
+        createdTask = {
+          ...createdTask,
+          subtasks: createdSubtasks,
+          subtask_count: createdSubtasks.length,
+          completed_subtask_count: 0,
+        } as Task;
+
+        // Schedule subtasks (not parent), same as task detail dialog
+        if (wantsAutoSchedule) {
+          const endpointMap: Record<string, string> = {
+            now: "schedule-now",
+            today: "schedule-today",
+            tomorrow: "schedule-tomorrow",
+            "next-week": "schedule-next-week",
+            "next-month": "schedule-next-month",
+            asap: "schedule-asap",
+            "due-date": "schedule-due-date",
+          };
+          const endpoint = endpointMap[scheduleMode] ?? "schedule-now";
+          const scheduleRes = await fetch(
+            `/api/tasks/${createdTask.id}/${endpoint}`,
+            { method: "POST" }
+          );
+          if (scheduleRes.ok) {
+            await fetchTasks(false);
+          }
+        }
+      }
+
+      if (initial_notes?.length) {
+        for (const text of initial_notes) {
+          await fetch(`/api/tasks/${createdTask.id}/todos`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ description: text }),
+          });
+        }
+      }
+
+      if (hasSubtasks && wantsAutoSchedule) {
+        setShowCreateForm(false);
+        setQuickAddInitialData(null);
+      } else {
+        setTasks((prev) => [createdTask, ...prev]);
+        setShowCreateForm(false);
+        setQuickAddInitialData(null);
       }
     } catch (error) {
       console.error("Error creating task:", error);
@@ -1025,19 +1103,44 @@ export default function CalendarPage() {
     const task = tasks.find((t) => t.id === taskId);
     if (!task || task.locked) return;
 
-    // The time from the slot is already in decimal hours (e.g., 18.0 for 6pm)
-    // Apply -15 minute offset to account for slot positioning
-    // Convert to hours and minutes, rounding to nearest 15-minute interval
+    const subtaskCount = task.subtask_count ?? (task as { subtasks?: Task[] }).subtasks?.length ?? 0;
+    const hasSubtasks = !task.parent_task_id && subtaskCount > 0;
+
+    if (hasSubtasks) {
+      // Parent with subtasks: schedule subtasks (not the parent), same as task detail popup
+      setProcessingTaskId(taskId);
+      try {
+        const todayInTz = getDateInTimezone(new Date(), timezone);
+        const tomorrowInTz = new Date(todayInTz);
+        tomorrowInTz.setDate(tomorrowInTz.getDate() + 1);
+        const dropDateStr = format(day, "yyyy-MM-dd");
+        const isToday = dropDateStr === format(todayInTz, "yyyy-MM-dd");
+        const isTomorrow = dropDateStr === format(tomorrowInTz, "yyyy-MM-dd");
+        const endpoint = isToday
+          ? "schedule-today"
+          : isTomorrow
+            ? "schedule-tomorrow"
+            : "schedule-today";
+        const response = await fetch(`/api/tasks/${taskId}/${endpoint}`, { method: "POST" });
+        if (response.ok) {
+          await fetchTasks(false);
+        }
+      } catch (error) {
+        console.error("Error scheduling task with subtasks:", error);
+      } finally {
+        setProcessingTaskId(null);
+      }
+      return;
+    }
+
+    // Single task (or subtask): set scheduled time via PATCH
     let totalMinutes = Math.round(time * 60);
-    totalMinutes = Math.max(0, totalMinutes - 15); // Subtract 15 minutes to fix offset
+    totalMinutes = Math.max(0, totalMinutes - 15);
     const snappedMinutes = Math.round(totalMinutes / 15) * 15;
     const hours = Math.floor(snappedMinutes / 60);
     const minutes = snappedMinutes % 60;
 
-    const duration = task.duration || 60; // Default to 60 minutes
-
-    // Create the start date in the user's timezone, then convert to UTC
-    // Pass day directly - createDateInTimezone will extract the correct date from it
+    const duration = task.duration || 60;
     const startDate = createDateInTimezone(day, hours, minutes, timezone);
     const endDate = new Date(startDate.getTime() + duration * 60000);
 
