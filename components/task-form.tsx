@@ -33,7 +33,7 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { useUserTimezone } from "@/hooks/use-user-timezone";
-import { ENERGY_LABELS, PRIORITY_LABELS, TASK_TYPE_LABELS } from "@/lib/task-utils";
+import { ENERGY_LABELS, generateTaskId, PRIORITY_LABELS, TASK_TYPE_LABELS } from "@/lib/task-utils";
 import {
   createDateInTimezone,
   type DueDatePreset,
@@ -100,10 +100,10 @@ export function TaskForm({
     (initialData?.dependency_ids?.length ?? 0) > 0
   );
   const [hasTriedSubmitWithoutDueDate, setHasTriedSubmitWithoutDueDate] = useState(false);
-  const [subtaskDrafts, setSubtaskDrafts] = useState<Array<{ title: string; duration?: number }>>(
-    []
-  );
-  const [initialNoteTexts, setInitialNoteTexts] = useState<string[]>([]);
+  const [subtaskDrafts, setSubtaskDrafts] = useState<
+    Array<{ id: string; title: string; duration?: number }>
+  >([]);
+  const [initialNoteTexts, setInitialNoteTexts] = useState<Array<{ id: string; text: string }>>([]);
   const [showExtraInfo, setShowExtraInfo] = useState(!!initialData?.description);
   const titleInputRef = useRef<HTMLInputElement>(null);
 
@@ -308,7 +308,7 @@ export function TaskForm({
           duration: s.duration ?? 30,
         }));
       }
-      const validNotes = initialNoteTexts.map((t) => t.trim()).filter(Boolean);
+      const validNotes = initialNoteTexts.map((n) => n.text.trim()).filter(Boolean);
       if (validNotes.length > 0) {
         payload.initial_notes = validNotes;
       }
@@ -522,20 +522,16 @@ export function TaskForm({
           {!initialData?.id && (
             <div className="space-y-2">
               <Label className="text-xs text-muted-foreground">Notes</Label>
-              <p className="text-xs text-muted-foreground">
-                Tick-box list when you open the task.
-              </p>
+              <p className="text-xs text-muted-foreground">Tick-box list when you open the task.</p>
               <div className="space-y-2">
-                {initialNoteTexts.map((text, index) => (
-                  <div key={index} className="flex gap-2 items-center">
+                {initialNoteTexts.map((note) => (
+                  <div key={note.id} className="flex gap-2 items-center">
                     <Input
-                      value={text}
+                      value={note.text}
                       onChange={(e) =>
-                        setInitialNoteTexts((prev) => {
-                          const next = [...prev];
-                          next[index] = e.target.value;
-                          return next;
-                        })
+                        setInitialNoteTexts((prev) =>
+                          prev.map((n) => (n.id === note.id ? { ...n, text: e.target.value } : n))
+                        )
                       }
                       placeholder="Note item"
                       className="flex-1 h-10 text-sm"
@@ -546,7 +542,7 @@ export function TaskForm({
                       size="icon"
                       className="h-10 w-10 shrink-0 text-muted-foreground hover:text-destructive"
                       onClick={() =>
-                        setInitialNoteTexts((prev) => prev.filter((_, i) => i !== index))
+                        setInitialNoteTexts((prev) => prev.filter((n) => n.id !== note.id))
                       }
                       aria-label="Remove note"
                     >
@@ -559,7 +555,9 @@ export function TaskForm({
                   variant="outline"
                   size="sm"
                   className="h-9"
-                  onClick={() => setInitialNoteTexts((prev) => [...prev, ""])}
+                  onClick={() =>
+                    setInitialNoteTexts((prev) => [...prev, { id: generateTaskId(), text: "" }])
+                  }
                 >
                   <Plus className="h-4 w-4 mr-1.5" />
                   Add note
@@ -569,73 +567,77 @@ export function TaskForm({
           )}
 
           {/* Subtasks - create only, task/todo only */}
-          {!initialData?.id &&
-            (formData.task_type === "task" || formData.task_type === "todo") && (
+          {!initialData?.id && (formData.task_type === "task" || formData.task_type === "todo") && (
+            <div className="space-y-2">
+              <Label className="text-xs text-muted-foreground">Subtasks</Label>
               <div className="space-y-2">
-                <Label className="text-xs text-muted-foreground">Subtasks</Label>
-                <div className="space-y-2">
-                  {subtaskDrafts.map((subtask, index) => (
-                    <div key={index} className="flex gap-2 items-start">
-                      <Input
-                        value={subtask.title}
-                        onChange={(e) =>
-                          setSubtaskDrafts((prev) => {
-                            const next = [...prev];
-                            next[index] = { ...next[index], title: e.target.value };
-                            return next;
-                          })
-                        }
-                        placeholder="Subtask title"
-                        className="flex-1 h-10 text-sm"
-                      />
-                      <Input
-                        type="number"
-                        value={subtask.duration ?? 30}
-                        onChange={(e) =>
-                          setSubtaskDrafts((prev) => {
-                            const next = [...prev];
-                            next[index] = {
-                              ...next[index],
-                              duration: e.target.value
-                                ? parseInt(e.target.value, 10)
-                                : undefined,
-                            };
-                            return next;
-                          })
-                        }
-                        placeholder="mins"
-                        min={1}
-                        className="w-20 h-10 text-sm"
-                      />
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="h-10 w-10 shrink-0 text-muted-foreground hover:text-destructive"
-                        onClick={() =>
-                          setSubtaskDrafts((prev) => prev.filter((_, i) => i !== index))
-                        }
-                        aria-label="Remove subtask"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  ))}
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="h-9"
-                    onClick={() =>
-                      setSubtaskDrafts((prev) => [...prev, { title: "", duration: 30 }])
-                    }
-                  >
-                    <Plus className="h-4 w-4 mr-1.5" />
-                    Add subtask
-                  </Button>
-                </div>
+                {subtaskDrafts.map((subtask) => (
+                  <div key={subtask.id} className="flex gap-2 items-start">
+                    <Input
+                      value={subtask.title}
+                      onChange={(e) =>
+                        setSubtaskDrafts((prev) =>
+                          prev.map((s) =>
+                            s.id === subtask.id ? { ...s, title: e.target.value } : s
+                          )
+                        )
+                      }
+                      placeholder="Subtask title"
+                      className="flex-1 h-10 text-sm"
+                    />
+                    <Input
+                      type="number"
+                      value={subtask.duration ?? 30}
+                      onChange={(e) =>
+                        setSubtaskDrafts((prev) =>
+                          prev.map((s) =>
+                            s.id === subtask.id
+                              ? {
+                                  ...s,
+                                  duration: e.target.value
+                                    ? parseInt(e.target.value, 10)
+                                    : undefined,
+                                }
+                              : s
+                          )
+                        )
+                      }
+                      placeholder="mins"
+                      min={1}
+                      className="w-20 h-10 text-sm"
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-10 w-10 shrink-0 text-muted-foreground hover:text-destructive"
+                      onClick={() =>
+                        setSubtaskDrafts((prev) => prev.filter((s) => s.id !== subtask.id))
+                      }
+                      aria-label="Remove subtask"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-9"
+                  onClick={() =>
+                    setSubtaskDrafts((prev) => [
+                      ...prev,
+                      { id: generateTaskId(), title: "", duration: 30 },
+                    ])
+                  }
+                >
+                  <Plus className="h-4 w-4 mr-1.5" />
+                  Add subtask
+                </Button>
               </div>
-            )}
+            </div>
+          )}
         </div>
       )}
 
@@ -903,7 +905,9 @@ export function TaskForm({
                       Schedule ASAP
                     </DropdownMenuItem>
                     <DropdownMenuItem
-                      onClick={() => formData.due_date && handleInputChange("schedule_mode", "due-date")}
+                      onClick={() =>
+                        formData.due_date && handleInputChange("schedule_mode", "due-date")
+                      }
                       disabled={!formData.due_date}
                       title={!formData.due_date ? "Set a due date first" : undefined}
                     >

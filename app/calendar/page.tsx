@@ -27,10 +27,7 @@ import { RefreshButton } from "@/components/refresh-button";
 import { type SchedulerLogEntry, SchedulerLogPanel } from "@/components/scheduler-log-panel";
 import { SlimTaskCard } from "@/components/slim-task-card";
 import { TaskDetailDialog } from "@/components/task-detail-dialog";
-import {
-  type CreateTaskRequestWithSubtasks,
-  TaskForm,
-} from "@/components/task-form";
+import { type CreateTaskRequestWithSubtasks, TaskForm } from "@/components/task-form";
 import { TaskGroupManager } from "@/components/task-group-manager";
 import { TaskMetrics } from "@/components/task-metrics";
 import { Badge } from "@/components/ui/badge";
@@ -738,9 +735,7 @@ export default function CalendarPage() {
       // When creating a task with subtasks + auto-schedule: create parent unscheduled, then
       // call the schedule API (same as task detail dialog) so subtasks get scheduled, not the parent
       const createBody =
-        hasSubtasks && wantsAutoSchedule
-          ? { ...body, auto_schedule: false }
-          : body;
+        hasSubtasks && wantsAutoSchedule ? { ...body, auto_schedule: false } : body;
 
       const response = await fetch("/api/tasks", {
         method: "POST",
@@ -795,10 +790,9 @@ export default function CalendarPage() {
             "due-date": "schedule-due-date",
           };
           const endpoint = endpointMap[scheduleMode] ?? "schedule-now";
-          const scheduleRes = await fetch(
-            `/api/tasks/${createdTask.id}/${endpoint}`,
-            { method: "POST" }
-          );
+          const scheduleRes = await fetch(`/api/tasks/${createdTask.id}/${endpoint}`, {
+            method: "POST",
+          });
           if (scheduleRes.ok) {
             await fetchTasks(false);
           }
@@ -1103,7 +1097,8 @@ export default function CalendarPage() {
     const task = tasks.find((t) => t.id === taskId);
     if (!task || task.locked) return;
 
-    const subtaskCount = task.subtask_count ?? (task as { subtasks?: Task[] }).subtasks?.length ?? 0;
+    const subtaskCount =
+      task.subtask_count ?? (task as { subtasks?: Task[] }).subtasks?.length ?? 0;
     const hasSubtasks = !task.parent_task_id && subtaskCount > 0;
 
     if (hasSubtasks) {

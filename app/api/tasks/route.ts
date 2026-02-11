@@ -315,10 +315,7 @@ export async function POST(request: NextRequest) {
       scheduled_start: body.scheduled_start || null,
       scheduled_end: body.scheduled_end || null,
       due_date: dueDate,
-      locked:
-        body.locked !== undefined
-          ? Boolean(body.locked)
-          : taskType === "event",
+      locked: body.locked !== undefined ? Boolean(body.locked) : taskType === "event",
       group_id: groupId,
       template_id: body.template_id || null,
       task_type: taskType,

@@ -8,10 +8,7 @@ import { toast } from "sonner";
 import { EditGroupDialog } from "@/components/edit-group-dialog";
 import { GroupedTaskList } from "@/components/grouped-task-list";
 import { TaskDetailDialog } from "@/components/task-detail-dialog";
-import {
-  type CreateTaskRequestWithSubtasks,
-  TaskForm,
-} from "@/components/task-form";
+import { type CreateTaskRequestWithSubtasks, TaskForm } from "@/components/task-form";
 import { TaskImportDialog } from "@/components/task-import-dialog";
 import { Button } from "@/components/ui/button";
 import { useConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -105,9 +102,7 @@ export default function TasksPage() {
       // When creating a task with subtasks + auto-schedule: create parent unscheduled, then
       // call the schedule API (same as task detail dialog) so subtasks get scheduled, not the parent
       const createBody =
-        hasSubtasks && wantsAutoSchedule
-          ? { ...body, auto_schedule: false }
-          : body;
+        hasSubtasks && wantsAutoSchedule ? { ...body, auto_schedule: false } : body;
 
       const response = await fetch("/api/tasks", {
         method: "POST",
@@ -162,10 +157,9 @@ export default function TasksPage() {
             "due-date": "schedule-due-date",
           };
           const endpoint = endpointMap[scheduleMode] ?? "schedule-now";
-          const scheduleRes = await fetch(
-            `/api/tasks/${createdTask.id}/${endpoint}`,
-            { method: "POST" }
-          );
+          const scheduleRes = await fetch(`/api/tasks/${createdTask.id}/${endpoint}`, {
+            method: "POST",
+          });
           if (scheduleRes.ok) {
             await fetchTasks();
           }
