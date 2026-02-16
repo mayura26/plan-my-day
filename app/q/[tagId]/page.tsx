@@ -224,18 +224,18 @@ export default function QuickTaskPage() {
               )}
             </div>
             <div className="flex gap-3 pt-2">
-              <Button asChild>
-                <Link href="/calendar">
+              <Link href="/calendar">
+                <Button>
                   <Calendar className="h-4 w-4 mr-2" />
                   Calendar
-                </Link>
-              </Button>
-              <Button variant="outline" asChild>
-                <Link href="/tasks">
+                </Button>
+              </Link>
+              <Link href="/tasks">
+                <Button variant="outline">
                   <ListTodo className="h-4 w-4 mr-2" />
                   Tasks
-                </Link>
-              </Button>
+                </Button>
+              </Link>
             </div>
           </CardContent>
         </Card>
