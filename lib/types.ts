@@ -305,3 +305,36 @@ export interface CreateDayNoteRequest {
 export interface UpdateDayNoteRequest {
   content: string;
 }
+
+// Quick Tag types (NFC tag-based quick task creation)
+export interface QuickTag {
+  id: string;
+  user_id: string;
+  name: string;
+  task_title: string;
+  task_description?: string | null;
+  task_type: "task" | "todo";
+  priority: number;
+  duration_minutes?: number | null;
+  energy_level: number;
+  schedule_offset_minutes: number;
+  group_id?: string | null;
+  auto_accept: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateQuickTagRequest {
+  name: string;
+  task_title: string;
+  task_description?: string;
+  task_type?: "task" | "todo";
+  priority?: number;
+  duration_minutes?: number;
+  energy_level?: number;
+  schedule_offset_minutes?: number;
+  group_id?: string;
+  auto_accept?: boolean;
+}
+
+export interface UpdateQuickTagRequest extends Partial<CreateQuickTagRequest> {}

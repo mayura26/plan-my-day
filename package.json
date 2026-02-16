@@ -15,7 +15,8 @@
     "db:migrate:push": "node scripts/migrate-add-push-subscriptions.mjs",
     "db:backup": "node scripts/backup-db-cron.mjs",
     "pwa:generate-keys": "node scripts/generate-vapid-keys.mjs",
-    "db:migrate:lock-events-todos": "node scripts/migrate-lock-events-todos.mjs"
+    "db:migrate:lock-events-todos": "node scripts/migrate-lock-events-todos.mjs",
+    "db:migrate:quick-tags": "node scripts/migrate-add-quick-tags.mjs"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

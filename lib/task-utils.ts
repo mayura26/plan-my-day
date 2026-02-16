@@ -407,6 +407,12 @@ export function generateDependencyId(): string {
   return `dep_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 }
 
+export function generateQuickTagId(): string {
+  const timestamp = Date.now().toString(36);
+  const random = Math.random().toString(36).substr(2, 4);
+  return `${timestamp.slice(-4)}${random}`.slice(0, 8);
+}
+
 export function generateDayNoteId(): string {
   return `note_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 }

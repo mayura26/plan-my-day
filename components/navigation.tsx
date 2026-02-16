@@ -1,6 +1,6 @@
 "use client";
 
-import { Calendar, CheckSquare, Menu, Settings, X } from "lucide-react";
+import { Calendar, CheckSquare, Menu, Settings, Tag, X } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -14,6 +14,7 @@ import { cn } from "@/lib/utils";
 const navigation = [
   { name: "Calendar", href: "/calendar", icon: Calendar },
   { name: "Tasks", href: "/tasks", icon: CheckSquare },
+  { name: "Tags", href: "/tags", icon: Tag },
   { name: "Settings", href: "/settings", icon: Settings },
 ];
 
