@@ -8,7 +8,9 @@
       "Bash(git push:*)",
       "Bash(find:*)",
       "Bash(dir:*)",
-      "Bash(git status:*)"
+      "Bash(git status:*)",
+      "Bash(npm run db:backup:*)",
+      "Bash(npm run db:migrate:quick-tags:*)"
     ]
   }
 }
