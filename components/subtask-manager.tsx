@@ -12,6 +12,7 @@ import { SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-
 import { CSS } from "@dnd-kit/utilities";
 import {
   Calendar,
+  CalendarX,
   CheckCircle2,
   Circle,
   Clock,
@@ -234,6 +235,7 @@ export function SubtaskManager({
   const [isUpdatingDuration, setIsUpdatingDuration] = useState(false);
   const [activeDragId, setActiveDragId] = useState<string | null>(null);
   const [isReordering, setIsReordering] = useState(false);
+  const [isUnschedulingAll, setIsUnschedulingAll] = useState(false);
   const [formData, setFormData] = useState<SubtaskFormData>({
     title: "",
     duration: undefined,
@@ -518,6 +520,44 @@ export function SubtaskManager({
     }
   };
 
+  const handleUnscheduleAll = async () => {
+    const confirmed = await confirm({
+      title: "Unschedule All Subtasks",
+      description:
+        "Are you sure you want to unschedule all incomplete subtasks? Completed subtasks will not be changed.",
+      variant: "default",
+      confirmText: "Unschedule All",
+    });
+
+    if (!confirmed) return;
+
+    setIsUnschedulingAll(true);
+    try {
+      const response = await fetch(`/api/tasks/${parentTaskId}/subtasks/unschedule-all`, {
+        method: "POST",
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        await fetchSubtasks();
+        onSubtaskChange?.();
+        toast.success(
+          data.unscheduledCount > 0
+            ? `${data.unscheduledCount} subtask(s) unscheduled`
+            : "No subtasks to unschedule"
+        );
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        toast.error(errorData.error || "Failed to unschedule subtasks");
+      }
+    } catch (error) {
+      console.error("Error unscheduling subtasks:", error);
+      toast.error("Failed to unschedule subtasks");
+    } finally {
+      setIsUnschedulingAll(false);
+    }
+  };
+
   const handleUpdateDuration = async (subtaskId: string, newDuration: number | undefined) => {
     // Find the subtask being edited
     const subtask = subtasks.find((st) => st.id === subtaskId);
@@ -608,6 +648,9 @@ export function SubtaskManager({
   const completedCount = subtasks.filter((st) => st.status === "completed").length;
   const totalCount = subtasks.length;
   const progressPercentage = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
+  const hasScheduledIncompleteSubtasks = subtasks.some(
+    (st) => st.status !== "completed" && (st.scheduled_start != null || st.scheduled_end != null)
+  );
 
   const durationMetrics = calculateDurationMetrics();
 
@@ -656,11 +699,25 @@ export function SubtaskManager({
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
             <CardTitle className="text-sm font-semibold">Subtasks</CardTitle>
-            {totalCount > 0 && (
-              <span className="text-xs text-muted-foreground">
-                {completedCount}/{totalCount} ({progressPercentage}%)
-              </span>
-            )}
+            <div className="flex items-center gap-2">
+              {!readOnly && hasScheduledIncompleteSubtasks && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleUnscheduleAll}
+                  disabled={isUnschedulingAll}
+                  className="h-7 text-xs"
+                >
+                  <CalendarX className="h-3.5 w-3.5 mr-1.5" />
+                  {isUnschedulingAll ? "Unscheduling..." : "Unschedule All"}
+                </Button>
+              )}
+              {totalCount > 0 && (
+                <span className="text-xs text-muted-foreground">
+                  {completedCount}/{totalCount} ({progressPercentage}%)
+                </span>
+              )}
+            </div>
           </div>
           {totalCount > 0 && (
             <div className="w-full bg-secondary rounded-full h-1.5 mt-2">
@@ -677,7 +734,23 @@ export function SubtaskManager({
         className={noCard ? "p-0 space-y-3 overflow-x-hidden" : "space-y-3 overflow-x-hidden"}
       >
         {noCard && (parentTaskDuration !== null || subtasks.length > 0) && (
-          <div className="pb-2 border-b overflow-x-hidden">{durationDisplay}</div>
+          <div className="pb-2 border-b overflow-x-hidden">
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <div>{durationDisplay}</div>
+              {!readOnly && hasScheduledIncompleteSubtasks && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleUnscheduleAll}
+                  disabled={isUnschedulingAll}
+                  className="h-7 text-xs flex-shrink-0"
+                >
+                  <CalendarX className="h-3.5 w-3.5 mr-1.5" />
+                  {isUnschedulingAll ? "Unscheduling..." : "Unschedule All"}
+                </Button>
+              )}
+            </div>
+          </div>
         )}
         {/* Subtask List */}
         {subtasks.length > 0 && (

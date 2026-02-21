@@ -315,7 +315,6 @@ export function TaskDetailDialog({
     // Mark that changes were made
     setHasChanges(true);
     // Refresh the task data in the dialog itself (parent task may have been unscheduled)
-    // But don't refresh the full list until dialog closes for smoother UX
     if (task) {
       try {
         const response = await fetch(`/api/tasks/${task.id}`);
@@ -330,6 +329,8 @@ export function TaskDetailDialog({
         }
         // Refresh notes count
         await fetchNotesCount(task.id);
+        // Refresh calendar/task list so unscheduled subtasks etc. update in real time
+        onTaskUpdate?.();
       } catch (error) {
         console.error("Error refreshing task:", error);
       }
@@ -825,7 +826,8 @@ export function TaskDetailDialog({
           {/* Schedule Information */}
           {(task.scheduled_start ||
             task.scheduled_end ||
-            ((task.task_type === "task" || task.task_type === "todo") && task.duration)) && (
+            ((task.task_type === "task" || task.task_type === "todo") && task.duration) ||
+            (task.task_type === "subtask" && task.duration)) && (
             <Card className="py-2 overflow-x-hidden">
               <CardContent className="pt-0 pb-0 px-3 sm:px-6 overflow-x-hidden">
                 <div className="flex flex-col gap-2 mb-2 sm:mb-3">
@@ -834,7 +836,9 @@ export function TaskDetailDialog({
                     Schedule
                   </h3>
                   <div className="flex gap-2 flex-wrap">
-                    {(task.task_type === "task" || task.task_type === "todo") &&
+                    {(task.task_type === "task" ||
+                      task.task_type === "todo" ||
+                      task.task_type === "subtask") &&
                       task.duration &&
                       task.duration > 0 && (
                         <div className="flex items-center">
@@ -944,13 +948,20 @@ export function TaskDetailDialog({
                   )}
                   {!task.scheduled_start &&
                     !task.scheduled_end &&
-                    (task.task_type === "task" || task.task_type === "todo") &&
+                    (task.task_type === "task" ||
+                      task.task_type === "todo" ||
+                      task.task_type === "subtask") &&
                     task.duration &&
                     task.duration > 0 && (
                       <div className="text-sm text-muted-foreground pt-2">
-                        This {task.task_type === "todo" ? "todo" : "task"} is not yet scheduled.
-                        Click "Schedule Now" to automatically schedule it to the next available slot
-                        today.
+                        This{" "}
+                        {task.task_type === "todo"
+                          ? "todo"
+                          : task.task_type === "subtask"
+                            ? "subtask"
+                            : "task"}{" "}
+                        is not yet scheduled. Click "Schedule Now" to automatically schedule it to
+                        the next available slot today.
                       </div>
                     )}
                 </div>
