@@ -1,5 +1,6 @@
 - [ ] Add event reminders
 - [ ] handle tasks overlap by splitting (especially for token scheudled one/events etc)
+- [ ] Token scheudle have option to be locked as well
 - [ ] Add AI task create function
 - [ ] Add voice support
 

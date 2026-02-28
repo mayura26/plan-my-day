@@ -28,6 +28,8 @@ export interface Task {
   task_type: TaskType;
   google_calendar_event_id?: string | null;
   notification_sent: boolean;
+  lead_reminder_sent: boolean;
+  due_reminder_sent: boolean;
   depends_on_task_id?: string | null; // Legacy single dependency (kept for backward compatibility)
   energy_level_required: number; // 1-5 scale (1 = low energy, 5 = high energy)
   parent_task_id?: string | null; // For subtasks - links to parent task
@@ -86,6 +88,14 @@ export interface GroupScheduleHours {
   sunday?: { start: number; end: number } | null;
 }
 
+export interface ReminderSettings {
+  enabled: boolean;
+  min_priority: number; // 1–5; tasks with priority <= this get reminders
+  lead_time_minutes: number | null; // null = disabled; minutes before scheduled_start
+  on_time_reminder: boolean; // fire at scheduled_start
+  due_date_lead_minutes: number | null; // null = disabled; minutes before due_date (unscheduled tasks only)
+}
+
 export interface TaskGroup {
   id: string;
   user_id: string;
@@ -97,6 +107,7 @@ export interface TaskGroup {
   auto_schedule_enabled?: boolean;
   auto_schedule_hours?: GroupScheduleHours | null;
   priority?: number; // 1-10 scale (1 = highest priority, 10 = lowest priority)
+  reminder_settings?: ReminderSettings | null;
   created_at: string;
   updated_at: string;
 }

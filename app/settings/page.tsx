@@ -7,6 +7,7 @@ import { useEffect } from "react";
 import { APIKeyManager } from "@/components/api-key-manager";
 import { AwakeHoursSelector } from "@/components/awake-hours-selector";
 import { ForceUpdateButton } from "@/components/force-update-button";
+import { GroupReminderSettings } from "@/components/group-reminder-settings";
 import { PushNotificationManager } from "@/components/push-notification-manager";
 import { PushSubscriptionList } from "@/components/push-subscription-list";
 import { TimezoneSelector } from "@/components/timezone-selector";
@@ -132,6 +133,25 @@ export default function SettingsPage() {
 
         {/* Push Subscription List */}
         <PushSubscriptionList />
+
+        <Separator />
+
+        {/* Task Reminder Rules */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <Bell className="h-5 w-5" />
+              <CardTitle>Task Reminder Rules</CardTitle>
+            </div>
+            <CardDescription>
+              Configure when to receive reminders for tasks in each group. Reminders fire via push
+              notification — enable push notifications above first.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <GroupReminderSettings />
+          </CardContent>
+        </Card>
 
         <Separator />
 

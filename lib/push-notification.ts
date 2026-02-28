@@ -91,6 +91,71 @@ export function createTaskReminderPayload(
   };
 }
 
+export function createLeadReminderPayload(
+  taskTitle: string,
+  taskId: string,
+  minutesUntil: number
+): NotificationPayload {
+  return {
+    title: `Starting soon: ${taskTitle}`,
+    body: `Starts in ${minutesUntil} minute${minutesUntil !== 1 ? "s" : ""}`,
+    tag: `task-${taskId}-lead`,
+    icon: "/web-app-manifest-192x192.png",
+    data: {
+      type: "task-lead-reminder",
+      taskId,
+      url: `/tasks?task=${taskId}`,
+    },
+    actions: [
+      { action: "view", title: "View Task" },
+      { action: "snooze", title: "Snooze 5 min" },
+    ],
+  };
+}
+
+export function createOnTimeReminderPayload(
+  taskTitle: string,
+  taskId: string
+): NotificationPayload {
+  return {
+    title: `Starting now: ${taskTitle}`,
+    body: "Your task is starting now",
+    tag: `task-${taskId}-ontime`,
+    icon: "/web-app-manifest-192x192.png",
+    data: {
+      type: "task-ontime-reminder",
+      taskId,
+      url: `/tasks?task=${taskId}`,
+    },
+    actions: [
+      { action: "view", title: "View Task" },
+      { action: "snooze", title: "Snooze 5 min" },
+    ],
+  };
+}
+
+export function createDueReminderPayload(
+  taskTitle: string,
+  taskId: string,
+  minutesUntil: number
+): NotificationPayload {
+  return {
+    title: `Due soon: ${taskTitle}`,
+    body: `Due in ${minutesUntil} minute${minutesUntil !== 1 ? "s" : ""}`,
+    tag: `task-${taskId}-due`,
+    icon: "/web-app-manifest-192x192.png",
+    data: {
+      type: "task-due-reminder",
+      taskId,
+      url: `/tasks?task=${taskId}`,
+    },
+    actions: [
+      { action: "view", title: "View Task" },
+      { action: "snooze", title: "Snooze 5 min" },
+    ],
+  };
+}
+
 export function createUpdateAvailablePayload(url?: string): NotificationPayload {
   return {
     title: "Update Available",

@@ -21,7 +21,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import type { GroupScheduleHours, TaskGroup } from "@/lib/types";
+import type { GroupScheduleHours, ReminderSettings, TaskGroup } from "@/lib/types";
 
 interface EditGroupDialogProps {
   open: boolean;
@@ -46,6 +46,8 @@ export function EditGroupDialog({
   const [autoScheduleHours, setAutoScheduleHours] = useState<GroupScheduleHours>({});
   const [isAutoScheduleExpanded, setIsAutoScheduleExpanded] = useState(false);
   const [priority, setPriority] = useState<number>(5);
+  const [reminderSettings, setReminderSettings] = useState<ReminderSettings | null>(null);
+  const [isReminderExpanded, setIsReminderExpanded] = useState(false);
 
   // Initialize form when group changes
   useEffect(() => {
@@ -56,6 +58,7 @@ export function EditGroupDialog({
       setAutoScheduleEnabled(group.auto_schedule_enabled ?? false);
       setAutoScheduleHours(group.auto_schedule_hours || {});
       setPriority(group.priority ?? 5);
+      setReminderSettings(group.reminder_settings ?? null);
     }
   }, [group]);
 
@@ -69,6 +72,8 @@ export function EditGroupDialog({
       setAutoScheduleHours({});
       setIsAutoScheduleExpanded(false);
       setPriority(5);
+      setReminderSettings(null);
+      setIsReminderExpanded(false);
     }
   }, [open]);
 
@@ -108,6 +113,7 @@ export function EditGroupDialog({
           auto_schedule_enabled: autoScheduleEnabled,
           auto_schedule_hours: autoScheduleEnabled ? autoScheduleHours : null,
           priority,
+          reminder_settings: reminderSettings,
         }),
       });
 
@@ -391,6 +397,159 @@ export function EditGroupDialog({
               )}
             </div>
           )}
+          {/* Reminder Notifications */}
+          <div className="border rounded-lg overflow-hidden">
+            <button
+              type="button"
+              className="w-full px-4 py-3 border-b cursor-pointer hover:bg-accent/50 transition-colors flex items-center justify-between bg-card"
+              onClick={() => setIsReminderExpanded(!isReminderExpanded)}
+            >
+              <div className="flex items-center gap-2">
+                {isReminderExpanded ? (
+                  <ChevronDown className="h-4 w-4" />
+                ) : (
+                  <ChevronRight className="h-4 w-4" />
+                )}
+                <h3 className="text-sm font-semibold">Reminder Notifications</h3>
+              </div>
+            </button>
+            {isReminderExpanded && (
+              <div className="p-4 space-y-4">
+                <div className="flex items-center justify-between">
+                  <label htmlFor="reminder-enabled" className="text-sm font-medium">
+                    Enable Reminders
+                  </label>
+                  <Switch
+                    id="reminder-enabled"
+                    checked={reminderSettings?.enabled ?? false}
+                    onCheckedChange={(checked) =>
+                      setReminderSettings((prev) => ({
+                        enabled: checked,
+                        min_priority: prev?.min_priority ?? 3,
+                        lead_time_minutes: prev?.lead_time_minutes ?? null,
+                        on_time_reminder: prev?.on_time_reminder ?? true,
+                        due_date_lead_minutes: prev?.due_date_lead_minutes ?? null,
+                      }))
+                    }
+                  />
+                </div>
+                {reminderSettings?.enabled && (
+                  <div className="space-y-4 pt-2 border-t">
+                    <div>
+                      <label htmlFor="reminder-min-priority" className="text-sm font-medium">
+                        Remind for priorities
+                      </label>
+                      <div className="text-xs text-muted-foreground mb-1">
+                        Remind for tasks with priority 1 (Critical) through selected value
+                      </div>
+                      <Select
+                        value={(reminderSettings.min_priority ?? 3).toString()}
+                        onValueChange={(value) =>
+                          setReminderSettings((prev) =>
+                            prev ? { ...prev, min_priority: parseInt(value, 10) } : prev
+                          )
+                        }
+                      >
+                        <SelectTrigger id="reminder-min-priority" className="mt-1 w-full">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {[1, 2, 3, 4, 5].map((p) => (
+                            <SelectItem key={p} value={p.toString()}>
+                              1 (Critical) through {p}{" "}
+                              {p === 1 ? "(Critical only)" : p === 5 ? "(All)" : ""}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <label htmlFor="reminder-lead-time" className="text-sm font-medium">
+                        Lead time reminder
+                      </label>
+                      <div className="text-xs text-muted-foreground mb-1">
+                        Send a reminder before the task starts
+                      </div>
+                      <Select
+                        value={(reminderSettings.lead_time_minutes ?? "off").toString()}
+                        onValueChange={(value) =>
+                          setReminderSettings((prev) =>
+                            prev
+                              ? {
+                                  ...prev,
+                                  lead_time_minutes: value === "off" ? null : parseInt(value, 10),
+                                }
+                              : prev
+                          )
+                        }
+                      >
+                        <SelectTrigger id="reminder-lead-time" className="mt-1 w-full">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="off">Off</SelectItem>
+                          <SelectItem value="5">5 minutes before</SelectItem>
+                          <SelectItem value="10">10 minutes before</SelectItem>
+                          <SelectItem value="15">15 minutes before</SelectItem>
+                          <SelectItem value="30">30 minutes before</SelectItem>
+                          <SelectItem value="60">1 hour before</SelectItem>
+                          <SelectItem value="120">2 hours before</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <label htmlFor="reminder-ontime" className="text-sm font-medium">
+                        On-time reminder
+                      </label>
+                      <Switch
+                        id="reminder-ontime"
+                        checked={reminderSettings.on_time_reminder ?? false}
+                        onCheckedChange={(checked) =>
+                          setReminderSettings((prev) =>
+                            prev ? { ...prev, on_time_reminder: checked } : prev
+                          )
+                        }
+                      />
+                    </div>
+                    <div>
+                      <label htmlFor="reminder-due-lead" className="text-sm font-medium">
+                        Due date reminder
+                      </label>
+                      <div className="text-xs text-muted-foreground mb-1">
+                        For tasks with no scheduled time — remind before the due date
+                      </div>
+                      <Select
+                        value={(reminderSettings.due_date_lead_minutes ?? "off").toString()}
+                        onValueChange={(value) =>
+                          setReminderSettings((prev) =>
+                            prev
+                              ? {
+                                  ...prev,
+                                  due_date_lead_minutes:
+                                    value === "off" ? null : parseInt(value, 10),
+                                }
+                              : prev
+                          )
+                        }
+                      >
+                        <SelectTrigger id="reminder-due-lead" className="mt-1 w-full">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="off">Off</SelectItem>
+                          <SelectItem value="30">30 minutes before</SelectItem>
+                          <SelectItem value="60">1 hour before</SelectItem>
+                          <SelectItem value="120">2 hours before</SelectItem>
+                          <SelectItem value="1440">1 day before</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
           <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isUpdating}>
               Cancel

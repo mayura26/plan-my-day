@@ -2,7 +2,7 @@ import { type NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { generateGroupId } from "@/lib/task-utils";
 import { db } from "@/lib/turso";
-import type { CreateTaskGroupRequest, TaskGroup } from "@/lib/types";
+import type { CreateTaskGroupRequest, ReminderSettings, TaskGroup } from "@/lib/types";
 
 // GET /api/task-groups - Get all task groups for the authenticated user
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -28,6 +28,15 @@ export async function GET(_request: NextRequest) {
           autoScheduleHours = null;
         }
       }
+      let reminderSettings: ReminderSettings | null = null;
+      if (row.reminder_settings) {
+        try {
+          reminderSettings = JSON.parse(row.reminder_settings as string);
+        } catch (e) {
+          console.error("Error parsing reminder_settings JSON:", e);
+          reminderSettings = null;
+        }
+      }
       return {
         id: row.id as string,
         user_id: row.user_id as string,
@@ -39,6 +48,7 @@ export async function GET(_request: NextRequest) {
         auto_schedule_enabled: Boolean(row.auto_schedule_enabled ?? false),
         auto_schedule_hours: autoScheduleHours,
         priority: row.priority ? (row.priority as number) : undefined,
+        reminder_settings: reminderSettings,
         created_at: row.created_at as string,
         updated_at: row.updated_at as string,
       };
@@ -194,6 +204,7 @@ export async function POST(request: NextRequest) {
       auto_schedule_enabled: autoScheduleEnabled,
       auto_schedule_hours: body.auto_schedule_hours ?? null,
       priority,
+      reminder_settings: null,
       created_at: now,
       updated_at: now,
     };

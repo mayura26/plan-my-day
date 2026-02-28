@@ -1,7 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/turso";
-import type { TaskGroup } from "@/lib/types";
+import type { ReminderSettings, TaskGroup } from "@/lib/types";
 
 // GET /api/task-groups/[id] - Get a specific task group
 export async function GET(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -31,6 +31,15 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
         autoScheduleHours = null;
       }
     }
+    let reminderSettings: ReminderSettings | null = null;
+    if (row.reminder_settings) {
+      try {
+        reminderSettings = JSON.parse(row.reminder_settings as string);
+      } catch (e) {
+        console.error("Error parsing reminder_settings JSON:", e);
+        reminderSettings = null;
+      }
+    }
     const group: TaskGroup = {
       id: row.id as string,
       user_id: row.user_id as string,
@@ -42,6 +51,7 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
       auto_schedule_enabled: Boolean(row.auto_schedule_enabled ?? false),
       auto_schedule_hours: autoScheduleHours,
       priority: row.priority ? (row.priority as number) : undefined,
+      reminder_settings: reminderSettings,
       created_at: row.created_at as string,
       updated_at: row.updated_at as string,
     };
@@ -71,6 +81,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       auto_schedule_enabled?: boolean;
       auto_schedule_hours?: import("@/lib/types").GroupScheduleHours | null;
       priority?: number;
+      reminder_settings?: ReminderSettings | null;
     } = await request.json();
 
     // Check if group exists and belongs to user
@@ -144,6 +155,37 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
             );
           }
         }
+      }
+    }
+
+    // Validate reminder_settings if provided
+    if (body.reminder_settings !== undefined && body.reminder_settings !== null) {
+      const rs = body.reminder_settings;
+      if (typeof rs.min_priority !== "number" || rs.min_priority < 1 || rs.min_priority > 5) {
+        return NextResponse.json(
+          { error: "reminder_settings.min_priority must be a number between 1 and 5" },
+          { status: 400 }
+        );
+      }
+      if (
+        rs.lead_time_minutes !== null &&
+        rs.lead_time_minutes !== undefined &&
+        (typeof rs.lead_time_minutes !== "number" || rs.lead_time_minutes <= 0)
+      ) {
+        return NextResponse.json(
+          { error: "reminder_settings.lead_time_minutes must be null or a positive integer" },
+          { status: 400 }
+        );
+      }
+      if (
+        rs.due_date_lead_minutes !== null &&
+        rs.due_date_lead_minutes !== undefined &&
+        (typeof rs.due_date_lead_minutes !== "number" || rs.due_date_lead_minutes <= 0)
+      ) {
+        return NextResponse.json(
+          { error: "reminder_settings.due_date_lead_minutes must be null or a positive integer" },
+          { status: 400 }
+        );
       }
     }
 
@@ -248,6 +290,10 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       updateFields.push("priority = ?");
       values.push(body.priority);
     }
+    if (body.reminder_settings !== undefined) {
+      updateFields.push("reminder_settings = ?");
+      values.push(body.reminder_settings === null ? null : JSON.stringify(body.reminder_settings));
+    }
 
     updateFields.push("updated_at = ?");
     values.push(now);
@@ -275,6 +321,15 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
         autoScheduleHours = null;
       }
     }
+    let reminderSettingsParsed: ReminderSettings | null = null;
+    if (row.reminder_settings) {
+      try {
+        reminderSettingsParsed = JSON.parse(row.reminder_settings as string);
+      } catch (e) {
+        console.error("Error parsing reminder_settings JSON:", e);
+        reminderSettingsParsed = null;
+      }
+    }
     const group: TaskGroup = {
       id: row.id as string,
       user_id: row.user_id as string,
@@ -285,6 +340,8 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       is_parent_group: Boolean(row.is_parent_group),
       auto_schedule_enabled: Boolean(row.auto_schedule_enabled ?? false),
       auto_schedule_hours: autoScheduleHours,
+      priority: row.priority ? (row.priority as number) : undefined,
+      reminder_settings: reminderSettingsParsed,
       created_at: row.created_at as string,
       updated_at: row.updated_at as string,
     };
