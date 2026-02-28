@@ -1,6 +1,8 @@
 - [ ] handle tasks overlap by splitting (especially for token scheudled one/events etc)
-- [ ] Add AI task create function
 - [ ] Add voice support
+- [ ] Issue where we can't scroll for diaglogs on group settings
+- [ ] mobile default to day view on load
+- [ ] locked task have weird cursor animation
 
 ### ⏳ Pending
 - [ ] AI-powered task scheduling engine

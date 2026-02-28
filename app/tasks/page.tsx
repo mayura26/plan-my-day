@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
+import { AITaskInput } from "@/components/ai-task-input";
 import { EditGroupDialog } from "@/components/edit-group-dialog";
 import { GroupedTaskList } from "@/components/grouped-task-list";
 import { TaskDetailDialog } from "@/components/task-detail-dialog";
@@ -39,6 +40,8 @@ export default function TasksPage() {
   const [groups, setGroups] = useState<TaskGroup[]>([]);
   const [showAllTasks, setShowAllTasks] = useState(false);
   const [showImportDialog, setShowImportDialog] = useState(false);
+  const [showAIInput, setShowAIInput] = useState(false);
+  const [aiParsedData, setAIParsedData] = useState<Partial<CreateTaskRequestWithSubtasks> | null>(null);
   const [editingGroup, setEditingGroup] = useState<TaskGroup | null>(null);
   const [showEditGroupDialog, setShowEditGroupDialog] = useState(false);
   const [showCreateParentDialog, setShowCreateParentDialog] = useState(false);
@@ -432,6 +435,11 @@ export default function TasksPage() {
     }
   };
 
+  const handleAIParsed = (data: Partial<CreateTaskRequestWithSubtasks>) => {
+    setAIParsedData(data);
+    setShowCreateForm(true);
+  };
+
   if (status === "loading" || isLoading) {
     return (
       <div className="min-h-screen bg-background">
@@ -465,6 +473,7 @@ export default function TasksPage() {
           onUnscheduleTask={handleUnscheduleTask}
           onCreateTask={() => setShowCreateForm(true)}
           onImport={() => setShowImportDialog(true)}
+          onAICreate={() => setShowAIInput(true)}
           showAllTasks={showAllTasks}
           onShowAllTasksChange={setShowAllTasks}
           onRenameGroup={handleRenameGroup}
@@ -495,15 +504,25 @@ export default function TasksPage() {
       />
 
       {/* Create Task Dialog */}
-      <Dialog open={showCreateForm} onOpenChange={setShowCreateForm}>
+      <Dialog
+        open={showCreateForm}
+        onOpenChange={(open) => {
+          setShowCreateForm(open);
+          if (!open) setAIParsedData(null);
+        }}
+      >
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto w-[95vw] md:w-full mx-2 md:mx-auto">
           <DialogHeader>
             <DialogTitle>Create New Task</DialogTitle>
           </DialogHeader>
           <TaskForm
             onSubmit={handleCreateTask}
-            onCancel={() => setShowCreateForm(false)}
+            onCancel={() => {
+              setShowCreateForm(false);
+              setAIParsedData(null);
+            }}
             isLoading={isCreating}
+            initialData={aiParsedData || undefined}
             taskGroups={groups}
           />
         </DialogContent>
@@ -701,6 +720,13 @@ export default function TasksPage() {
         group={editingGroup}
         groups={groups}
         onGroupUpdated={handleGroupUpdated}
+      />
+
+      <AITaskInput
+        open={showAIInput}
+        onOpenChange={setShowAIInput}
+        onParsed={handleAIParsed}
+        groups={groups}
       />
     </div>
   );

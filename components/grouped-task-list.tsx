@@ -7,6 +7,7 @@ import {
   Folder,
   Plus,
   Search,
+  Sparkles,
   Trash2,
   Upload,
 } from "lucide-react";
@@ -39,6 +40,7 @@ interface GroupedTaskListProps {
   onRenameGroup?: (group: TaskGroup) => void;
   onDeleteGroup?: (groupId: string) => Promise<void>;
   onCreateParentGroup?: () => void;
+  onAICreate?: () => void;
 }
 
 type GroupByOption = "status" | "group" | "none";
@@ -59,6 +61,7 @@ export function GroupedTaskList({
   onRenameGroup,
   onDeleteGroup,
   onCreateParentGroup,
+  onAICreate,
 }: GroupedTaskListProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [groupBy, setGroupBy] = useState<GroupByOption>("status");
@@ -343,6 +346,12 @@ export function GroupedTaskList({
             <Button onClick={onImport} variant="outline" className="h-11 px-4 md:h-10 md:px-4">
               <Upload className="w-4 h-4 mr-2" />
               Import Tasks
+            </Button>
+          )}
+          {onAICreate && (
+            <Button onClick={onAICreate} variant="outline" className="h-11 px-4 md:h-10 md:px-4">
+              <Sparkles className="w-4 h-4 mr-2" />
+              Add with AI
             </Button>
           )}
           {onCreateTask && (

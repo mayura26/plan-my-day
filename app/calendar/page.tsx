@@ -12,11 +12,12 @@ import {
   useSensors,
 } from "@dnd-kit/core";
 import { format, startOfMonth } from "date-fns";
-import { CheckSquare, ChevronDown, ChevronRight, Plus, X } from "lucide-react";
+import { CheckSquare, ChevronDown, ChevronRight, Plus, Sparkles, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
+import { AITaskInput } from "@/components/ai-task-input";
 import { CalendarSkeleton } from "@/components/calendar-skeleton";
 import { DayCalendar } from "@/components/day-calendar";
 import { DayNoteDialog } from "@/components/day-note-dialog";
@@ -84,7 +85,8 @@ export default function CalendarPage() {
   const [noteDialogOpen, setNoteDialogOpen] = useState(false);
   const [noteDialogDate, setNoteDialogDate] = useState<Date | null>(null);
   const [processOverdueOpen, setProcessOverdueOpen] = useState(false);
-  const [quickAddInitialData, setQuickAddInitialData] = useState<Partial<CreateTaskRequest> | null>(
+  const [showAIInput, setShowAIInput] = useState(false);
+  const [quickAddInitialData, setQuickAddInitialData] = useState<Partial<CreateTaskRequestWithSubtasks> | null>(
     null
   );
   const [sidebarWidth, setSidebarWidth] = useState<number>(() => {
@@ -722,6 +724,12 @@ export default function CalendarPage() {
     } finally {
       setProcessingTaskId(null);
     }
+  };
+
+  const handleAIParsed = (data: Partial<CreateTaskRequestWithSubtasks>) => {
+    setQuickAddInitialData(data);
+    setShowCreateForm(true);
+    setSidebarOpen(false);
   };
 
   const handleCreateTask = async (taskData: CreateTaskRequestWithSubtasks) => {
@@ -1381,17 +1389,30 @@ export default function CalendarPage() {
                 <X className="h-4 w-4" />
               </Button>
             </div>
-            {/* Add Task Button */}
-            <Button
-              className="w-full h-11"
-              onClick={() => {
-                setShowCreateForm(true);
-                setSidebarOpen(false); // Close sidebar on mobile when creating task
-              }}
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Add Task
-            </Button>
+            {/* Add Task / Add with AI */}
+            <div className="flex gap-2">
+              <Button
+                className="flex-1 h-11"
+                onClick={() => {
+                  setShowCreateForm(true);
+                  setSidebarOpen(false);
+                }}
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Add Task
+              </Button>
+              <Button
+                variant="outline"
+                className="flex-1 h-11"
+                onClick={() => {
+                  setShowAIInput(true);
+                  setSidebarOpen(false);
+                }}
+              >
+                <Sparkles className="h-4 w-4 mr-2" />
+                Add with AI
+              </Button>
+            </div>
 
             {/* Day Notes Section - Only show in day view when note exists - Always at top */}
             {viewMode === "day" &&
@@ -1769,6 +1790,13 @@ export default function CalendarPage() {
           />
         </DialogContent>
       </Dialog>
+
+      <AITaskInput
+        open={showAIInput}
+        onOpenChange={setShowAIInput}
+        onParsed={handleAIParsed}
+        groups={groups}
+      />
 
       {/* Edit Task Dialog */}
       <Dialog

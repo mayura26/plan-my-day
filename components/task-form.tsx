@@ -45,6 +45,14 @@ import {
 } from "@/lib/timezone-utils";
 import type { CreateTaskRequest, TaskGroup, TaskType } from "@/lib/types";
 
+// If the string is already in datetime-local format (YYYY-MM-DDTHH:MM, no timezone
+// suffix), use it directly so we don't double-convert AI-pre-converted dates.
+function toDateTimeLocal(value: string | null | undefined, timezone: string): string {
+  if (!value) return "";
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(value)) return value;
+  return formatDateTimeLocalForTimezone(value, timezone);
+}
+
 /** Form-only: optional subtasks and initial notes (todos) when creating a task. */
 export type CreateTaskRequestWithSubtasks = CreateTaskRequest & {
   subtasks?: Array<{ title: string; duration?: number }>;
@@ -55,7 +63,7 @@ export type CreateTaskRequestWithSubtasks = CreateTaskRequest & {
 interface TaskFormProps {
   onSubmit: (task: CreateTaskRequestWithSubtasks) => Promise<void>;
   onCancel?: () => void;
-  initialData?: Partial<CreateTaskRequest> & { id?: string };
+  initialData?: Partial<CreateTaskRequestWithSubtasks> & { id?: string };
   isLoading?: boolean;
   taskGroups?: TaskGroup[];
 }
@@ -84,9 +92,9 @@ export function TaskForm({
     template_id: initialData?.template_id || undefined,
     depends_on_task_id: initialData?.depends_on_task_id || undefined,
     dependency_ids: initialData?.dependency_ids || [],
-    scheduled_start: formatDateTimeLocalForTimezone(initialData?.scheduled_start, timezone),
-    scheduled_end: formatDateTimeLocalForTimezone(initialData?.scheduled_end, timezone),
-    due_date: formatDateTimeLocalForTimezone(initialData?.due_date, timezone),
+    scheduled_start: toDateTimeLocal(initialData?.scheduled_start, timezone),
+    scheduled_end: toDateTimeLocal(initialData?.scheduled_end, timezone),
+    due_date: toDateTimeLocal(initialData?.due_date, timezone),
     auto_schedule: initialData?.auto_schedule || false,
     schedule_mode: (initialData as any)?.schedule_mode || "now",
     locked:
@@ -102,9 +110,18 @@ export function TaskForm({
   const [hasTriedSubmitWithoutDueDate, setHasTriedSubmitWithoutDueDate] = useState(false);
   const [subtaskDrafts, setSubtaskDrafts] = useState<
     Array<{ id: string; title: string; duration?: number }>
-  >([]);
+  >(
+    () =>
+      (initialData?.subtasks ?? []).map((s, i) => ({
+        id: `ai-subtask-${i}`,
+        title: s.title,
+        duration: s.duration,
+      }))
+  );
   const [initialNoteTexts, setInitialNoteTexts] = useState<Array<{ id: string; text: string }>>([]);
-  const [showExtraInfo, setShowExtraInfo] = useState(!!initialData?.description);
+  const [showExtraInfo, setShowExtraInfo] = useState(
+    !!initialData?.description || (initialData?.subtasks?.length ?? 0) > 0
+  );
   const titleInputRef = useRef<HTMLInputElement>(null);
 
   // Fetch existing dependencies when editing a task
@@ -184,9 +201,9 @@ export function TaskForm({
         group_id: initialData.group_id || undefined,
         template_id: initialData.template_id || undefined,
         depends_on_task_id: initialData.depends_on_task_id || undefined,
-        scheduled_start: formatDateTimeLocalForTimezone(initialData.scheduled_start, timezone),
-        scheduled_end: formatDateTimeLocalForTimezone(initialData.scheduled_end, timezone),
-        due_date: formatDateTimeLocalForTimezone(initialData.due_date, timezone),
+        scheduled_start: toDateTimeLocal(initialData.scheduled_start, timezone),
+        scheduled_end: toDateTimeLocal(initialData.scheduled_end, timezone),
+        due_date: toDateTimeLocal(initialData.due_date, timezone),
         auto_schedule: initialData.auto_schedule || false,
         locked:
           initialData.locked !== undefined
