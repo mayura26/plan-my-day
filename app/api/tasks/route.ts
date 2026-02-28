@@ -4,7 +4,14 @@ import { scheduleTaskUnified } from "@/lib/scheduler-utils";
 import { generateDependencyId, generateTaskId, validateTaskData } from "@/lib/task-utils";
 import { getUserTimezone } from "@/lib/timezone-utils";
 import { db } from "@/lib/turso";
-import type { CreateTaskRequest, Task, TaskGroup, SchedulingMode, TaskStatus, TaskType } from "@/lib/types";
+import type {
+  CreateTaskRequest,
+  SchedulingMode,
+  Task,
+  TaskGroup,
+  TaskStatus,
+  TaskType,
+} from "@/lib/types";
 
 // Helper to map database row to Task object
 function mapRowToTask(row: any): Task {
@@ -425,15 +432,9 @@ export async function POST(request: NextRequest) {
         const rawMode = row.default_schedule_mode as string | null | undefined;
         userDefaultScheduleMode =
           rawMode &&
-          [
-            "now",
-            "today",
-            "tomorrow",
-            "next-week",
-            "next-month",
-            "asap",
-            "due-date",
-          ].includes(rawMode)
+          ["now", "today", "tomorrow", "next-week", "next-month", "asap", "due-date"].includes(
+            rawMode
+          )
             ? (rawMode as SchedulingMode)
             : "now";
       } else {
@@ -515,8 +516,8 @@ export async function POST(request: NextRequest) {
           );
           const allGroups = allGroupsResult.rows.map(mapRowToGroup);
 
-        // Use unified scheduler with the selected mode (body, else user default, else "now")
-        const scheduleMode = (body.schedule_mode ?? userDefaultScheduleMode) as SchedulingMode;
+          // Use unified scheduler with the selected mode (body, else user default, else "now")
+          const scheduleMode = (body.schedule_mode ?? userDefaultScheduleMode) as SchedulingMode;
           const result = scheduleTaskUnified({
             mode: scheduleMode,
             task,

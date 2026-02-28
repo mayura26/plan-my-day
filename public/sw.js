@@ -21,6 +21,7 @@ const STATIC_CACHE_URLS = [
   "/settings",
   "/auth/signin",
   "/manifest.json",
+  "/web-app-manifest-192x192.png",
 ];
 
 // Install event - cache static assets
@@ -211,10 +212,15 @@ self.addEventListener("push", (event) => {
     }
   }
 
+  // Resolve icon and badge to absolute URLs so Android (and others) load them correctly
+  const toAbsoluteUrl = (path) => new URL(path, self.location.origin).href;
+  const iconPath = data.icon || "/web-app-manifest-192x192.png";
+  const badgePath = data.badge || "/web-app-manifest-192x192.png";
+
   const options = {
     body: data.body || "You have a new notification",
-    icon: data.icon || "/web-app-manifest-192x192.png",
-    badge: data.badge || "/web-app-manifest-192x192.png",
+    icon: toAbsoluteUrl(iconPath),
+    badge: toAbsoluteUrl(badgePath),
     tag: data.tag || "default",
     data: data.data || {},
     actions: data.actions || [],
