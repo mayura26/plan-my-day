@@ -106,7 +106,7 @@ export function SlimTaskCard({
       {...attributes}
       className={cn(
         "w-full text-left py-1.5 px-2 rounded border bg-card hover:bg-accent/50 transition-colors cursor-grab active:cursor-grabbing text-xs overflow-hidden overflow-x-hidden",
-        task.locked && "cursor-not-allowed opacity-75",
+        task.locked && "cursor-pointer opacity-75",
         isSubtask && "pl-6 pr-2 border-l-2 border-l-primary/30 bg-muted/30 rounded-r-md py-1"
       )}
       onClick={handleClick}

@@ -218,7 +218,7 @@ export function ResizableTask({
         isShortTask ? "p-0.5 md:p-1" : "p-1.5 md:p-2",
         isShortTask ? "min-h-0 md:min-h-0" : "min-h-[44px] md:min-h-0", // Only apply min-height to longer tasks on mobile
         "hover:shadow-lg transition-shadow overflow-hidden group", // Removed 'relative' - using absolute positioning from style
-        task.locked && "cursor-not-allowed opacity-75",
+        task.locked && "cursor-pointer opacity-75",
         !task.locked && "cursor-grab active:cursor-grabbing",
         isActiveDrag && "shadow-xl ring-2 ring-primary/50",
         isTaskResizing && "ring-2 ring-primary/50",
