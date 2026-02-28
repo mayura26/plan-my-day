@@ -2178,9 +2178,16 @@ function shuffleSingleDay(
     return { movedTasks, pushedToDays };
   }
 
-  // Sort moveable tasks by due date (soonest first), then priority, then current position
+  // Sort moveable tasks by current scheduled position first (preserve user's visual order)
   moveableTasks.sort((a, b) => {
-    // 1. Due date ASC (soonest deadlines first, nulls last)
+    // 1. Current scheduled_start ASC (respect current visual order)
+    const slotA = getEffectiveSlot(a, taskSlotOverrides);
+    const slotB = getEffectiveSlot(b, taskSlotOverrides);
+    const startA = slotA ? slotA.start.getTime() : 0;
+    const startB = slotB ? slotB.start.getTime() : 0;
+    if (startA !== startB) return startA - startB;
+
+    // 2. Due date ASC as tiebreaker (soonest deadlines first, nulls last)
     if (a.due_date && b.due_date) {
       const cmp = a.due_date.localeCompare(b.due_date);
       if (cmp !== 0) return cmp;
@@ -2190,15 +2197,8 @@ function shuffleSingleDay(
       return 1;
     }
 
-    // 2. Priority ASC (1 = highest priority)
+    // 3. Priority ASC as tiebreaker
     if (a.priority !== b.priority) return a.priority - b.priority;
-
-    // 3. Current scheduled_start as tiebreaker
-    const slotA = getEffectiveSlot(a, taskSlotOverrides);
-    const slotB = getEffectiveSlot(b, taskSlotOverrides);
-    const startA = slotA ? slotA.start.getTime() : 0;
-    const startB = slotB ? slotB.start.getTime() : 0;
-    if (startA !== startB) return startA - startB;
 
     return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
   });
@@ -2271,8 +2271,17 @@ function shuffleSingleDay(
       continue;
     }
 
-    // Use the single day window for placement so we pack from start of day and only push when day is full
-    const effectiveCursor = new Date(Math.max(cursor.getTime(), dayWindowStart.getTime()));
+    // Use the single day window for placement so we pack from start of day and only push when day is full.
+    // Also keep the task at or after its current scheduled position to avoid pulling it earlier.
+    const taskCurrentSlot = getEffectiveSlot(task, taskSlotOverrides);
+    const taskCurrentStart = taskCurrentSlot?.start;
+    const effectiveCursor = new Date(
+      Math.max(
+        cursor.getTime(),
+        dayWindowStart.getTime(),
+        taskCurrentStart ? taskCurrentStart.getTime() : 0
+      )
+    );
 
     if (effectiveCursor.getTime() > dayWindowEnd.getTime()) {
       feedback.push(`No slot for "${task.title.slice(0, 40)}": past working hours (day full).`);
