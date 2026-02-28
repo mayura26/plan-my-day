@@ -16,12 +16,6 @@ interface AITaskInputProps {
   groups?: TaskGroup[];
 }
 
-const EXAMPLES = [
-  "Team meeting tomorrow at 2pm for 1 hour, high priority",
-  "Submit quarterly report by Friday, 2 hours, urgent",
-  "Quick email reply to client, low energy needed",
-];
-
 const LOCK_THRESHOLD = 60; // px upward drag to lock recording
 
 export function AITaskInput({ open, onOpenChange, onParsed, groups = [] }: AITaskInputProps) {
@@ -270,7 +264,7 @@ export function AITaskInput({ open, onOpenChange, onParsed, groups = [] }: AITas
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto w-[95vw] md:w-full mx-2 md:mx-auto">
+      <DialogContent className="max-w-lg max-h-[90vh] w-[95vw] md:w-full mx-2 md:mx-auto flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Sparkles className="w-5 h-5" />
@@ -278,55 +272,17 @@ export function AITaskInput({ open, onOpenChange, onParsed, groups = [] }: AITas
           </DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-4">
-          <div>
-            <div className="relative">
-              <textarea
-                ref={textareaRef}
-                value={text}
-                onChange={(e) => setText(e.target.value)}
-                onKeyDown={handleKeyDown}
-                placeholder="Describe your task in plain English..."
-                rows={3}
-                className="w-full resize-none rounded-md border border-input bg-background px-3 py-2 pr-10 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                disabled={isParsing || isTranscribing}
-              />
-              <button
-                type="button"
-                onClick={handleMicClick}
-                onPointerDown={handlePointerDown}
-                onPointerMove={handlePointerMove}
-                onPointerUp={handlePointerUp}
-                onPointerCancel={handlePointerCancel}
-                disabled={isParsing || isTranscribing}
-                style={{ touchAction: "none" }}
-                className={cn(
-                  "absolute right-2 top-2 rounded-md p-1.5 transition-colors",
-                  isRecording
-                    ? isLocked
-                      ? "text-red-500 hover:bg-red-50 dark:hover:bg-red-950"
-                      : "text-red-500 hover:bg-red-50 dark:hover:bg-red-950 animate-pulse"
-                    : "text-muted-foreground hover:text-foreground hover:bg-muted"
-                )}
-                title={
-                  isRecording
-                    ? isLocked
-                      ? "Tap to stop recording"
-                      : "Release to stop · slide up to lock"
-                    : "Hold to record · click to toggle"
-                }
-              >
-                {isTranscribing ? (
-                  <span className="h-4 w-4 block animate-spin rounded-full border-2 border-current border-t-transparent" />
-                ) : isRecording && isLocked ? (
-                  <Square className="h-4 w-4 fill-current" />
-                ) : isRecording ? (
-                  <MicOff className="h-4 w-4" />
-                ) : (
-                  <Mic className="h-4 w-4" />
-                )}
-              </button>
-            </div>
+        <div className="space-y-4 flex-1 overflow-y-auto min-h-0">
+          <div className="flex flex-col h-44">
+            <textarea
+              ref={textareaRef}
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder="Describe your task in plain English..."
+              className="flex-1 min-h-0 w-full resize-none rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+              disabled={isParsing || isTranscribing}
+            />
 
             {/* Recording visualizer panel */}
             {isRecording && (
@@ -352,20 +308,18 @@ export function AITaskInput({ open, onOpenChange, onParsed, groups = [] }: AITas
                   </span>
                 </div>
 
-                {/* Drag-to-lock hint + progress bar */}
-                {!isLocked && (
-                  <div className="flex items-center gap-2 px-0.5">
-                    <span className="text-xs text-muted-foreground/60">↑ Slide mic up to lock</span>
-                    {dragProgress > 0 && (
-                      <div className="flex-1 h-1 rounded-full bg-muted overflow-hidden">
-                        <div
-                          className="h-full bg-red-400 rounded-full"
-                          style={{ width: `${dragProgress * 100}%`, transition: "none" }}
-                        />
-                      </div>
-                    )}
-                  </div>
-                )}
+                {/* Drag-to-lock hint + progress bar — always rendered to prevent layout shift when locking */}
+                <div className={cn("flex items-center gap-2 px-0.5", isLocked && "invisible")}>
+                  <span className="text-xs text-muted-foreground/60">↑ Slide mic up to lock</span>
+                  {dragProgress > 0 && (
+                    <div className="flex-1 h-1 rounded-full bg-muted overflow-hidden">
+                      <div
+                        className="h-full bg-red-400 rounded-full"
+                        style={{ width: `${dragProgress * 100}%`, transition: "none" }}
+                      />
+                    </div>
+                  )}
+                </div>
 
                 {/* Frequency visualizer canvas */}
                 <div className="rounded-md overflow-hidden bg-muted/30 border border-red-200 dark:border-red-900/60">
@@ -394,24 +348,6 @@ export function AITaskInput({ open, onOpenChange, onParsed, groups = [] }: AITas
             </label>
           </div>
 
-          {/* Example hints */}
-          <div className="rounded-md bg-muted/50 px-3 py-2 text-xs text-muted-foreground space-y-1">
-            <p className="font-medium">Examples:</p>
-            {EXAMPLES.map((ex) => (
-              <button
-                type="button"
-                key={ex}
-                className="cursor-pointer hover:text-foreground transition-colors text-left text-inherit bg-transparent border-0 p-0 font-inherit w-full"
-                onClick={() => setText(ex)}
-              >
-                • {ex}
-              </button>
-            ))}
-            <p className="mt-1 opacity-70">
-              Press Enter to parse · Shift+Enter for new line · Click mic to record
-            </p>
-          </div>
-
           {/* Error */}
           {parseError && <p className="text-sm text-destructive">{parseError}</p>}
 
@@ -421,8 +357,53 @@ export function AITaskInput({ open, onOpenChange, onParsed, groups = [] }: AITas
               Could not extract: {partialWarning.join(", ")}. You can fill these in the form.
             </p>
           )}
+        </div>
 
-          <div className="flex justify-end gap-2">
+        {/* Footer — outside the scrollable body so it never moves */}
+        <div className="shrink-0 flex items-center justify-between pt-3 border-t">
+          {/* Mic — left side */}
+          <button
+            type="button"
+            onClick={handleMicClick}
+            onPointerDown={handlePointerDown}
+            onPointerMove={handlePointerMove}
+            onPointerUp={handlePointerUp}
+            onPointerCancel={handlePointerCancel}
+            disabled={isParsing || isTranscribing}
+            style={{ touchAction: "none" }}
+            className={cn(
+              "inline-flex items-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+              isRecording
+                ? isLocked
+                  ? "text-red-500 bg-red-50 dark:bg-red-950/40"
+                  : "text-red-500 bg-red-50 dark:bg-red-950/40 animate-pulse"
+                : "text-muted-foreground hover:text-foreground hover:bg-muted"
+            )}
+            title={
+              isRecording
+                ? isLocked
+                  ? "Tap to stop recording"
+                  : "Release to stop · slide up to lock"
+                : "Hold to record · click to toggle"
+            }
+            aria-label="Voice input"
+          >
+            {isTranscribing ? (
+              <span className="h-4 w-4 block animate-spin rounded-full border-2 border-current border-t-transparent" />
+            ) : isRecording && isLocked ? (
+              <Square className="h-4 w-4 fill-current" />
+            ) : isRecording ? (
+              <MicOff className="h-4 w-4" />
+            ) : (
+              <Mic className="h-4 w-4" />
+            )}
+            <span className="hidden sm:inline text-xs">
+              {isTranscribing ? "Transcribing…" : isRecording ? "Stop" : "Voice"}
+            </span>
+          </button>
+
+          {/* Cancel + Parse — right side */}
+          <div className="flex gap-2">
             <Button variant="ghost" onClick={() => onOpenChange(false)} disabled={isParsing}>
               Cancel
             </Button>
