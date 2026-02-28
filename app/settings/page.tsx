@@ -1,6 +1,6 @@
 "use client";
 
-import { Bell, Briefcase, Clock, Key, RefreshCw } from "lucide-react";
+import { Bell, Briefcase, CalendarClock, Clock, Key, RefreshCw } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { useEffect } from "react";
@@ -10,6 +10,7 @@ import { ForceUpdateButton } from "@/components/force-update-button";
 import { GroupReminderSettings } from "@/components/group-reminder-settings";
 import { PushNotificationManager } from "@/components/push-notification-manager";
 import { PushSubscriptionList } from "@/components/push-subscription-list";
+import { SchedulingPreferencesSelector } from "@/components/scheduling-preferences-selector";
 import { TimezoneSelector } from "@/components/timezone-selector";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
@@ -88,6 +89,24 @@ export default function SettingsPage() {
           </CardHeader>
           <CardContent>
             <AwakeHoursSelector />
+          </CardContent>
+        </Card>
+
+        <Separator />
+
+        {/* New task scheduling */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <CalendarClock className="h-5 w-5" />
+              <CardTitle>New Task Scheduling</CardTitle>
+            </div>
+            <CardDescription>
+              Choose whether new tasks are auto-scheduled by default and which schedule mode to use.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <SchedulingPreferencesSelector />
           </CardContent>
         </Card>
 

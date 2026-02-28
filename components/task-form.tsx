@@ -129,6 +129,35 @@ export function TaskForm({
     fetchDependencies();
   }, [initialData?.id]);
 
+  // Apply user scheduling preferences when creating a new task (do not override explicit initialData)
+  useEffect(() => {
+    if (initialData?.id) return;
+    let cancelled = false;
+    const fetchPrefs = async () => {
+      try {
+        const response = await fetch("/api/user/scheduling-preferences");
+        if (!response.ok || cancelled) return;
+        const data = await response.json();
+        if (cancelled) return;
+        setFormData((prev) => ({
+          ...prev,
+          ...(initialData?.auto_schedule === undefined && {
+            auto_schedule: data.auto_schedule_new_tasks ?? false,
+          }),
+          ...((initialData as { schedule_mode?: string })?.schedule_mode === undefined && {
+            schedule_mode: data.default_schedule_mode ?? "now",
+          }),
+        }));
+      } catch (error) {
+        console.error("Error fetching scheduling preferences:", error);
+      }
+    };
+    fetchPrefs();
+    return () => {
+      cancelled = true;
+    };
+  }, [initialData]);
+
   // Focus title input when form is first rendered (for new tasks)
   useEffect(() => {
     if (!initialData?.id && titleInputRef.current) {

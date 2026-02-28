@@ -18,6 +18,7 @@
     "db:migrate:lock-events-todos": "node scripts/migrate-lock-events-todos.mjs",
     "db:migrate:quick-tags": "node scripts/migrate-add-quick-tags.mjs",
     "db:migrate:reminder-settings": "node scripts/migrate-add-reminder-settings.mjs",
+    "db:migrate:scheduling-preferences": "node scripts/migrate-add-scheduling-preferences.mjs",
     "reminders:process": "node scripts/process-reminders.mjs"
   },
   "dependencies": {

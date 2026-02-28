@@ -4,7 +4,7 @@ import { scheduleTaskUnified } from "@/lib/scheduler-utils";
 import { generateDependencyId, generateTaskId, validateTaskData } from "@/lib/task-utils";
 import { getUserTimezone } from "@/lib/timezone-utils";
 import { db } from "@/lib/turso";
-import type { CreateTaskRequest, Task, TaskGroup, TaskStatus, TaskType } from "@/lib/types";
+import type { CreateTaskRequest, Task, TaskGroup, SchedulingMode, TaskStatus, TaskType } from "@/lib/types";
 
 // Helper to map database row to Task object
 function mapRowToTask(row: any): Task {
@@ -388,143 +388,167 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Handle auto-schedule if enabled
-    if (
-      body.auto_schedule &&
+    // Handle auto-schedule if enabled (or user default when body omits it)
+    const canAutoSchedule =
       (task.task_type === "task" || task.task_type === "todo") &&
       task.duration &&
       task.duration > 0 &&
       !task.scheduled_start &&
-      !task.scheduled_end
-    ) {
-      try {
-        // Get user's timezone and awake hours
-        const userResult = await db.execute(
-          "SELECT timezone, awake_hours FROM users WHERE id = ?",
-          [session.user.id]
-        );
-        const userTimezone =
-          userResult.rows.length > 0
-            ? getUserTimezone(userResult.rows[0].timezone as string | null)
-            : "UTC";
+      !task.scheduled_end;
 
-        let awakeHours = null;
-        if (userResult.rows.length > 0 && userResult.rows[0].awake_hours) {
+    if (canAutoSchedule) {
+      // Resolve auto_schedule: use body when provided, else user preference
+      let shouldAutoSchedule: boolean;
+      let userTimezone = "UTC";
+      let awakeHours: ReturnType<typeof JSON.parse> = null;
+      let userDefaultScheduleMode: SchedulingMode = "now";
+
+      const userResult = await db.execute(
+        "SELECT timezone, awake_hours, auto_schedule_new_tasks, default_schedule_mode FROM users WHERE id = ?",
+        [session.user.id]
+      );
+      if (userResult.rows.length > 0) {
+        const row = userResult.rows[0];
+        userTimezone = getUserTimezone(row.timezone as string | null);
+        if (row.awake_hours) {
           try {
-            awakeHours = JSON.parse(userResult.rows[0].awake_hours as string);
+            awakeHours = JSON.parse(row.awake_hours as string);
           } catch (e) {
             console.error("Error parsing awake_hours JSON:", e);
-            awakeHours = null;
           }
         }
+        if (body.auto_schedule === undefined) {
+          shouldAutoSchedule = Boolean(row.auto_schedule_new_tasks ?? 0);
+        } else {
+          shouldAutoSchedule = Boolean(body.auto_schedule);
+        }
+        const rawMode = row.default_schedule_mode as string | null | undefined;
+        userDefaultScheduleMode =
+          rawMode &&
+          [
+            "now",
+            "today",
+            "tomorrow",
+            "next-week",
+            "next-month",
+            "asap",
+            "due-date",
+          ].includes(rawMode)
+            ? (rawMode as SchedulingMode)
+            : "now";
+      } else {
+        shouldAutoSchedule = body.auto_schedule === true;
+      }
 
-        // Get task's group if it has one
-        let taskGroup: TaskGroup | null = null;
-        if (task.group_id) {
-          const groupResult = await db.execute(
-            "SELECT * FROM task_groups WHERE id = ? AND user_id = ?",
-            [task.group_id, session.user.id]
-          );
-          if (groupResult.rows.length > 0) {
-            const row = groupResult.rows[0];
-            let autoScheduleHours = null;
-            if (row.auto_schedule_hours) {
-              try {
-                autoScheduleHours = JSON.parse(row.auto_schedule_hours as string);
-              } catch (e) {
-                console.error("Error parsing auto_schedule_hours JSON:", e);
+      if (shouldAutoSchedule) {
+        try {
+          let taskGroup: TaskGroup | null = null;
+          if (task.group_id) {
+            const groupResult = await db.execute(
+              "SELECT * FROM task_groups WHERE id = ? AND user_id = ?",
+              [task.group_id, session.user.id]
+            );
+            if (groupResult.rows.length > 0) {
+              const row = groupResult.rows[0];
+              let autoScheduleHours = null;
+              if (row.auto_schedule_hours) {
+                try {
+                  autoScheduleHours = JSON.parse(row.auto_schedule_hours as string);
+                } catch (e) {
+                  console.error("Error parsing auto_schedule_hours JSON:", e);
+                }
               }
+              taskGroup = {
+                id: row.id as string,
+                user_id: row.user_id as string,
+                name: row.name as string,
+                color: row.color as string,
+                collapsed: Boolean(row.collapsed),
+                parent_group_id: (row.parent_group_id as string) || null,
+                is_parent_group: Boolean(row.is_parent_group),
+                auto_schedule_enabled: Boolean(row.auto_schedule_enabled ?? false),
+                auto_schedule_hours: autoScheduleHours,
+                priority: row.priority ? (row.priority as number) : undefined,
+                created_at: row.created_at as string,
+                updated_at: row.updated_at as string,
+              };
             }
-            taskGroup = {
+          }
+
+          // Get all tasks for the user to check for conflicts (including the newly created task)
+          const allTasksResult = await db.execute("SELECT * FROM tasks WHERE user_id = ?", [
+            session.user.id,
+          ]);
+          const allTasks = allTasksResult.rows.map((row: any) => {
+            // Map row to Task format
+            return {
               id: row.id as string,
               user_id: row.user_id as string,
-              name: row.name as string,
-              color: row.color as string,
-              collapsed: Boolean(row.collapsed),
-              parent_group_id: (row.parent_group_id as string) || null,
-              is_parent_group: Boolean(row.is_parent_group),
-              auto_schedule_enabled: Boolean(row.auto_schedule_enabled ?? false),
-              auto_schedule_hours: autoScheduleHours,
-              priority: row.priority ? (row.priority as number) : undefined,
+              title: row.title as string,
+              description: row.description as string | null,
+              priority: row.priority as number,
+              status: row.status as TaskStatus,
+              duration: row.duration as number | null,
+              scheduled_start: row.scheduled_start as string | null,
+              scheduled_end: row.scheduled_end as string | null,
+              due_date: row.due_date as string | null,
+              locked: Boolean(row.locked),
+              group_id: row.group_id as string | null,
+              template_id: row.template_id as string | null,
+              task_type: row.task_type as TaskType,
+              google_calendar_event_id: row.google_calendar_event_id as string | null,
+              notification_sent: Boolean(row.notification_sent),
+              depends_on_task_id: row.depends_on_task_id as string | null,
+              energy_level_required: row.energy_level_required as number,
+              parent_task_id: row.parent_task_id as string | null,
+              continued_from_task_id: row.continued_from_task_id as string | null,
+              ignored: Boolean(row.ignored ?? false),
               created_at: row.created_at as string,
               updated_at: row.updated_at as string,
-            };
-          }
-        }
+            } as Task;
+          });
 
-        // Get all tasks for the user to check for conflicts (including the newly created task)
-        const allTasksResult = await db.execute("SELECT * FROM tasks WHERE user_id = ?", [
-          session.user.id,
-        ]);
-        const allTasks = allTasksResult.rows.map((row: any) => {
-          // Map row to Task format
-          return {
-            id: row.id as string,
-            user_id: row.user_id as string,
-            title: row.title as string,
-            description: row.description as string | null,
-            priority: row.priority as number,
-            status: row.status as TaskStatus,
-            duration: row.duration as number | null,
-            scheduled_start: row.scheduled_start as string | null,
-            scheduled_end: row.scheduled_end as string | null,
-            due_date: row.due_date as string | null,
-            locked: Boolean(row.locked),
-            group_id: row.group_id as string | null,
-            template_id: row.template_id as string | null,
-            task_type: row.task_type as TaskType,
-            google_calendar_event_id: row.google_calendar_event_id as string | null,
-            notification_sent: Boolean(row.notification_sent),
-            depends_on_task_id: row.depends_on_task_id as string | null,
-            energy_level_required: row.energy_level_required as number,
-            parent_task_id: row.parent_task_id as string | null,
-            continued_from_task_id: row.continued_from_task_id as string | null,
-            ignored: Boolean(row.ignored ?? false),
-            created_at: row.created_at as string,
-            updated_at: row.updated_at as string,
-          } as Task;
-        });
-
-        // Fetch all user groups for displaced task group hour lookups
-        const allGroupsResult = await db.execute(
-          "SELECT * FROM task_groups WHERE user_id = ? ORDER BY name ASC",
-          [session.user.id]
-        );
-        const allGroups = allGroupsResult.rows.map(mapRowToGroup);
-
-        // Use unified scheduler with the selected mode (default to "now" if not specified)
-        const scheduleMode = body.schedule_mode || "now";
-        const result = scheduleTaskUnified({
-          mode: scheduleMode,
-          task,
-          allTasks,
-          taskGroup,
-          allGroups,
-          awakeHours,
-          timezone: userTimezone,
-        });
-
-        if (result.slot) {
-          // Update task with the scheduled times
-          const updatedAt = new Date().toISOString();
-          await db.execute(
-            `UPDATE tasks SET scheduled_start = ?, scheduled_end = ?, updated_at = ? WHERE id = ? AND user_id = ?`,
-            [
-              result.slot.start.toISOString(),
-              result.slot.end.toISOString(),
-              updatedAt,
-              task.id,
-              session.user.id,
-            ]
+          // Fetch all user groups for displaced task group hour lookups
+          const allGroupsResult = await db.execute(
+            "SELECT * FROM task_groups WHERE user_id = ? ORDER BY name ASC",
+            [session.user.id]
           );
+          const allGroups = allGroupsResult.rows.map(mapRowToGroup);
 
-          task.scheduled_start = result.slot.start.toISOString();
-          task.scheduled_end = result.slot.end.toISOString();
-          task.updated_at = updatedAt;
+        // Use unified scheduler with the selected mode (body, else user default, else "now")
+        const scheduleMode = (body.schedule_mode ?? userDefaultScheduleMode) as SchedulingMode;
+          const result = scheduleTaskUnified({
+            mode: scheduleMode,
+            task,
+            allTasks,
+            taskGroup,
+            allGroups,
+            awakeHours,
+            timezone: userTimezone,
+          });
+
+          if (result.slot) {
+            // Update task with the scheduled times
+            const updatedAt = new Date().toISOString();
+            await db.execute(
+              `UPDATE tasks SET scheduled_start = ?, scheduled_end = ?, updated_at = ? WHERE id = ? AND user_id = ?`,
+              [
+                result.slot.start.toISOString(),
+                result.slot.end.toISOString(),
+                updatedAt,
+                task.id,
+                session.user.id,
+              ]
+            );
+
+            task.scheduled_start = result.slot.start.toISOString();
+            task.scheduled_end = result.slot.end.toISOString();
+            task.updated_at = updatedAt;
+          }
+        } catch (error) {
+          console.error("Error auto-scheduling task:", error);
+          // Continue with task creation even if auto-schedule fails
         }
-      } catch (error) {
-        console.error("Error auto-scheduling task:", error);
-        // Continue with task creation even if auto-schedule fails
       }
     }
 

@@ -7,6 +7,8 @@ export interface User {
   image?: string | null;
   timezone?: string | null;
   awake_hours?: GroupScheduleHours | null;
+  auto_schedule_new_tasks?: boolean;
+  default_schedule_mode?: SchedulingMode;
   created_at: string;
   updated_at: string;
 }
