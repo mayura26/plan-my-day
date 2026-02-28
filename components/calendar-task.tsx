@@ -4,10 +4,19 @@ import { useDraggable } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
 import { parseISO } from "date-fns";
 import { Archive, Flag, GripVertical, Zap } from "lucide-react";
+import type { TaskSegment } from "@/lib/overlap-utils";
 import { getEnergyLevelColor, isTaskOverdue, isTaskTimeExpired } from "@/lib/task-utils";
 import { formatDateShort } from "@/lib/timezone-utils";
 import type { Task, TaskGroup } from "@/lib/types";
 import { cn } from "@/lib/utils";
+
+// Convert hex color to rgba for background
+function hexToRgba(hex: string, alpha: number): string {
+  const r = Number.parseInt(hex.slice(1, 3), 16);
+  const g = Number.parseInt(hex.slice(3, 5), 16);
+  const b = Number.parseInt(hex.slice(5, 7), 16);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
 
 // Helper function to get priority bar color
 export const getPriorityBarColor = (priority: number) => {
@@ -62,6 +71,7 @@ interface ResizableTaskProps {
   overlappingCompletedTasks?: Task[];
   onOverlapClick?: (taskId: string) => void;
   parentTaskName?: string | null;
+  isNested?: boolean;
 }
 
 export function ResizableTask({
@@ -76,6 +86,7 @@ export function ResizableTask({
   overlappingCompletedTasks = [],
   onOverlapClick,
   parentTaskName,
+  isNested,
 }: ResizableTaskProps) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: task.id,
@@ -154,14 +165,6 @@ export function ResizableTask({
   // Calculate task duration
   const taskDuration = calculateTaskDuration(task);
 
-  // Convert hex color to rgba for background
-  const hexToRgba = (hex: string, alpha: number) => {
-    const r = parseInt(hex.slice(1, 3), 16);
-    const g = parseInt(hex.slice(3, 5), 16);
-    const b = parseInt(hex.slice(5, 7), 16);
-    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-  };
-
   // Only apply transform when actually dragging/resizing to avoid positioning issues
   const transformString = transform ? CSS.Translate.toString(transform) : undefined;
 
@@ -183,7 +186,7 @@ export function ResizableTask({
               ? 0.5
               : 1,
     transition: isDragging || isTaskResizing ? "none" : "all 0.2s ease-in-out",
-    zIndex: isActiveDrag ? 50 : 10,
+    zIndex: isActiveDrag ? 50 : isNested ? 11 : 10,
     ...(groupColor
       ? {
           backgroundColor: hexToRgba(groupColor, 0.4),
@@ -444,6 +447,100 @@ export function ResizableTask({
           </div>
         </>
       )}
+    </div>
+  );
+}
+
+interface TaskSegmentBlockProps {
+  task: Task;
+  position: { top: string; height: string };
+  segment: TaskSegment;
+  onTaskClick?: (taskId: string) => void;
+  selectedGroupId?: string | null;
+  groups?: TaskGroup[];
+}
+
+export function TaskSegmentBlock({
+  task,
+  position,
+  segment,
+  onTaskClick,
+  selectedGroupId,
+  groups = [],
+}: TaskSegmentBlockProps) {
+  const group = groups.find((g) => g.id === task.group_id);
+  const groupColor = group?.color || null;
+
+  const taskGroupId = task.group_id || null;
+  const belongsToSelectedGroup =
+    selectedGroupId === null
+      ? false
+      : selectedGroupId === "ungrouped"
+        ? taskGroupId === null
+        : taskGroupId === selectedGroupId;
+  const shouldFade = selectedGroupId !== null && !belongsToSelectedGroup;
+
+  const style = {
+    position: "absolute" as const,
+    top: position.top,
+    height: position.height,
+    left: "0.25rem",
+    right: "0.25rem",
+    zIndex: 9,
+    opacity: shouldFade ? 0.3 : 1,
+    ...(groupColor
+      ? {
+          backgroundColor: hexToRgba(groupColor, 0.4),
+          borderColor: groupColor,
+        }
+      : {}),
+    cursor: "pointer",
+    transition: "all 0.2s ease-in-out",
+  };
+
+  return (
+    // biome-ignore lint/a11y/useSemanticElements: Segment block requires div for absolute positioning
+    <div
+      role="button"
+      tabIndex={0}
+      style={style}
+      className={cn(
+        "rounded-md border-l-4 overflow-hidden select-none pointer-events-auto",
+        "hover:shadow-lg transition-shadow",
+        !groupColor && "bg-gray-500/40 border-gray-500",
+        belongsToSelectedGroup && selectedGroupId !== null && "ring-2 ring-primary ring-offset-1"
+      )}
+      onClick={(e) => {
+        e.stopPropagation();
+        onTaskClick?.(task.id);
+      }}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onTaskClick?.(task.id);
+        }
+      }}
+    >
+      {/* Dashed top border on continuation segments */}
+      {!segment.isFirst && (
+        <div className="absolute top-0 left-0 right-0 border-t-2 border-dashed border-white/30 pointer-events-none" />
+      )}
+
+      {/* Priority top bar */}
+      <div
+        className={cn(
+          "absolute top-0 left-0 right-0 h-1 rounded-t-md pointer-events-none",
+          getPriorityBarColor(task.priority)
+        )}
+      />
+
+      <div className="px-1.5 pt-2 pb-1 text-xs">
+        {segment.isFirst ? (
+          <span className="font-medium text-white truncate block">{task.title}</span>
+        ) : (
+          <span className="text-white/70 italic truncate block">↳ {task.title}</span>
+        )}
+      </div>
     </div>
   );
 }

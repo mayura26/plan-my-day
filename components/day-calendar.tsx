@@ -4,11 +4,16 @@ import { addDays, isSameDay, parseISO, subDays } from "date-fns";
 import { ChevronLeft, ChevronRight, Menu, StickyNote } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { CalendarSlot } from "@/components/calendar-slot";
-import { ResizableTask } from "@/components/calendar-task";
+import { ResizableTask, TaskSegmentBlock } from "@/components/calendar-task";
 import { RefreshButton } from "@/components/refresh-button";
 import { ShuffleButton } from "@/components/shuffle-button";
 import { Button } from "@/components/ui/button";
-import { doTasksOverlap } from "@/lib/overlap-utils";
+import {
+  calculateHostSegments,
+  detectNestedTasks,
+  doTasksOverlap,
+  type TaskSegment,
+} from "@/lib/overlap-utils";
 import { sortTasksByScheduledTime } from "@/lib/task-utils";
 import {
   formatDateInTimezone,
@@ -149,6 +154,24 @@ export function DayCalendar({
       startHour,
       endHour,
     };
+  };
+
+  const getSegmentPosition = (segment: TaskSegment) => {
+    try {
+      const start = parseISO(segment.segmentStart);
+      const end = parseISO(segment.segmentEnd);
+      const { hour: sh, minute: sm } = getHoursAndMinutesInTimezone(start, timezone);
+      const { hour: eh, minute: em } = getHoursAndMinutesInTimezone(end, timezone);
+      const startMin = sh * 60 + sm;
+      const durMin = eh * 60 + em - startMin;
+      if (durMin <= 0) return null;
+      return {
+        top: `${(startMin / (24 * 60)) * 100}%`,
+        height: `${(durMin / (24 * 60)) * 100}%`,
+      };
+    } catch {
+      return null;
+    }
   };
 
   const formatTime = (hour: number) => {
@@ -384,17 +407,40 @@ export function DayCalendar({
                   // Sort tasks by scheduled time to ensure consistent rendering order
                   const sortedTasks = sortTasksByScheduledTime(tasksToRender);
 
-                  // Render each task with its own position calculation
-                  return sortedTasks.map((task) => {
-                    // Calculate position for this specific task
-                    // Create a fresh position object for each task to avoid any object reuse issues
-                    const position = getTaskPosition(task);
-                    if (!position) return null;
+                  // Detect nested task relationships among active tasks
+                  const { hostToGuests, guestIds } = detectNestedTasks(activeTasks);
 
-                    // Get overlapping completed tasks for this task (if it's an active task)
+                  // Render each task — hosts split into segments, guests float on top
+                  return sortedTasks.flatMap((task) => {
                     const overlappingCompletedTasks = overlapMap.get(task.id) || [];
+                    const isHost = hostToGuests.has(task.id);
+                    const isGuest = guestIds.has(task.id);
 
-                    return (
+                    if (isHost) {
+                      const guests = hostToGuests.get(task.id) ?? [];
+                      const segments = calculateHostSegments(task, guests);
+                      if (segments.length === 0) return [];
+                      return segments.flatMap((segment) => {
+                        const segPos = getSegmentPosition(segment);
+                        if (!segPos) return [];
+                        return [
+                          <TaskSegmentBlock
+                            key={`${task.id}-seg-${segment.segmentIndex}`}
+                            task={task}
+                            position={segPos}
+                            segment={segment}
+                            onTaskClick={onTaskClick}
+                            selectedGroupId={selectedGroupId}
+                            groups={groups}
+                          />,
+                        ];
+                      });
+                    }
+
+                    const position = getTaskPosition(task);
+                    if (!position) return [];
+
+                    return [
                       <ResizableTask
                         key={task.id}
                         task={task}
@@ -410,8 +456,9 @@ export function DayCalendar({
                         parentTaskName={
                           task.parent_task_id ? parentTasksMap?.get(task.parent_task_id) : null
                         }
-                      />
-                    );
+                        isNested={isGuest}
+                      />,
+                    ];
                   });
                 })()}
               </div>

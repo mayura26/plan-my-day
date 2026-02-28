@@ -1,5 +1,3 @@
-- [ ] handle tasks overlap by splitting (especially for token scheudled one/events etc)
-
 ### ⏳ Pending
 - [ ] AI-powered task scheduling engine
 - [ ] Automatic rescheduling logic
@@ -22,7 +20,6 @@
 
 ### ⏳ Pending
 - [ ] Advanced calendar features
-- [ ] Drag-and-drop functionality
 - [ ] Multi-user collaboration
 - [ ] Real-time updates
 - [ ] Mobile optimization
