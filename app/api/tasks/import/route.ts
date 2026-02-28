@@ -256,6 +256,8 @@ export async function POST(request: NextRequest) {
           task_type: (taskData.task_type || "task") as TaskType,
           google_calendar_event_id: null,
           notification_sent: false,
+          lead_reminder_sent: false,
+          due_reminder_sent: false,
           depends_on_task_id: null,
           energy_level_required: energyLevel,
           parent_task_id: null,

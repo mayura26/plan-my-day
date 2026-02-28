@@ -10,7 +10,11 @@
       "Bash(dir:*)",
       "Bash(git status:*)",
       "Bash(npm run db:backup:*)",
-      "Bash(npm run db:migrate:quick-tags:*)"
+      "Bash(npm run db:migrate:quick-tags:*)",
+      "Bash(tail:*)",
+      "Bash(cd \"D:/VSCode Projects/plan-my-day\" && npm run db:migrate:reminder-settings 2>&1)",
+      "Bash(node:*)",
+      "Bash(cd:*)"
     ]
   }
 }

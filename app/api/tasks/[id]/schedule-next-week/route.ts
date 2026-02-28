@@ -24,6 +24,8 @@ function mapRowToTask(row: any): Task {
     task_type: row.task_type as TaskType,
     google_calendar_event_id: row.google_calendar_event_id as string | null,
     notification_sent: Boolean(row.notification_sent),
+    lead_reminder_sent: Boolean(row.lead_reminder_sent ?? 0),
+    due_reminder_sent: Boolean(row.due_reminder_sent ?? 0),
     depends_on_task_id: row.depends_on_task_id as string | null,
     energy_level_required: row.energy_level_required as number,
     parent_task_id: row.parent_task_id as string | null,
