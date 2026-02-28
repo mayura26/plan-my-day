@@ -215,7 +215,7 @@ self.addEventListener("push", (event) => {
   // Resolve icon and badge to absolute URLs so Android (and others) load them correctly
   const toAbsoluteUrl = (path) => new URL(path, self.location.origin).href;
   const iconPath = data.icon || "/web-app-manifest-192x192.png";
-  const badgePath = data.badge || "/web-app-manifest-192x192.png";
+  const badgePath = data.badge || "/badge-icon.svg";
 
   const options = {
     body: data.body || "You have a new notification",
