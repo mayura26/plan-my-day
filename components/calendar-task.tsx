@@ -241,7 +241,7 @@ export function ResizableTask({
       {/* Priority top bar */}
       <div
         className={cn(
-          "absolute top-0 left-0 right-0 h-1 rounded-t-md",
+          "absolute top-0 left-0 right-0 h-1 rounded-t-md pointer-events-none",
           getPriorityBarColor(task.priority)
         )}
       />
@@ -403,7 +403,7 @@ export function ResizableTask({
             role={topResizeAttributes.role || "button"}
             tabIndex={topResizeAttributes.tabIndex ?? 0}
             className={cn(
-              "absolute top-0 left-0 right-0 h-3 md:h-2 cursor-ns-resize bg-white/20 hover:bg-white/30 transition-opacity flex items-center justify-center touch-none",
+              "absolute top-0 left-0 right-0 z-20 h-3 md:h-2 cursor-ns-resize bg-white/20 hover:bg-white/30 transition-opacity flex items-center justify-center touch-none",
               isTopResizing
                 ? "opacity-100 bg-white/40"
                 : "opacity-50 md:opacity-0 md:group-hover:opacity-100"
@@ -427,7 +427,7 @@ export function ResizableTask({
             role={bottomResizeAttributes.role || "button"}
             tabIndex={bottomResizeAttributes.tabIndex ?? 0}
             className={cn(
-              "absolute bottom-0 left-0 right-0 h-3 md:h-2 cursor-ns-resize bg-white/20 hover:bg-white/30 transition-opacity flex items-center justify-center touch-none",
+              "absolute bottom-0 left-0 right-0 z-20 h-3 md:h-2 cursor-ns-resize bg-white/20 hover:bg-white/30 transition-opacity flex items-center justify-center touch-none",
               isBottomResizing
                 ? "opacity-100 bg-white/40"
                 : "opacity-50 md:opacity-0 md:group-hover:opacity-100"
