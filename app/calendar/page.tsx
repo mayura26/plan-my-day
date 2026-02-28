@@ -86,9 +86,8 @@ export default function CalendarPage() {
   const [noteDialogDate, setNoteDialogDate] = useState<Date | null>(null);
   const [processOverdueOpen, setProcessOverdueOpen] = useState(false);
   const [showAIInput, setShowAIInput] = useState(false);
-  const [quickAddInitialData, setQuickAddInitialData] = useState<Partial<CreateTaskRequestWithSubtasks> | null>(
-    null
-  );
+  const [quickAddInitialData, setQuickAddInitialData] =
+    useState<Partial<CreateTaskRequestWithSubtasks> | null>(null);
   const [sidebarWidth, setSidebarWidth] = useState<number>(() => {
     // Load from localStorage or default to 380px (wider for buttons to fit in one row)
     if (typeof window !== "undefined") {

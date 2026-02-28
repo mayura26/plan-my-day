@@ -110,13 +110,12 @@ export function TaskForm({
   const [hasTriedSubmitWithoutDueDate, setHasTriedSubmitWithoutDueDate] = useState(false);
   const [subtaskDrafts, setSubtaskDrafts] = useState<
     Array<{ id: string; title: string; duration?: number }>
-  >(
-    () =>
-      (initialData?.subtasks ?? []).map((s, i) => ({
-        id: `ai-subtask-${i}`,
-        title: s.title,
-        duration: s.duration,
-      }))
+  >(() =>
+    (initialData?.subtasks ?? []).map((s, i) => ({
+      id: `ai-subtask-${i}`,
+      title: s.title,
+      duration: s.duration,
+    }))
   );
   const [initialNoteTexts, setInitialNoteTexts] = useState<Array<{ id: string; text: string }>>([]);
   const [showExtraInfo, setShowExtraInfo] = useState(

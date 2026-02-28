@@ -14,7 +14,9 @@
       "Bash(tail:*)",
       "Bash(cd \"D:/VSCode Projects/plan-my-day\" && npm run db:migrate:reminder-settings 2>&1)",
       "Bash(node:*)",
-      "Bash(cd:*)"
+      "Bash(cd:*)",
+      "WebSearch",
+      "Bash(npm run:*)"
     ]
   }
 }

@@ -565,9 +565,7 @@ export default function TagsPage() {
               </div>
               <Switch
                 checked={formData.default_locked}
-                onCheckedChange={(checked) =>
-                  setFormData({ ...formData, default_locked: checked })
-                }
+                onCheckedChange={(checked) => setFormData({ ...formData, default_locked: checked })}
               />
             </div>
           </div>

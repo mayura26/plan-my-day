@@ -1306,85 +1306,85 @@ export function TaskGroupManager({
               </DialogDescription>
             </DialogHeader>
             <div className="flex-1 min-h-0 overflow-y-auto">
-            <div className="space-y-4">
-              <div>
-                <div className="text-sm font-medium mb-1">Group Name</div>
-                <Input
-                  value={newGroupName}
-                  onChange={(e) => setNewGroupName(e.target.value)}
-                  placeholder="Enter group name"
-                  className="mt-1"
-                />
-              </div>
-              <div>
-                <label htmlFor="group-color-input-create" className="text-sm font-medium">
-                  Color
-                </label>
-                <div className="mt-1 flex items-center gap-3">
-                  <div className="relative">
-                    <input
-                      id="group-color-input-create"
-                      type="color"
-                      value={newGroupColor}
-                      onChange={(e) => setNewGroupColor(e.target.value)}
-                      className="h-10 w-20 cursor-pointer rounded-md border border-input bg-background"
-                      title="Pick a color"
-                    />
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div
-                      className="h-10 w-10 rounded-md border border-input"
-                      style={{ backgroundColor: newGroupColor }}
-                    />
-                    <Input
-                      type="text"
-                      value={newGroupColor}
-                      onChange={(e) => setNewGroupColor(e.target.value)}
-                      placeholder="#3B82F6"
-                      className="w-24 font-mono text-sm"
-                    />
-                  </div>
-                </div>
-              </div>
-              {!isCreatingParentGroup && (
+              <div className="space-y-4">
                 <div>
-                  <label htmlFor="parent-group-select-create" className="text-sm font-medium">
-                    Parent Group
-                  </label>
-                  <Select
-                    value={newParentGroupId || "__none__"}
-                    onValueChange={(value) =>
-                      setNewParentGroupId(value === "__none__" ? null : value)
-                    }
-                  >
-                    <SelectTrigger id="parent-group-select-create" className="mt-1 w-full">
-                      <SelectValue placeholder="None (top-level group)" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="__none__">None (top-level group)</SelectItem>
-                      {getAvailableParentGroups().map((group) => (
-                        <SelectItem key={group.id} value={group.id}>
-                          {group.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <div className="text-sm font-medium mb-1">Group Name</div>
+                  <Input
+                    value={newGroupName}
+                    onChange={(e) => setNewGroupName(e.target.value)}
+                    placeholder="Enter group name"
+                    className="mt-1"
+                  />
                 </div>
-              )}
-            </div>
-            </div>
-              <div className="flex justify-end gap-2">
-                <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
-                  Cancel
-                </Button>
-                <Button
-                  onClick={createGroup}
-                  loading={isCreating}
-                  disabled={!newGroupName.trim() || isCreating}
-                >
-                  {isCreatingParentGroup ? "Create Parent Group" : "Create Group"}
-                </Button>
+                <div>
+                  <label htmlFor="group-color-input-create" className="text-sm font-medium">
+                    Color
+                  </label>
+                  <div className="mt-1 flex items-center gap-3">
+                    <div className="relative">
+                      <input
+                        id="group-color-input-create"
+                        type="color"
+                        value={newGroupColor}
+                        onChange={(e) => setNewGroupColor(e.target.value)}
+                        className="h-10 w-20 cursor-pointer rounded-md border border-input bg-background"
+                        title="Pick a color"
+                      />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div
+                        className="h-10 w-10 rounded-md border border-input"
+                        style={{ backgroundColor: newGroupColor }}
+                      />
+                      <Input
+                        type="text"
+                        value={newGroupColor}
+                        onChange={(e) => setNewGroupColor(e.target.value)}
+                        placeholder="#3B82F6"
+                        className="w-24 font-mono text-sm"
+                      />
+                    </div>
+                  </div>
+                </div>
+                {!isCreatingParentGroup && (
+                  <div>
+                    <label htmlFor="parent-group-select-create" className="text-sm font-medium">
+                      Parent Group
+                    </label>
+                    <Select
+                      value={newParentGroupId || "__none__"}
+                      onValueChange={(value) =>
+                        setNewParentGroupId(value === "__none__" ? null : value)
+                      }
+                    >
+                      <SelectTrigger id="parent-group-select-create" className="mt-1 w-full">
+                        <SelectValue placeholder="None (top-level group)" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__">None (top-level group)</SelectItem>
+                        {getAvailableParentGroups().map((group) => (
+                          <SelectItem key={group.id} value={group.id}>
+                            {group.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
               </div>
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button
+                onClick={createGroup}
+                loading={isCreating}
+                disabled={!newGroupName.trim() || isCreating}
+              >
+                {isCreatingParentGroup ? "Create Parent Group" : "Create Group"}
+              </Button>
+            </div>
           </DialogContent>
         </Dialog>
         <Button

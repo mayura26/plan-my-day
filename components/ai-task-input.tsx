@@ -1,12 +1,12 @@
 "use client";
 
-import { Lock, Mic, MicOff, Square, Sparkles } from "lucide-react";
+import { Lock, Mic, MicOff, Sparkles, Square } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { cn } from "@/lib/utils";
 import type { TaskGroup } from "@/lib/types";
+import { cn } from "@/lib/utils";
 import type { CreateTaskRequestWithSubtasks } from "./task-form";
 
 interface AITaskInputProps {
@@ -60,7 +60,7 @@ export function AITaskInput({ open, onOpenChange, onParsed, groups = [] }: AITas
     } else {
       setTimeout(() => textareaRef.current?.focus(), 50);
     }
-  }, [open]);
+  }, [open, isRecording]);
 
   // Frequency-bar visualizer — runs while recording
   useEffect(() => {
@@ -140,7 +140,9 @@ export function AITaskInput({ open, onOpenChange, onParsed, groups = [] }: AITas
       };
 
       recorder.onstop = async () => {
-        stream.getTracks().forEach((t) => t.stop());
+        stream.getTracks().forEach((t) => {
+          t.stop();
+        });
         audioContextRef.current?.close();
         audioContextRef.current = null;
         analyserRef.current = null;
@@ -396,15 +398,18 @@ export function AITaskInput({ open, onOpenChange, onParsed, groups = [] }: AITas
           <div className="rounded-md bg-muted/50 px-3 py-2 text-xs text-muted-foreground space-y-1">
             <p className="font-medium">Examples:</p>
             {EXAMPLES.map((ex) => (
-              <p
+              <button
+                type="button"
                 key={ex}
-                className="cursor-pointer hover:text-foreground transition-colors"
+                className="cursor-pointer hover:text-foreground transition-colors text-left text-inherit bg-transparent border-0 p-0 font-inherit w-full"
                 onClick={() => setText(ex)}
               >
                 • {ex}
-              </p>
+              </button>
             ))}
-            <p className="mt-1 opacity-70">Press Enter to parse · Shift+Enter for new line · Click mic to record</p>
+            <p className="mt-1 opacity-70">
+              Press Enter to parse · Shift+Enter for new line · Click mic to record
+            </p>
           </div>
 
           {/* Error */}

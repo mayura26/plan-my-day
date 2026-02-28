@@ -41,7 +41,9 @@ export default function TasksPage() {
   const [showAllTasks, setShowAllTasks] = useState(false);
   const [showImportDialog, setShowImportDialog] = useState(false);
   const [showAIInput, setShowAIInput] = useState(false);
-  const [aiParsedData, setAIParsedData] = useState<Partial<CreateTaskRequestWithSubtasks> | null>(null);
+  const [aiParsedData, setAIParsedData] = useState<Partial<CreateTaskRequestWithSubtasks> | null>(
+    null
+  );
   const [editingGroup, setEditingGroup] = useState<TaskGroup | null>(null);
   const [showEditGroupDialog, setShowEditGroupDialog] = useState(false);
   const [showCreateParentDialog, setShowCreateParentDialog] = useState(false);
