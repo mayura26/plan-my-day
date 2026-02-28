@@ -20,6 +20,7 @@
     "db:migrate:quick-tag-default-locked": "node scripts/migrate-add-quick-tag-default-locked.mjs",
     "db:migrate:reminder-settings": "node scripts/migrate-add-reminder-settings.mjs",
     "db:migrate:scheduling-preferences": "node scripts/migrate-add-scheduling-preferences.mjs",
+    "db:migrate:ai-preferences": "node scripts/migrate-add-ai-preferences.mjs",
     "reminders:process": "node scripts/process-reminders.mjs"
   },
   "dependencies": {

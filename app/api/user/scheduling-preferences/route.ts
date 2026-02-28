@@ -22,7 +22,7 @@ export async function GET() {
     }
 
     const result = await db.execute(
-      "SELECT auto_schedule_new_tasks, default_schedule_mode FROM users WHERE id = ?",
+      "SELECT auto_schedule_new_tasks, default_schedule_mode, default_ai_group_id FROM users WHERE id = ?",
       [session.user.id]
     );
 
@@ -37,10 +37,12 @@ export async function GET() {
       rawMode && VALID_MODES.includes(rawMode as SchedulingMode)
         ? (rawMode as SchedulingMode)
         : "now";
+    const default_ai_group_id = (row.default_ai_group_id as string | null) ?? null;
 
     return NextResponse.json({
       auto_schedule_new_tasks,
       default_schedule_mode,
+      default_ai_group_id,
     });
   } catch (error) {
     console.error("Error fetching scheduling preferences:", error);
@@ -59,6 +61,7 @@ export async function PUT(request: NextRequest) {
     const body: {
       auto_schedule_new_tasks?: boolean;
       default_schedule_mode?: string;
+      default_ai_group_id?: string | null;
     } = await request.json();
 
     if (body.default_schedule_mode !== undefined) {
@@ -87,9 +90,29 @@ export async function PUT(request: NextRequest) {
       args.push(body.default_schedule_mode);
     }
 
+    if (body.default_ai_group_id !== undefined) {
+      if (body.default_ai_group_id === null) {
+        updates.push("default_ai_group_id = NULL");
+      } else {
+        // Verify the group exists and belongs to this user
+        const groupCheck = await db.execute(
+          "SELECT id FROM task_groups WHERE id = ? AND user_id = ?",
+          [body.default_ai_group_id, session.user.id]
+        );
+        if (groupCheck.rows.length === 0) {
+          return NextResponse.json({ error: "Group not found" }, { status: 400 });
+        }
+        updates.push("default_ai_group_id = ?");
+        args.push(body.default_ai_group_id);
+      }
+    }
+
     if (updates.length === 0) {
       return NextResponse.json(
-        { error: "Provide at least one of: auto_schedule_new_tasks, default_schedule_mode" },
+        {
+          error:
+            "Provide at least one of: auto_schedule_new_tasks, default_schedule_mode, default_ai_group_id",
+        },
         { status: 400 }
       );
     }
@@ -100,7 +123,7 @@ export async function PUT(request: NextRequest) {
     await db.execute(`UPDATE users SET ${updates.join(", ")} WHERE id = ?`, args);
 
     const getResult = await db.execute(
-      "SELECT auto_schedule_new_tasks, default_schedule_mode FROM users WHERE id = ?",
+      "SELECT auto_schedule_new_tasks, default_schedule_mode, default_ai_group_id FROM users WHERE id = ?",
       [session.user.id]
     );
     const row = getResult.rows[0];
@@ -110,10 +133,12 @@ export async function PUT(request: NextRequest) {
       rawMode && VALID_MODES.includes(rawMode as SchedulingMode)
         ? (rawMode as SchedulingMode)
         : "now";
+    const default_ai_group_id = (row?.default_ai_group_id as string | null) ?? null;
 
     return NextResponse.json({
       auto_schedule_new_tasks,
       default_schedule_mode,
+      default_ai_group_id,
     });
   } catch (error) {
     console.error("Error updating scheduling preferences:", error);

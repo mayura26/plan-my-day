@@ -1,9 +1,10 @@
 "use client";
 
-import { Bell, Briefcase, CalendarClock, Clock, Key, RefreshCw } from "lucide-react";
+import { Bell, Briefcase, CalendarClock, Clock, Key, Mic, RefreshCw } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { useEffect } from "react";
+import { AIPreferencesSelector } from "@/components/ai-preferences-selector";
 import { APIKeyManager } from "@/components/api-key-manager";
 import { AwakeHoursSelector } from "@/components/awake-hours-selector";
 import { ForceUpdateButton } from "@/components/force-update-button";
@@ -107,6 +108,25 @@ export default function SettingsPage() {
           </CardHeader>
           <CardContent>
             <SchedulingPreferencesSelector />
+          </CardContent>
+        </Card>
+
+        <Separator />
+
+        {/* AI Task Input */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <Mic className="h-5 w-5" />
+              <CardTitle>AI Task Input</CardTitle>
+            </div>
+            <CardDescription>
+              Configure how AI interprets your tasks. Set a default group to use when the AI
+              can&apos;t determine one from your description or voice input.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <AIPreferencesSelector />
           </CardContent>
         </Card>
 

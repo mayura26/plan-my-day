@@ -1,5 +1,5 @@
-import OpenAI from "openai";
 import { NextResponse } from "next/server";
+import OpenAI from "openai";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/turso";
 
@@ -27,15 +27,24 @@ function utcToDateTimeLocal(isoString: string | null | undefined, tz: string): s
 
 function buildSystemPrompt(
   groups: { id: string; name: string }[],
-  generateSubtasks: boolean
+  generateSubtasks: boolean,
+  defaultGroup?: { id: string; name: string } | null
 ): string {
-  const groupSection =
-    groups.length > 0
-      ? `
-Available task groups (pick the best match based on the task description, or null if none fits):
+  let groupSection: string;
+  if (groups.length > 0) {
+    const defaultHint = defaultGroup
+      ? `If you cannot confidently match a group, use the user's preferred default: id: "${defaultGroup.id}", name: "${defaultGroup.name}".`
+      : `If you cannot confidently match a group, return null.`;
+    groupSection = `Available task groups:
 ${groups.map((g) => `- id: "${g.id}", name: "${g.name}"`).join("\n")}
-- "group_id": return the id string of the best matching group, or null if none fits`
-      : `- "group_id": null (no groups available)`;
+- "group_id": assign the best matching group id using these rules:
+  - Only assign a "Work", "Professional" or similar group for explicitly work-related tasks (job deliverables, work meetings, professional responsibilities).
+  - Personal/domestic tasks (cooking, cleaning, shopping, errands, appointments, leisure) → life/personal/admin groups
+  - Health, exercise, wellbeing tasks → health/fitness groups
+  - ${defaultHint}`;
+  } else {
+    groupSection = `- "group_id": null (no groups available)`;
+  }
 
   const subtaskSection = generateSubtasks
     ? `- "subtasks": break the task into 2-5 concrete, actionable steps. Each has "title" (string) and "duration" (number in minutes). Return as an array.`
@@ -87,14 +96,16 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "AI parsing is not configured" }, { status: 503 });
   }
 
-  // Fetch the user's timezone from their settings — authoritative source
+  // Fetch timezone and AI group preference in one query
   let tz = "UTC";
+  let defaultAiGroupId: string | null = null;
   try {
-    const tzResult = await db.execute({
-      sql: "SELECT timezone FROM users WHERE id = ?",
+    const userResult = await db.execute({
+      sql: "SELECT timezone, default_ai_group_id FROM users WHERE id = ?",
       args: [session.user.id],
     });
-    tz = (tzResult.rows[0]?.timezone as string) || "UTC";
+    tz = (userResult.rows[0]?.timezone as string) || "UTC";
+    defaultAiGroupId = (userResult.rows[0]?.default_ai_group_id as string) || null;
   } catch {
     // fall back to UTC
   }
@@ -111,6 +122,11 @@ export async function POST(request: Request) {
   }
 
   const { text, groups = [], generate_subtasks = false } = body;
+
+  // Resolve the default group object from the groups array (if it's still valid)
+  const defaultGroup = defaultAiGroupId
+    ? (groups.find((g) => g.id === defaultAiGroupId) ?? null)
+    : null;
 
   if (!text || typeof text !== "string") {
     return NextResponse.json({ error: "text is required" }, { status: 400 });
@@ -159,7 +175,7 @@ Parse this task description:
       model: "gpt-4.1-mini",
       response_format: { type: "json_object" },
       messages: [
-        { role: "system", content: buildSystemPrompt(groups, generate_subtasks) },
+        { role: "system", content: buildSystemPrompt(groups, generate_subtasks, defaultGroup) },
         { role: "user", content: userPrompt },
       ],
       temperature: 0.1,
@@ -189,7 +205,11 @@ Parse this task description:
     if (parsed.priority) result.priority = parsed.priority;
     if (parsed.duration) result.duration = parsed.duration;
     if (parsed.energy_level_required) result.energy_level_required = parsed.energy_level_required;
-    if (parsed.group_id) result.group_id = parsed.group_id;
+    if (parsed.group_id) {
+      result.group_id = parsed.group_id;
+    } else if (defaultAiGroupId) {
+      result.group_id = defaultAiGroupId;
+    }
 
     // AI outputs local datetime strings directly (YYYY-MM-DDTHH:MM).
     // If it still returns a UTC ISO string (with Z), fall back to server-side conversion.
