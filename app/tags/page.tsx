@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, Clock, Copy, Edit2, Plus, Tag, Trash2, Zap } from "lucide-react";
+import { Check, Clock, Copy, Edit2, Lock, Plus, Tag, Trash2, Zap } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { useCallback, useEffect, useState } from "react";
@@ -51,6 +51,7 @@ interface TagFormData {
   schedule_offset_minutes: number;
   group_id: string;
   auto_accept: boolean;
+  default_locked: boolean;
 }
 
 const DEFAULT_FORM: TagFormData = {
@@ -64,6 +65,7 @@ const DEFAULT_FORM: TagFormData = {
   schedule_offset_minutes: 60,
   group_id: "",
   auto_accept: false,
+  default_locked: false,
 };
 
 export default function TagsPage() {
@@ -138,6 +140,7 @@ export default function TagsPage() {
       schedule_offset_minutes: tag.schedule_offset_minutes,
       group_id: tag.group_id || "",
       auto_accept: tag.auto_accept,
+      default_locked: tag.default_locked ?? false,
     });
     setDialogOpen(true);
   };
@@ -163,6 +166,7 @@ export default function TagsPage() {
         schedule_offset_minutes: formData.schedule_offset_minutes,
         group_id: formData.group_id || undefined,
         auto_accept: formData.auto_accept,
+        default_locked: formData.default_locked,
       };
 
       const url = editingTag ? `/api/quick-tags/${editingTag.id}` : "/api/quick-tags";
@@ -327,6 +331,12 @@ export default function TagsPage() {
                       Schedules in {getOffsetLabel(tag.schedule_offset_minutes)}
                     </Badge>
                     {tag.auto_accept && <Badge>Auto-create</Badge>}
+                    {tag.default_locked && (
+                      <Badge variant="secondary" className="gap-1">
+                        <Lock className="h-3 w-3" />
+                        Locked
+                      </Badge>
+                    )}
                   </div>
 
                   <div className="flex items-center gap-2">
@@ -543,6 +553,21 @@ export default function TagsPage() {
               <Switch
                 checked={formData.auto_accept}
                 onCheckedChange={(checked) => setFormData({ ...formData, auto_accept: checked })}
+              />
+            </div>
+
+            <div className="flex items-center justify-between rounded-lg border p-4">
+              <div className="space-y-0.5">
+                <Label>Lock task in place</Label>
+                <p className="text-sm text-muted-foreground">
+                  Auto-scheduler won&apos;t move this task
+                </p>
+              </div>
+              <Switch
+                checked={formData.default_locked}
+                onCheckedChange={(checked) =>
+                  setFormData({ ...formData, default_locked: checked })
+                }
               />
             </div>
           </div>

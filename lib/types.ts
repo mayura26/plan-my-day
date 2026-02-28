@@ -333,6 +333,7 @@ export interface QuickTag {
   schedule_offset_minutes: number;
   group_id?: string | null;
   auto_accept: boolean;
+  default_locked: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -348,6 +349,7 @@ export interface CreateQuickTagRequest {
   schedule_offset_minutes?: number;
   group_id?: string;
   auto_accept?: boolean;
+  default_locked?: boolean;
 }
 
 export interface UpdateQuickTagRequest extends Partial<CreateQuickTagRequest> {}

@@ -18,6 +18,7 @@ function mapRowToQuickTag(row: any): QuickTag {
     schedule_offset_minutes: row.schedule_offset_minutes as number,
     group_id: row.group_id as string | null,
     auto_accept: Boolean(row.auto_accept),
+    default_locked: Boolean(row.default_locked ?? 0),
     created_at: row.created_at as string,
     updated_at: row.updated_at as string,
   };
@@ -83,8 +84,8 @@ export async function POST(request: NextRequest) {
       sql: `INSERT INTO quick_tags (
         id, user_id, name, task_title, task_description, task_type,
         priority, duration_minutes, energy_level, schedule_offset_minutes,
-        group_id, auto_accept, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        group_id, auto_accept, default_locked, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       args: [
         id,
         session.user.id,
@@ -98,6 +99,7 @@ export async function POST(request: NextRequest) {
         body.schedule_offset_minutes ?? 60,
         body.group_id || null,
         body.auto_accept ? 1 : 0,
+        body.default_locked ? 1 : 0,
         now,
         now,
       ],

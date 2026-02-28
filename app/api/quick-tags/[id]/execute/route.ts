@@ -125,7 +125,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         scheduledStart.toISOString(),
         scheduledEnd.toISOString(),
         null, // due_date
-        0, // locked
+        tag.default_locked ? 1 : 0, // locked from tag default
         groupId,
         null, // template_id
         taskType,

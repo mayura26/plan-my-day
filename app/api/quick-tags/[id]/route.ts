@@ -17,6 +17,7 @@ function mapRowToQuickTag(row: any): QuickTag {
     schedule_offset_minutes: row.schedule_offset_minutes as number,
     group_id: row.group_id as string | null,
     auto_accept: Boolean(row.auto_accept),
+    default_locked: Boolean(row.default_locked ?? 0),
     created_at: row.created_at as string,
     updated_at: row.updated_at as string,
   };
@@ -131,6 +132,10 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     if (body.auto_accept !== undefined) {
       updateFields.push("auto_accept = ?");
       values.push(body.auto_accept ? 1 : 0);
+    }
+    if (body.default_locked !== undefined) {
+      updateFields.push("default_locked = ?");
+      values.push(body.default_locked ? 1 : 0);
     }
 
     if (updateFields.length === 0) {

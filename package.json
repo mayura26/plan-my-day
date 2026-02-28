@@ -17,6 +17,7 @@
     "pwa:generate-keys": "node scripts/generate-vapid-keys.mjs",
     "db:migrate:lock-events-todos": "node scripts/migrate-lock-events-todos.mjs",
     "db:migrate:quick-tags": "node scripts/migrate-add-quick-tags.mjs",
+    "db:migrate:quick-tag-default-locked": "node scripts/migrate-add-quick-tag-default-locked.mjs",
     "db:migrate:reminder-settings": "node scripts/migrate-add-reminder-settings.mjs",
     "db:migrate:scheduling-preferences": "node scripts/migrate-add-scheduling-preferences.mjs",
     "reminders:process": "node scripts/process-reminders.mjs"
