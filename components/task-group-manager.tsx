@@ -1294,7 +1294,7 @@ export function TaskGroupManager({
               <span className="text-xs">New Group</span>
             </Button>
           </DialogTrigger>
-          <DialogContent>
+          <DialogContent className="max-h-[90vh] flex flex-col">
             <DialogHeader>
               <DialogTitle>
                 {isCreatingParentGroup ? "Create New Parent Group" : "Create New Group"}
@@ -1305,6 +1305,7 @@ export function TaskGroupManager({
                   : "Create a new task group to organize your tasks."}
               </DialogDescription>
             </DialogHeader>
+            <div className="flex-1 min-h-0 overflow-y-auto">
             <div className="space-y-4">
               <div>
                 <div className="text-sm font-medium mb-1">Group Name</div>
@@ -1370,6 +1371,8 @@ export function TaskGroupManager({
                   </Select>
                 </div>
               )}
+            </div>
+            </div>
               <div className="flex justify-end gap-2">
                 <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
                   Cancel
@@ -1382,7 +1385,6 @@ export function TaskGroupManager({
                   {isCreatingParentGroup ? "Create Parent Group" : "Create Group"}
                 </Button>
               </div>
-            </div>
           </DialogContent>
         </Dialog>
         <Button

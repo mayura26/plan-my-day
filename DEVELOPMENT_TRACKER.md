@@ -1,7 +1,6 @@
 - [ ] handle tasks overlap by splitting (especially for token scheudled one/events etc)
 - [ ] Add voice support
-- [ ] Issue where we can't scroll for diaglogs on group settings
-- [ ] mobile default to day view on load
+- [x] Issue where we can't scroll for diaglogs on group settings
 - [ ] locked task have weird cursor animation
 
 ### ⏳ Pending

@@ -95,7 +95,7 @@ export function AITaskInput({ open, onOpenChange, onParsed, groups = [] }: AITas
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg w-[95vw] md:w-full mx-2 md:mx-auto">
+      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto w-[95vw] md:w-full mx-2 md:mx-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Sparkles className="w-5 h-5" />

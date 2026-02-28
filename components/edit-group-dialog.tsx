@@ -140,11 +140,12 @@ export function EditGroupDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent className="max-h-[90vh] flex flex-col">
         <DialogHeader>
           <DialogTitle>Edit Group</DialogTitle>
           <DialogDescription>Update the group name, color, and parent group.</DialogDescription>
         </DialogHeader>
+        <div className="flex-1 min-h-0 overflow-y-auto">
         <div className="space-y-4">
           <div>
             <div className="text-sm font-medium mb-1">Group Name</div>
@@ -550,6 +551,8 @@ export function EditGroupDialog({
             )}
           </div>
 
+        </div>
+        </div>
           <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isUpdating}>
               Cancel
@@ -562,7 +565,6 @@ export function EditGroupDialog({
               {isUpdating ? "Updating..." : "Update Group"}
             </Button>
           </div>
-        </div>
       </DialogContent>
     </Dialog>
   );
