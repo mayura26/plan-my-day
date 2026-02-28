@@ -15,7 +15,7 @@ import { format, startOfMonth } from "date-fns";
 import { CheckSquare, ChevronDown, ChevronRight, Plus, Sparkles, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { AITaskInput } from "@/components/ai-task-input";
 import { CalendarSkeleton } from "@/components/calendar-skeleton";
@@ -79,7 +79,7 @@ export default function CalendarPage() {
   const [expandedSections, setExpandedSections] = useState<Set<string>>(
     new Set(["task-groups", "quick-stats", "unscheduled-tasks"])
   );
-  const [viewMode, setViewMode] = useState<ViewMode>("week");
+  const [viewMode, setViewMode] = useState<ViewMode>("day");
   const [currentDate, setCurrentDate] = useState<Date>(new Date());
   const [dayNotes, setDayNotes] = useState<Map<string, DayNote>>(new Map());
   const [noteDialogOpen, setNoteDialogOpen] = useState(false);
@@ -113,6 +113,13 @@ export default function CalendarPage() {
       },
     })
   );
+
+  // Default to week view on desktop (>=768px), day view on mobile; run once on mount
+  useLayoutEffect(() => {
+    if (typeof window !== "undefined" && window.innerWidth >= 768) {
+      setViewMode("week");
+    }
+  }, []);
 
   const fetchParentTaskNames = useCallback(async (tasksToProcess: Task[]) => {
     // Get unique parent task IDs from tasks that have parent_task_id and are scheduled
