@@ -2491,21 +2491,34 @@ export function pullForwardTasksForGroup(options: PullForwardOptions): PullForwa
     ? new Date(Math.max(roundUpTo15Min(nowUTC).getTime(), windowStart.getTime()))
     : windowStart;
 
-  // Gather all tasks scheduled on the target day (regardless of group) as obstacles
-  // Completed/rescheduled tasks don't block scheduling - their time slots are free
+  // Obstacles = tasks from OTHER groups on today + locked/in_progress same-group tasks.
+  // Unlocked, non-in_progress same-group tasks on today are candidates for repacking.
   const obstacles: Array<{ start: Date; end: Date }> = [];
   for (const t of allTasks) {
     if (t.status === "completed" || t.status === "rescheduled") continue;
     const slot = getEffectiveSlot(t, emptyOverrides);
     if (!slot) continue;
     if (!isOnDay(slot.start, tYear, tMonth, tDay, timezone)) continue;
+    // Same-group tasks that can be moved are candidates, not walls
+    if (
+      t.group_id === groupId &&
+      !t.locked &&
+      t.status !== "in_progress" &&
+      t.status !== "cancelled"
+    )
+      continue;
     obstacles.push({ start: slot.start, end: slot.end });
   }
   obstacles.sort((a, b) => a.start.getTime() - b.start.getTime());
 
-  // Find future tasks for this group that can be pulled forward
-  // Sort by scheduled_start ASC (pull nearest future tasks first)
-  const futureTasks = allTasks
+  // Candidates = all unlocked same-group tasks that haven't started:
+  //   • today's unfinished tasks (compact them forward from now)
+  //   • future tasks within the look-ahead window (pull them in)
+  // Sorted by importance so high-priority work lands first.
+  const maxDate = new Date(windowEnd);
+  maxDate.setUTCDate(maxDate.getUTCDate() + maxLookAheadDays);
+
+  const eligibleTasks = allTasks
     .filter((t) => {
       if (t.group_id !== groupId) return false;
       if (t.locked) return false;
@@ -2518,67 +2531,106 @@ export function pullForwardTasksForGroup(options: PullForwardOptions): PullForwa
         return false;
       if (!t.duration || t.duration <= 0) return false;
       if (!t.scheduled_start || !t.scheduled_end) return false;
-      // Must be scheduled AFTER the target day
       const slot = getEffectiveSlot(t, emptyOverrides);
       if (!slot) return false;
+      // Always include today's tasks (they get repacked to start from now)
+      if (isOnDay(slot.start, tYear, tMonth, tDay, timezone)) return true;
+      // Future tasks: cap to look-ahead window
       return (
-        !isOnDay(slot.start, tYear, tMonth, tDay, timezone) &&
-        slot.start.getTime() > windowStart.getTime()
+        slot.start.getTime() > windowStart.getTime() &&
+        slot.start.getTime() <= maxDate.getTime()
       );
     })
     .sort((a, b) => {
-      // futureTasks are filtered to only include tasks with scheduled_start
+      // 1. Priority ASC — 1 = highest priority
+      if (a.priority !== b.priority) return a.priority - b.priority;
+
+      // 2. Due date ASC — soonest deadlines first, nulls last
+      if (a.due_date && b.due_date) {
+        const cmp = a.due_date.localeCompare(b.due_date);
+        if (cmp !== 0) return cmp;
+      } else if (a.due_date) {
+        return -1;
+      } else if (b.due_date) {
+        return 1;
+      }
+
+      // 3. scheduled_start ASC — respect current visual order when equally important
       if (!a.scheduled_start || !b.scheduled_start) return 0;
-      const startA = new Date(a.scheduled_start).getTime();
-      const startB = new Date(b.scheduled_start).getTime();
-      return startA - startB;
+      return new Date(a.scheduled_start).getTime() - new Date(b.scheduled_start).getTime();
     });
 
-  // Cap the look-ahead: only pull from the next N days
-  const maxDate = new Date(windowEnd);
-  maxDate.setUTCDate(maxDate.getUTCDate() + maxLookAheadDays);
-  const eligibleTasks = futureTasks.filter((t) => {
-    // futureTasks are filtered to only include tasks with scheduled_start
-    if (!t.scheduled_start) return false;
-    const start = new Date(t.scheduled_start);
-    return start.getTime() <= maxDate.getTime();
-  });
-
   if (eligibleTasks.length === 0) {
-    feedback.push(`No future tasks found for "${group.name}" to pull forward.`);
+    feedback.push(`No tasks found for "${group.name}" to repack.`);
     return { movedTasks, feedback };
   }
 
-  feedback.push(`Found ${eligibleTasks.length} future task(s) for "${group.name}".`);
+  feedback.push(`Repacking ${eligibleTasks.length} task(s) for "${group.name}" from now.`);
 
-  // Try to place each future task into today's available slots
-  for (const task of eligibleTasks) {
-    // eligibleTasks are filtered from futureTasks which only include tasks with duration > 0
-    if (!task.duration || task.duration <= 0) continue;
-    const durationMs = task.duration * 60 * 1000;
+  // Sequential packing: find the first available slot, then pack tasks one after
+  // another. Stop the moment a task would hit any obstacle — don't jump over gaps.
+  let cursor = roundUpTo15Min(effectiveWindowStart);
 
-    const slot = findSlotInWindow(effectiveWindowStart, windowEnd, durationMs, obstacles);
-
-    if (slot) {
-      movedTasks.push({
-        taskId: task.id,
-        newStart: slot.start.toISOString(),
-        newEnd: slot.end.toISOString(),
-      });
-      // Add this as an obstacle so subsequent tasks don't overlap
-      obstacles.push(slot);
-      obstacles.sort((a, b) => a.start.getTime() - b.start.getTime());
-    } else {
-      // No more room today
-      feedback.push(`No more room today. Pulled ${movedTasks.length} task(s).`);
-      break;
+  // Advance cursor past any obstacle that contains it (e.g. "now" falls mid-task)
+  let advanced = true;
+  while (advanced) {
+    advanced = false;
+    for (const obs of obstacles) {
+      if (cursor.getTime() >= obs.start.getTime() && cursor.getTime() < obs.end.getTime()) {
+        cursor = roundUpTo15Min(obs.end);
+        advanced = true;
+        break;
+      }
     }
   }
 
+  for (const task of eligibleTasks) {
+    if (!task.duration || task.duration <= 0) continue;
+    const durationMs = task.duration * 60 * 1000;
+
+    const candidateStart = roundUpTo15Min(cursor);
+    const candidateEnd = new Date(candidateStart.getTime() + durationMs);
+
+    // Stop if we've run out of working window
+    if (candidateEnd.getTime() > windowEnd.getTime()) {
+      feedback.push(`No more room today. Stopped at working window end.`);
+      break;
+    }
+
+    // Stop if placing here would clash with any obstacle (sequential pack — no gap-jumping)
+    const clash = obstacles.find(
+      (obs) =>
+        candidateStart.getTime() < obs.end.getTime() &&
+        candidateEnd.getTime() > obs.start.getTime()
+    );
+
+    if (clash) {
+      feedback.push(`Blocked by an immovable task. Stopped after ${movedTasks.length} move(s).`);
+      break;
+    }
+
+    // Only record as moved if the time actually changed (skip no-op updates)
+    const currentStart = task.scheduled_start ? new Date(task.scheduled_start).getTime() : null;
+    if (currentStart === null || Math.abs(currentStart - candidateStart.getTime()) > 60_000) {
+      movedTasks.push({
+        taskId: task.id,
+        newStart: candidateStart.toISOString(),
+        newEnd: candidateEnd.toISOString(),
+      });
+    }
+
+    // Advance cursor to right after this task
+    cursor = candidateEnd;
+
+    // Add this task as an obstacle so subsequent tasks don't overlap
+    obstacles.push({ start: candidateStart, end: candidateEnd });
+    obstacles.sort((a, b) => a.start.getTime() - b.start.getTime());
+  }
+
   if (movedTasks.length === 0) {
-    feedback.push("No available slots on this day to fit future tasks.");
+    feedback.push("All tasks are already in place — nothing to move.");
   } else {
-    feedback.push(`Pulled ${movedTasks.length} task(s) forward to ${targetDate}.`);
+    feedback.push(`Rescheduled ${movedTasks.length} task(s) for ${targetDate}.`);
   }
 
   return { movedTasks, feedback };
