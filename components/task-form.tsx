@@ -8,6 +8,7 @@ import {
   Clock,
   Lock,
   Plus,
+  Sparkles,
   Trash2,
   Unlock,
   Zap,
@@ -300,6 +301,16 @@ export function TaskForm({
       if (formData.duration && formData.duration < 0) {
         newErrors.duration = "Duration must be positive";
       }
+    }
+
+    // Enforce due date when schedule mode requires it
+    const scheduleMode = (formData as any).schedule_mode;
+    if (
+      formData.auto_schedule &&
+      (scheduleMode === "smart" || scheduleMode === "due-date") &&
+      !formData.due_date
+    ) {
+      newErrors.due_date = `Due date is required for "${scheduleMode === "smart" ? "Smart Schedule" : "Schedule to Due Date"}"`;
     }
 
     if (Object.keys(newErrors).length > 0) {
@@ -920,6 +931,7 @@ export function TaskForm({
                           "next-month": "Schedule Next Month",
                           asap: "Schedule ASAP",
                           "due-date": "Schedule to Due Date",
+                          smart: "Smart Schedule",
                         };
                         return labels[mode] || "Schedule Now";
                       })()}
@@ -966,6 +978,16 @@ export function TaskForm({
                     >
                       <CalendarClock className="h-4 w-4 mr-2" />
                       Schedule to Due Date
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() =>
+                        formData.due_date && handleInputChange("schedule_mode", "smart")
+                      }
+                      disabled={!formData.due_date}
+                      title={!formData.due_date ? "Set a due date first" : undefined}
+                    >
+                      <Sparkles className="h-4 w-4 mr-2" />
+                      Smart Schedule
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>

@@ -823,6 +823,7 @@ export default function CalendarPage() {
             "next-month": "schedule-next-month",
             asap: "schedule-asap",
             "due-date": "schedule-due-date",
+            smart: "schedule-smart",
           };
           const endpoint = endpointMap[scheduleMode] ?? "schedule-now";
           const scheduleRes = await fetch(`/api/tasks/${createdTask.id}/${endpoint}`, {

@@ -17,6 +17,7 @@ import {
   Link2,
   Lock,
   LockOpen,
+  Sparkles,
   Tag,
   Trash2,
   XCircle,
@@ -387,6 +388,7 @@ export function TaskDetailDialog({
         "next-month": "schedule-next-month",
         asap: "schedule-asap",
         "due-date": "schedule-due-date",
+        smart: "schedule-smart",
       };
 
       const response = await fetch(`/api/tasks/${task.id}/${endpointMap[mode]}`, {
@@ -420,6 +422,7 @@ export function TaskDetailDialog({
           "next-month": "schedule-next-month",
           asap: "schedule-asap",
           "due-date": "schedule-due-date",
+          smart: "schedule-smart",
         };
         onSchedulerLog?.({
           operation: modeToOp[mode] as SchedulerLogEntry["operation"],
@@ -465,6 +468,7 @@ export function TaskDetailDialog({
         "next-month": "Schedule Next Month",
         asap: "Schedule ASAP",
         "due-date": "Schedule to Due Date",
+        smart: "Smart Schedule",
       };
 
       // Log to scheduler log panel
@@ -476,6 +480,7 @@ export function TaskDetailDialog({
         "next-month": "schedule-next-month",
         asap: "schedule-asap",
         "due-date": "schedule-due-date",
+        smart: "schedule-smart",
       };
       onSchedulerLog?.({
         operation: modeToOperation[mode] as SchedulerLogEntry["operation"],
@@ -897,6 +902,18 @@ export function TaskDetailDialog({
                               <DropdownMenuItem onClick={() => handleSchedule("asap")}>
                                 <Zap className="h-4 w-4 mr-2" />
                                 Schedule ASAP
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() => task.due_date && handleSchedule("smart")}
+                                disabled={!task.due_date}
+                              >
+                                <Sparkles className="h-4 w-4 mr-2" />
+                                Smart Schedule
+                                {!task.due_date && (
+                                  <span className="ml-2 text-xs text-muted-foreground">
+                                    (no due date)
+                                  </span>
+                                )}
                               </DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>

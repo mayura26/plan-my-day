@@ -1176,6 +1176,24 @@ export function scheduleTaskUnified(options: UnifiedSchedulingOptions): Scheduli
         allGroups
       );
 
+    case "smart": {
+      reportProgress("Mode: Smart Schedule - Backward search with displacement");
+      if (!task.due_date) {
+        return { slot: null, feedback, error: "Task must have a due date for Smart Schedule" };
+      }
+      return scheduleTaskSmartWithShuffling(
+        task,
+        allTasks,
+        taskGroup,
+        awakeHours,
+        timezone,
+        reportProgress,
+        maxTimeout,
+        dependencyMap,
+        allGroups
+      );
+    }
+
     case "due-date": {
       reportProgress("Mode: Schedule to Due Date - Searching backwards from due date");
       if (!task.due_date) {
@@ -1914,6 +1932,328 @@ function scheduleTaskASAPWithShuffling(
     slot: taskSlot,
     feedback: [],
     shuffledTasks,
+  };
+}
+
+// ============================================================================
+// SMART SCHEDULE WITH SHUFFLING (backward search + displacement)
+// ============================================================================
+
+function scheduleTaskSmartWithShuffling(
+  task: Task,
+  allTasks: Task[],
+  taskGroup: TaskGroup | null | undefined,
+  awakeHours: GroupScheduleHours | null,
+  timezone: string,
+  reportProgress: (message: string) => void,
+  maxTimeout: number,
+  dependencyMap?: DependencyMap,
+  allGroups?: TaskGroup[]
+): SchedulingResult {
+  const startTime = Date.now();
+
+  if (!task.duration || task.duration <= 0) {
+    return { slot: null, feedback: [], error: "Task must have a duration to be scheduled" };
+  }
+  if (!task.due_date) {
+    return { slot: null, feedback: [], error: "Task must have a due date for Smart Schedule" };
+  }
+
+  const dueDate = new Date(task.due_date);
+  const nowUTC = new Date();
+
+  // Determine schedule hours (group rules or awake hours)
+  const useGroupRules = taskGroup?.auto_schedule_enabled && taskGroup?.auto_schedule_hours;
+  const scheduleHours = useGroupRules ? taskGroup!.auto_schedule_hours! : awakeHours;
+
+  // Determine if due date is today in user's timezone
+  const nowTz = getTimeInTimezone(nowUTC, timezone);
+  const dueDateTz = getTimeInTimezone(dueDate, timezone);
+  const isDueToday =
+    nowTz.year === dueDateTz.year &&
+    nowTz.month === dueDateTz.month &&
+    nowTz.day === dueDateTz.day;
+
+  // Build groups map for displaced task lookups
+  const groupsMap = new Map<string, TaskGroup>();
+  if (allGroups) {
+    for (const g of allGroups) {
+      groupsMap.set(g.id, g);
+    }
+  }
+
+  const getTaskGroupHours = (t: Task): GroupScheduleHours | null => {
+    if (t.group_id) {
+      const group = groupsMap.get(t.group_id);
+      if (group?.auto_schedule_enabled && group.auto_schedule_hours) {
+        return group.auto_schedule_hours;
+      }
+    }
+    return awakeHours;
+  };
+
+  const slotsOverlap = (slot1: TimeSlot, slot2: TimeSlot): boolean =>
+    slot1.start.getTime() < slot2.end.getTime() && slot1.end.getTime() > slot2.start.getTime();
+
+  // Shared displacement state
+  const shuffledTasks: Array<{ taskId: string; newSlot: TimeSlot }> = [];
+  const shuffledTaskIds = new Set<string>();
+  const shuffledTaskSlots = new Map<string, TimeSlot>();
+  const maxRecursionDepth = 100;
+
+  // All scheduled tasks (excluding task itself and terminal statuses)
+  const scheduledTasks = allTasks.filter(
+    (t) =>
+      t.id !== task.id &&
+      t.scheduled_start &&
+      t.scheduled_end &&
+      t.status !== "completed" &&
+      t.status !== "cancelled" &&
+      t.status !== "rescheduled"
+  );
+
+  // Recursive shuffle that respects group rules and checks due-date violations
+  const shuffleTask = (conflictingTask: Task, newSlotStart: Date, depth: number): TimeSlot | null => {
+    if (Date.now() - startTime > maxTimeout) {
+      reportProgress("Shuffling timeout reached");
+      return null;
+    }
+    if (depth > maxRecursionDepth) {
+      reportProgress(`Maximum recursion depth reached for task ${conflictingTask.id}`);
+      return null;
+    }
+    if (shuffledTaskIds.has(conflictingTask.id)) {
+      return null;
+    }
+    if (conflictingTask.locked) {
+      reportProgress(`Task ${conflictingTask.id} is locked, cannot shuffle`);
+      return null;
+    }
+    if (conflictingTask.status === "in_progress") {
+      reportProgress(`Task ${conflictingTask.id} is in progress, cannot shuffle`);
+      return null;
+    }
+
+    const taskDuration = (conflictingTask.duration || 30) * 60 * 1000;
+    let candidateSlotStart = roundUpTo15Min(new Date(newSlotStart));
+
+    // Check dependency constraints for the displaced task
+    if (dependencyMap) {
+      const depConstraint = getDependencyConstraint(conflictingTask, allTasks, dependencyMap);
+      if (depConstraint) {
+        const minStart = roundUpTo15Min(depConstraint);
+        if (candidateSlotStart.getTime() < minStart.getTime()) {
+          candidateSlotStart = minStart;
+        }
+      }
+    }
+
+    let candidateSlotEnd = new Date(candidateSlotStart.getTime() + taskDuration);
+    let candidateSlot: TimeSlot = { start: candidateSlotStart, end: candidateSlotEnd };
+
+    // Respect group/awake hours for this displaced task
+    const taskGroupHours = getTaskGroupHours(conflictingTask);
+    if (!isWithinWorkingHours(candidateSlot, taskGroupHours || awakeHours, timezone)) {
+      candidateSlotStart = getStartOfNextWorkingDay(candidateSlotStart, taskGroupHours || awakeHours, timezone);
+      candidateSlotEnd = new Date(candidateSlotStart.getTime() + taskDuration);
+      candidateSlot = { start: candidateSlotStart, end: candidateSlotEnd };
+    }
+
+    // Smart constraint: don't violate the displaced task's own due date
+    if (conflictingTask.due_date && candidateSlot.end > new Date(conflictingTask.due_date)) {
+      reportProgress(`Cannot displace task ${conflictingTask.id}: would violate its own deadline`);
+      return null;
+    }
+
+    // Find conflicts at candidate position
+    const conflicts: Task[] = [];
+    for (const otherTask of scheduledTasks) {
+      if (
+        otherTask.id === conflictingTask.id ||
+        shuffledTaskIds.has(otherTask.id) ||
+        otherTask.status === "completed" ||
+        otherTask.status === "cancelled" ||
+        otherTask.status === "rescheduled" ||
+        !otherTask.scheduled_start ||
+        !otherTask.scheduled_end
+      ) {
+        continue;
+      }
+      const otherSlot: TimeSlot = {
+        start: new Date(otherTask.scheduled_start),
+        end: new Date(otherTask.scheduled_end),
+      };
+      if (slotsOverlap(candidateSlot, otherSlot)) {
+        conflicts.push(otherTask);
+      }
+    }
+    for (const [taskId, shuffledSlot] of shuffledTaskSlots.entries()) {
+      if (taskId === conflictingTask.id) continue;
+      if (slotsOverlap(candidateSlot, shuffledSlot)) {
+        const shuffledTask = scheduledTasks.find((t) => t.id === taskId);
+        if (shuffledTask && !conflicts.includes(shuffledTask)) {
+          conflicts.push(shuffledTask);
+        }
+      }
+    }
+
+    // Recursively shuffle conflicts
+    if (conflicts.length > 0) {
+      conflicts.sort((a, b) => {
+        const aStart = a.scheduled_start ? new Date(a.scheduled_start).getTime() : 0;
+        const bStart = b.scheduled_start ? new Date(b.scheduled_start).getTime() : 0;
+        return aStart - bStart;
+      });
+      let latestConflictEnd = candidateSlot.end;
+      for (const conflictTask of conflicts) {
+        const shuffledSlot = shuffleTask(conflictTask, latestConflictEnd, depth + 1);
+        if (shuffledSlot) {
+          shuffledTasks.push({ taskId: conflictTask.id, newSlot: shuffledSlot });
+          shuffledTaskIds.add(conflictTask.id);
+          shuffledTaskSlots.set(conflictTask.id, shuffledSlot);
+          latestConflictEnd = shuffledSlot.end;
+        }
+      }
+    }
+
+    return candidateSlot;
+  };
+
+  // Helper: build virtual task list reflecting shuffled slots
+  const buildVirtualTasks = (): Task[] =>
+    allTasks.map((t) => {
+      const slot = shuffledTaskSlots.get(t.id);
+      if (slot) {
+        return {
+          ...t,
+          scheduled_start: slot.start.toISOString(),
+          scheduled_end: slot.end.toISOString(),
+        };
+      }
+      return t;
+    });
+
+  // Phase 1: Natural backward search (no displacement)
+  reportProgress("Phase 1: Searching for natural slot before due date...");
+  const naturalSlot = findAvailableSlotBeforeDeadline(
+    task,
+    allTasks,
+    dueDate,
+    scheduleHours ?? null,
+    30,
+    timezone,
+    dependencyMap,
+    allTasks
+  );
+  if (naturalSlot && naturalSlot.start >= nowUTC) {
+    reportProgress(`Found natural slot: ${naturalSlot.start.toISOString()}`);
+    return { slot: naturalSlot, feedback: [], shuffledTasks: [] };
+  }
+
+  // Phase 1b: Extended hours fallback (today only, when group hours differ from awake hours)
+  if (isDueToday && useGroupRules && awakeHours) {
+    reportProgress("Phase 1b: Trying extended awake hours for today...");
+    const extSlot = findAvailableSlotBeforeDeadline(
+      task,
+      allTasks,
+      dueDate,
+      awakeHours,
+      0,
+      timezone,
+      dependencyMap,
+      allTasks
+    );
+    if (extSlot && extSlot.start >= nowUTC) {
+      reportProgress(`Found slot using extended awake hours: ${extSlot.start.toISOString()}`);
+      return { slot: extSlot, feedback: [], shuffledTasks: [] };
+    }
+  }
+
+  // Phase 2: Collect displaceable blockers in window [nowUTC, dueDate]
+  reportProgress("Phase 2: Collecting displaceable blockers...");
+  const blockers = scheduledTasks.filter((t) => {
+    if (!t.scheduled_start || !t.scheduled_end) return false;
+    const tStart = new Date(t.scheduled_start);
+    const tEnd = new Date(t.scheduled_end);
+    // Overlaps with [nowUTC, dueDate]
+    return tStart < dueDate && tEnd > nowUTC;
+  });
+
+  // Sort: furthest due_date first (null → Infinity), ties by earliest scheduled_start
+  blockers.sort((a, b) => {
+    const aDue = a.due_date ? new Date(a.due_date).getTime() : Number.POSITIVE_INFINITY;
+    const bDue = b.due_date ? new Date(b.due_date).getTime() : Number.POSITIVE_INFINITY;
+    if (bDue !== aDue) return bDue - aDue; // furthest first
+    const aStart = a.scheduled_start ? new Date(a.scheduled_start).getTime() : 0;
+    const bStart = b.scheduled_start ? new Date(b.scheduled_start).getTime() : 0;
+    return aStart - bStart;
+  });
+
+  reportProgress(`Found ${blockers.length} potential blockers to displace`);
+
+  // Phase 3: Iterative displacement — try each blocker, then retry backward search
+  for (const blocker of blockers) {
+    if (shuffledTaskIds.has(blocker.id) || blocker.locked || blocker.status === "in_progress") {
+      continue;
+    }
+
+    // Push blocker to after the due date (or after its current end if later)
+    const blockerEnd = blocker.scheduled_end ? new Date(blocker.scheduled_end) : dueDate;
+    const newStart = roundUpTo15Min(
+      new Date(Math.max(blockerEnd.getTime(), dueDate.getTime()))
+    );
+
+    reportProgress(`Attempting to displace blocker "${blocker.title}" to after due date...`);
+    const displaced = shuffleTask(blocker, newStart, 0);
+    if (displaced) {
+      shuffledTasks.push({ taskId: blocker.id, newSlot: displaced });
+      shuffledTaskIds.add(blocker.id);
+      shuffledTaskSlots.set(blocker.id, displaced);
+      reportProgress(`Displaced "${blocker.title}" to ${displaced.start.toISOString()}`);
+
+      // Retry backward search with virtual task list
+      const virtualTasks = buildVirtualTasks();
+      const slot = findAvailableSlotBeforeDeadline(
+        task,
+        virtualTasks,
+        dueDate,
+        scheduleHours ?? null,
+        30,
+        timezone,
+        dependencyMap,
+        virtualTasks
+      );
+      if (slot && slot.start >= nowUTC) {
+        reportProgress(`Found slot after displacement: ${slot.start.toISOString()}`);
+        return { slot, feedback: [], shuffledTasks };
+      }
+
+      // Phase 3b: Extended hours retry (today only)
+      if (isDueToday && useGroupRules && awakeHours) {
+        const extSlot = findAvailableSlotBeforeDeadline(
+          task,
+          virtualTasks,
+          dueDate,
+          awakeHours,
+          0,
+          timezone,
+          dependencyMap,
+          virtualTasks
+        );
+        if (extSlot && extSlot.start >= nowUTC) {
+          reportProgress(`Found slot using extended awake hours after displacement: ${extSlot.start.toISOString()}`);
+          return { slot: extSlot, feedback: [], shuffledTasks };
+        }
+      }
+    }
+  }
+
+  // Phase 4: Impossible
+  return {
+    slot: null,
+    feedback: [],
+    error:
+      "Unable to schedule task before its due date. All overlapping tasks are locked or would violate their own deadlines.",
   };
 }
 

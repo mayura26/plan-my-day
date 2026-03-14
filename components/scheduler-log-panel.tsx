@@ -9,6 +9,7 @@ import {
   RotateCcw,
   ScrollText,
   Shuffle,
+  Sparkles,
   Trash2,
   Zap,
 } from "lucide-react";
@@ -28,6 +29,7 @@ export type SchedulerOperation =
   | "schedule-next-month"
   | "schedule-asap"
   | "schedule-due-date"
+  | "schedule-smart"
   | "reschedule"
   | "carryover";
 
@@ -102,6 +104,11 @@ const operationConfig: Record<
     label: "Due Date",
     icon: CalendarClock,
     color: "bg-orange-500/10 text-orange-600 dark:text-orange-400",
+  },
+  "schedule-smart": {
+    label: "Smart Schedule",
+    icon: Sparkles,
+    color: "bg-violet-500/10 text-violet-600 dark:text-violet-400",
   },
   reschedule: {
     label: "Reschedule",

@@ -1,6 +1,6 @@
 "use client";
 
-import { CalendarClock, Clock, Zap } from "lucide-react";
+import { CalendarClock, Clock, Sparkles, Zap } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -23,11 +23,13 @@ const SCHEDULE_MODE_OPTIONS: { value: SchedulingMode; label: string }[] = [
   { value: "next-month", label: "Schedule Next Month" },
   { value: "asap", label: "Schedule ASAP" },
   { value: "due-date", label: "Schedule to Due Date" },
+  { value: "smart", label: "Smart Schedule" },
 ];
 
 function ModeIcon({ mode }: { mode: SchedulingMode }) {
   if (mode === "now") return <Clock className="h-4 w-4 mr-2" />;
   if (mode === "asap") return <Zap className="h-4 w-4 mr-2" />;
+  if (mode === "smart") return <Sparkles className="h-4 w-4 mr-2" />;
   return <CalendarClock className="h-4 w-4 mr-2" />;
 }
 

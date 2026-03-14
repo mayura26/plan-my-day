@@ -236,6 +236,7 @@ export function ProcessOverdueDialog({
             "next-month": "schedule-next-month",
             asap: "schedule-asap",
             "due-date": "schedule-due-date",
+            smart: "schedule-smart",
           };
           const modeToOp: Record<SchedulingMode, string> = {
             now: "schedule-now",
@@ -245,6 +246,7 @@ export function ProcessOverdueDialog({
             "next-month": "schedule-next-month",
             asap: "schedule-asap",
             "due-date": "schedule-due-date",
+            smart: "schedule-smart",
           };
           const promise = fetch(`/api/tasks/${taskId}/${endpointMap[mode]}`, {
             method: "POST",
@@ -783,6 +785,7 @@ export function ProcessOverdueDialog({
                                 "next-month": "schedule-next-month",
                                 asap: "schedule-asap",
                                 "due-date": "schedule-due-date",
+                                smart: "schedule-smart",
                               };
 
                               setProcessingTaskId(task.id);
@@ -814,6 +817,7 @@ export function ProcessOverdueDialog({
                                   "next-month": "schedule-next-month",
                                   asap: "schedule-asap",
                                   "due-date": "schedule-due-date",
+                                  smart: "schedule-smart",
                                 };
                                 onSchedulerLog?.({
                                   operation: (modeToOp[mode] ||

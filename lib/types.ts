@@ -50,14 +50,18 @@ export type TaskType = "task" | "event" | "todo" | "subtask";
  * Scheduling modes available in the UI and API
  * All modes are user-facing and can be selected from various dialogs
  */
-export type SchedulingMode =
-  | "now"
-  | "today"
-  | "tomorrow"
-  | "next-week"
-  | "next-month"
-  | "asap"
-  | "due-date";
+export const SCHEDULING_MODES = [
+  "now",
+  "today",
+  "tomorrow",
+  "next-week",
+  "next-month",
+  "asap",
+  "due-date",
+  "smart",
+] as const;
+
+export type SchedulingMode = (typeof SCHEDULING_MODES)[number];
 
 // Task with additional computed properties for UI
 export interface TaskWithSubtasks extends Task {

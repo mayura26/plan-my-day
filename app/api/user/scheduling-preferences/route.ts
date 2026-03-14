@@ -1,17 +1,10 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/turso";
+import { SCHEDULING_MODES } from "@/lib/types";
 import type { SchedulingMode } from "@/lib/types";
 
-const VALID_MODES: SchedulingMode[] = [
-  "now",
-  "today",
-  "tomorrow",
-  "next-week",
-  "next-month",
-  "asap",
-  "due-date",
-];
+const VALID_MODES = SCHEDULING_MODES;
 
 // GET /api/user/scheduling-preferences - Get user's scheduling preferences for new tasks
 export async function GET() {
