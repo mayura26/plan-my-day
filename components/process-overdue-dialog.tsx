@@ -7,19 +7,15 @@ import {
   CheckCircle2,
   Clock,
   RotateCcw,
-  X,
-  XCircle,
+  Zap,
 } from "lucide-react";
-import { useState } from "react";
-import { toast } from "sonner";
+import { useMemo, useState } from "react";
 import type { SchedulerLogEntry } from "@/components/scheduler-log-panel";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
 import { useConfirmDialog } from "@/components/ui/confirm-dialog";
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -33,10 +29,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
 import { useUserTimezone } from "@/hooks/use-user-timezone";
 import { getOverdueTasks } from "@/lib/task-utils";
-import { formatDateTimeLocalForTimezone, parseDateTimeLocalToUTC } from "@/lib/timezone-utils";
+import {
+  formatDateInTimezone,
+  formatDateTimeLocalForTimezone,
+  parseDateTimeLocalToUTC,
+} from "@/lib/timezone-utils";
 import type { SchedulingMode, Task } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -49,23 +48,53 @@ interface ProcessOverdueDialogProps {
   onSchedulerLog?: (entry: Omit<SchedulerLogEntry, "id" | "timestamp">) => void;
 }
 
-type TaskAction =
-  | "carryover"
-  | "reschedule"
-  | "schedule-now"
-  | "schedule-tomorrow"
-  | "update-due-date"
-  | "ignore"
-  | "mark-complete"
-  | null;
+type MissedScheduleAction = "carryover" | "reschedule" | "complete";
+type OverdueDeadlineAction = "extend-due-date" | "schedule" | "complete" | "ignore";
 
-interface TaskActionState {
-  action: TaskAction;
-  additionalDuration?: number;
-  notes?: string;
-  newDueDate?: string;
-  autoSchedule?: boolean;
+interface TaskDecision {
+  action: MissedScheduleAction | OverdueDeadlineAction;
   scheduleMode?: SchedulingMode;
+  carryoverDuration?: number;
+  carryoverNotes?: string;
+  newDueDate?: string;
+}
+
+const SCHEDULE_MODE_LABELS: Record<SchedulingMode, string> = {
+  now: "Schedule Now",
+  today: "Later Today",
+  tomorrow: "Tomorrow",
+  "next-week": "Next Week",
+  "next-month": "Next Month",
+  asap: "ASAP",
+  "due-date": "By Due Date",
+  smart: "Smart",
+};
+
+const MODE_TO_ENDPOINT: Record<SchedulingMode, string> = {
+  now: "schedule-now",
+  today: "schedule-today",
+  tomorrow: "schedule-tomorrow",
+  "next-week": "schedule-next-week",
+  "next-month": "schedule-next-month",
+  asap: "schedule-asap",
+  "due-date": "schedule-due-date",
+  smart: "schedule-smart",
+};
+
+type DecisionMap = Record<string, TaskDecision>;
+
+function partitionOverdueTasks(tasks: Task[]) {
+  const now = new Date();
+  const groupA: Task[] = [];
+  const groupB: Task[] = [];
+  for (const task of tasks) {
+    if (task.scheduled_end && new Date(task.scheduled_end) < now) {
+      groupA.push(task);
+    } else {
+      groupB.push(task);
+    }
+  }
+  return { groupA, groupB };
 }
 
 export function ProcessOverdueDialog({
@@ -73,301 +102,195 @@ export function ProcessOverdueDialog({
   open,
   onOpenChange,
   onTasksUpdated,
-  onTaskUpdate,
+  onTaskUpdate: _onTaskUpdate,
   onSchedulerLog,
 }: ProcessOverdueDialogProps) {
   const { timezone } = useUserTimezone();
   const { confirm } = useConfirmDialog();
-  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
-  const [taskActions, setTaskActions] = useState<Map<string, TaskActionState>>(new Map());
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [processingTaskId, setProcessingTaskId] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [decisions, setDecisions] = useState<DecisionMap>({});
+  const [isApplying, setIsApplying] = useState(false);
+  const [applyError, setApplyError] = useState<string | null>(null);
 
-  // Use getOverdueTasks which filters out completed, cancelled, rescheduled, and ignored tasks
   const overdueTasks = getOverdueTasks(tasks);
+  const { groupA, groupB } = useMemo(() => partitionOverdueTasks(overdueTasks), [overdueTasks]);
+  const resolvedCount = Object.keys(decisions).length;
+  const canApply = resolvedCount > 0 && !isApplying;
 
-  // Determine task type for each overdue task
-  const getTaskType = (task: Task): "scheduled" | "due-date" => {
-    const now = new Date();
-    // If scheduled_end has passed, it's a scheduled task
-    if (task.scheduled_end && new Date(task.scheduled_end) < now) {
-      return "scheduled";
-    }
-    // Otherwise it's a due-date task
-    return "due-date";
+  const setDecision = (taskId: string, decision: TaskDecision) => {
+    setDecisions((prev) => ({ ...prev, [taskId]: decision }));
   };
 
-  const handleSelectAction = (taskId: string, action: TaskAction, e?: React.MouseEvent) => {
-    if (e) {
-      e.preventDefault();
-      e.stopPropagation();
-    }
-    const newActions = new Map(taskActions);
-    if (action === null) {
-      newActions.delete(taskId);
-      setSelectedTaskId(null);
-    } else {
-      // Get existing state to preserve duration/notes if action is the same
-      const existing = newActions.get(taskId);
-      if (existing && existing.action === action) {
-        // Action already selected - toggle it off
-        newActions.delete(taskId);
-        setSelectedTaskId(null);
-      } else {
-        // Set new action, preserving existing duration/notes if switching actions
-        const preservedState =
-          existing && existing.action !== action
-            ? {
-                additionalDuration: existing.additionalDuration,
-                notes: existing.notes,
-                newDueDate: existing.newDueDate,
-                scheduleMode: existing.scheduleMode,
-              }
-            : {};
-        // Set default schedule mode if action is reschedule
-        const defaultState =
-          action === "reschedule" && !preservedState.scheduleMode
-            ? { scheduleMode: "now" as SchedulingMode }
-            : {};
-        newActions.set(taskId, { action, ...preservedState, ...defaultState });
-        setSelectedTaskId(taskId);
-      }
-    }
-    setTaskActions(newActions);
+  const clearDecision = (taskId: string) => {
+    setDecisions((prev) => {
+      const next = { ...prev };
+      delete next[taskId];
+      return next;
+    });
   };
 
-  const updateTaskAction = (taskId: string, updates: Partial<TaskActionState>) => {
-    const newActions = new Map(taskActions);
-    const current = newActions.get(taskId) || { action: null };
-    newActions.set(taskId, { ...current, ...updates });
-    setTaskActions(newActions);
+  const updateDecision = (taskId: string, updates: Partial<TaskDecision>) => {
+    setDecisions((prev) => {
+      const existing = prev[taskId];
+      if (!existing) return prev;
+      return { ...prev, [taskId]: { ...existing, ...updates } };
+    });
   };
 
-  const handleProcessAll = async () => {
-    if (taskActions.size === 0) {
-      setError("Please select actions for at least one task");
-      return;
-    }
+  const executeDecision = async (task: Task, decision: TaskDecision) => {
+    const { action } = decision;
 
-    setIsProcessing(true);
-    setError(null);
+    if (action === "carryover") {
+      const duration = decision.carryoverDuration ?? task.duration ?? 30;
 
-    try {
-      const promises: Promise<void>[] = [];
+      let response = await fetch(`/api/tasks/${task.id}/carryover`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          additional_duration: duration,
+          notes: decision.carryoverNotes,
+          auto_schedule: true,
+        }),
+      });
 
-      for (const [taskId, actionState] of taskActions.entries()) {
-        if (!actionState.action) continue;
-
-        const task = overdueTasks.find((t) => t.id === taskId);
-        if (!task) continue;
-
-        if (actionState.action === "carryover") {
-          // Create carryover task
-          const createCarryover = async () => {
-            const duration = actionState.additionalDuration || task.duration || 30;
-
-            // First attempt
-            let response = await fetch(`/api/tasks/${taskId}/carryover`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                additional_duration: duration,
-                notes: actionState.notes,
-                auto_schedule: actionState.autoSchedule ?? false,
-              }),
-            });
-
-            // If it's a subtask and we got an expansion error, show confirmation
-            if (!response.ok && task.task_type === "subtask") {
-              const errorData = await response.json();
-              if (errorData.error?.includes("exceeds parent task duration")) {
-                // Show confirmation dialog for parent duration expansion
-                const confirmed = await confirm({
-                  title: "Expand Parent Task Duration?",
-                  description: `Creating this carryover subtask requires expanding the parent task duration from ${errorData.parent_duration} min to ${errorData.total_with_carryover} min (an increase of ${errorData.required_extension} min). Do you want to proceed?`,
-                  confirmText: "Expand & Create",
-                  cancelText: "Cancel",
-                  variant: "default",
-                });
-
-                if (!confirmed) {
-                  throw new Error(`Carryover cancelled for ${task.title}`);
-                }
-
-                // Retry with extend_parent_duration flag
-                response = await fetch(`/api/tasks/${taskId}/carryover`, {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({
-                    additional_duration: duration,
-                    notes: actionState.notes,
-                    auto_schedule: actionState.autoSchedule ?? false,
-                    extend_parent_duration: true,
-                  }),
-                });
-              }
-            }
-
-            if (!response.ok) {
-              const data = await response.json();
-              throw new Error(data.error || `Failed to process ${task.title}`);
-            }
-            const carryoverData = await response.json();
-            onSchedulerLog?.({
-              operation: "carryover",
-              targetDate: "",
-              feedback: [carryoverData.message || `Carryover created for "${task.title}"`],
-              movedCount: 1,
-              success: true,
-              taskName: task.title,
-            });
-          };
-
-          promises.push(createCarryover());
-        } else if (actionState.action === "reschedule") {
-          // Reschedule task using the selected schedule mode
-          const mode = actionState.scheduleMode || "now";
-          const endpointMap: Record<SchedulingMode, string> = {
-            now: "schedule-now",
-            today: "schedule-today",
-            tomorrow: "schedule-tomorrow",
-            "next-week": "schedule-next-week",
-            "next-month": "schedule-next-month",
-            asap: "schedule-asap",
-            "due-date": "schedule-due-date",
-            smart: "schedule-smart",
-          };
-          const modeToOp: Record<SchedulingMode, string> = {
-            now: "schedule-now",
-            today: "schedule-today",
-            tomorrow: "schedule-tomorrow",
-            "next-week": "schedule-next-week",
-            "next-month": "schedule-next-month",
-            asap: "schedule-asap",
-            "due-date": "schedule-due-date",
-            smart: "schedule-smart",
-          };
-          const promise = fetch(`/api/tasks/${taskId}/${endpointMap[mode]}`, {
-            method: "POST",
-          }).then(async (res) => {
-            if (!res.ok) {
-              const data = await res.json();
-              throw new Error(data.error || `Failed to reschedule ${task.title}`);
-            }
-            const resData = await res.json();
-            onSchedulerLog?.({
-              operation: (modeToOp[mode] || "reschedule") as SchedulerLogEntry["operation"],
-              targetDate: "",
-              feedback: resData.feedback || [],
-              movedCount: resData.shuffledTasks?.length || 0,
-              success: true,
-              taskName: task.title,
-            });
+      if (!response.ok && task.task_type === "subtask") {
+        const errorData = await response.json();
+        if (errorData.error?.includes("exceeds parent task duration")) {
+          const confirmed = await confirm({
+            title: "Expand Parent Task Duration?",
+            description: `Creating this carryover subtask requires expanding the parent task duration from ${errorData.parent_duration} min to ${errorData.total_with_carryover} min (an increase of ${errorData.required_extension} min). Do you want to proceed?`,
+            confirmText: "Expand & Create",
+            cancelText: "Cancel",
+            variant: "default",
           });
-          promises.push(promise);
-        } else if (actionState.action === "schedule-now") {
-          // Schedule task now
-          const promise = fetch(`/api/tasks/${taskId}/schedule-now`, {
-            method: "POST",
-          }).then(async (res) => {
-            if (!res.ok) {
-              const data = await res.json();
-              throw new Error(data.error || `Failed to schedule ${task.title}`);
-            }
-            const resData = await res.json();
-            onSchedulerLog?.({
-              operation: "schedule-now",
-              targetDate: "",
-              feedback: resData.feedback || [],
-              movedCount: resData.shuffledTasks?.length || 0,
-              success: true,
-              taskName: task.title,
-            });
-          });
-          promises.push(promise);
-        } else if (actionState.action === "schedule-tomorrow") {
-          // Schedule task for tomorrow
-          const promise = fetch(`/api/tasks/${taskId}/schedule-tomorrow`, {
-            method: "POST",
-          }).then(async (res) => {
-            if (!res.ok) {
-              const data = await res.json();
-              throw new Error(data.error || `Failed to schedule ${task.title} for tomorrow`);
-            }
-            const resData = await res.json();
-            onSchedulerLog?.({
-              operation: "schedule-tomorrow",
-              targetDate: "",
-              feedback: resData.feedback || [],
-              movedCount: resData.shuffledTasks?.length || 0,
-              success: true,
-              taskName: task.title,
-            });
-          });
-          promises.push(promise);
-        } else if (actionState.action === "update-due-date") {
-          // Update due date
-          if (!actionState.newDueDate) {
-            throw new Error(`Please provide a new due date for ${task.title}`);
+
+          if (!confirmed) {
+            throw new Error(`Carryover cancelled for "${task.title}"`);
           }
-          const utcDate = parseDateTimeLocalToUTC(actionState.newDueDate, timezone);
-          const promise = fetch(`/api/tasks/${taskId}`, {
-            method: "PUT",
+
+          response = await fetch(`/api/tasks/${task.id}/carryover`, {
+            method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              due_date: utcDate,
+              additional_duration: duration,
+              notes: decision.carryoverNotes,
+              auto_schedule: true,
+              extend_parent_duration: true,
             }),
-          }).then(async (res) => {
-            if (!res.ok) {
-              const data = await res.json();
-              throw new Error(data.error || `Failed to update ${task.title}`);
-            }
           });
-          promises.push(promise);
-        } else if (actionState.action === "ignore") {
-          // Mark as ignored
-          const promise = fetch(`/api/tasks/${taskId}`, {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              ignored: true,
-            }),
-          }).then(async (res) => {
-            if (!res.ok) {
-              const data = await res.json();
-              throw new Error(data.error || `Failed to ignore ${task.title}`);
-            }
-          });
-          promises.push(promise);
-        } else if (actionState.action === "mark-complete") {
-          // Mark task as completed
-          const promise = fetch(`/api/tasks/${taskId}`, {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              status: "completed",
-            }),
-          }).then(async (res) => {
-            if (!res.ok) {
-              const data = await res.json();
-              throw new Error(data.error || `Failed to complete ${task.title}`);
-            }
-          });
-          promises.push(promise);
         }
       }
 
-      await Promise.all(promises);
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || `Failed to process "${task.title}"`);
+      }
+
+      const carryoverData = await response.json();
+      onSchedulerLog?.({
+        operation: "carryover",
+        targetDate: "",
+        feedback: [carryoverData.message || `Carryover created for "${task.title}"`],
+        movedCount: 1,
+        success: true,
+        taskName: task.title,
+      });
+    } else if (action === "reschedule" || action === "schedule") {
+      const mode: SchedulingMode = decision.scheduleMode ?? "asap";
+      const endpoint = MODE_TO_ENDPOINT[mode];
+      const res = await fetch(`/api/tasks/${task.id}/${endpoint}`, { method: "POST" });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || `Failed to reschedule "${task.title}"`);
+      }
+      const resData = await res.json();
+      onSchedulerLog?.({
+        operation: endpoint as SchedulerLogEntry["operation"],
+        targetDate: "",
+        feedback: resData.feedback || [],
+        movedCount: resData.shuffledTasks?.length || 0,
+        success: true,
+        taskName: task.title,
+      });
+    } else if (action === "complete") {
+      const res = await fetch(`/api/tasks/${task.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "completed" }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || `Failed to complete "${task.title}"`);
+      }
+    } else if (action === "extend-due-date") {
+      if (!decision.newDueDate) {
+        throw new Error(`No due date provided for "${task.title}"`);
+      }
+      const utcDate = parseDateTimeLocalToUTC(decision.newDueDate, timezone);
+      const res = await fetch(`/api/tasks/${task.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ due_date: utcDate }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || `Failed to update due date for "${task.title}"`);
+      }
+    } else if (action === "ignore") {
+      const res = await fetch(`/api/tasks/${task.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ignored: true }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || `Failed to ignore "${task.title}"`);
+      }
+    }
+  };
+
+  const handleApplyAll = async () => {
+    // Pre-apply validation
+    const validationErrors: string[] = [];
+    for (const [taskId, decision] of Object.entries(decisions)) {
+      const task = overdueTasks.find((t) => t.id === taskId);
+      if (!task) continue;
+      if (decision.action === "carryover" && (decision.carryoverDuration ?? 30) <= 0) {
+        validationErrors.push(`"${task.title}": carryover duration must be > 0`);
+      }
+      if (decision.action === "extend-due-date") {
+        if (!decision.newDueDate) {
+          validationErrors.push(`"${task.title}": new due date is required`);
+        } else if (new Date(decision.newDueDate) <= new Date()) {
+          validationErrors.push(`"${task.title}": new due date must be in the future`);
+        }
+      }
+    }
+    if (validationErrors.length > 0) {
+      setApplyError(validationErrors.join(" · "));
+      return;
+    }
+
+    setIsApplying(true);
+    setApplyError(null);
+    const errors: string[] = [];
+
+    for (const [taskId, decision] of Object.entries(decisions)) {
+      const task = overdueTasks.find((t) => t.id === taskId);
+      if (!task) continue;
+      try {
+        await executeDecision(task, decision);
+      } catch (err) {
+        errors.push(err instanceof Error ? err.message : `Failed: "${task.title}"`);
+      }
+    }
+
+    setIsApplying(false);
+    if (errors.length > 0) {
+      setApplyError(errors.join(" · "));
+    } else {
+      setDecisions({});
       onTasksUpdated();
       onOpenChange(false);
-      // Reset state
-      setTaskActions(new Map());
-      setSelectedTaskId(null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to process tasks");
-    } finally {
-      setIsProcessing(false);
     }
   };
 
@@ -377,8 +300,8 @@ export function ProcessOverdueDialog({
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>No Overdue Tasks</DialogTitle>
-            <DialogDescription>All tasks are up to date!</DialogDescription>
           </DialogHeader>
+          <p className="text-sm text-muted-foreground py-2">All tasks are up to date!</p>
           <DialogFooter>
             <Button onClick={() => onOpenChange(false)}>Close</Button>
           </DialogFooter>
@@ -389,630 +312,460 @@ export function ProcessOverdueDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
+      <DialogContent className="sm:max-w-2xl max-h-[90vh] flex flex-col gap-0 p-0">
+        {/* Sticky header */}
+        <DialogHeader className="px-6 pt-6 pb-4 border-b">
           <DialogTitle className="flex items-center gap-2">
-            <AlertTriangle className="h-5 w-5 text-red-500" />
-            Process Overdue Tasks ({overdueTasks.length})
+            <AlertTriangle className="h-5 w-5 text-amber-500" />
+            Review Overdue Tasks ({overdueTasks.length})
           </DialogTitle>
-          <DialogDescription>
-            Review and handle your overdue tasks. Select an action for each task below.
-          </DialogDescription>
+          <div className="mt-3 space-y-1.5">
+            <div className="flex items-center justify-between text-sm text-muted-foreground">
+              <span>
+                {resolvedCount} of {overdueTasks.length} resolved
+              </span>
+              <span>{Math.round((resolvedCount / overdueTasks.length) * 100)}%</span>
+            </div>
+            <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
+              <div
+                className="h-full rounded-full bg-primary transition-all duration-300"
+                style={{ width: `${(resolvedCount / overdueTasks.length) * 100}%` }}
+              />
+            </div>
+          </div>
         </DialogHeader>
 
-        <div className="space-y-4 py-4">
-          {overdueTasks.map((task) => {
-            const taskType = getTaskType(task);
-            const actionState = taskActions.get(task.id);
-            const isSelected = selectedTaskId === task.id;
-
-            return (
-              // biome-ignore lint/a11y/useSemanticElements: Task container requires div for complex layout
-              <div
-                key={task.id}
-                role="button"
-                tabIndex={0}
-                className={cn(
-                  "border rounded-lg p-4 space-y-3",
-                  isSelected && "ring-2 ring-primary"
-                )}
-                onClick={(e) => {
-                  // Prevent clicks on the container from interfering
-                  e.stopPropagation();
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault();
-                    e.stopPropagation();
-                  }
-                }}
-              >
-                {/* Task Info */}
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <h4 className="font-medium">{task.title}</h4>
-                    {task.parent_task_id &&
-                      (() => {
-                        const parentTask = tasks.find((t) => t.id === task.parent_task_id);
-                        return parentTask ? (
-                          <p className="text-sm text-muted-foreground/70 mt-0.5 italic">
-                            {parentTask.title}
-                          </p>
-                        ) : null;
-                      })()}
-                    <div className="flex items-center gap-4 mt-1 text-sm text-muted-foreground">
-                      {task.duration && (
-                        <span className="flex items-center gap-1">
-                          <Clock className="h-3 w-3" />
-                          {task.duration} min
-                        </span>
-                      )}
-                      {task.due_date && (
-                        <span className="flex items-center gap-1">
-                          <Calendar className="h-3 w-3" />
-                          Due: {new Date(task.due_date).toLocaleDateString()}
-                        </span>
-                      )}
-                      {task.scheduled_end && (
-                        <span className="flex items-center gap-1">
-                          <CalendarClock className="h-3 w-3" />
-                          Was scheduled: {new Date(task.scheduled_end).toLocaleString()}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  <span
-                    className={cn(
-                      "text-xs px-2 py-1 rounded",
-                      taskType === "scheduled"
-                        ? "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300"
-                        : "bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300"
-                    )}
-                  >
-                    {taskType === "scheduled" ? "Scheduled" : "Due Date"}
-                  </span>
+        {/* Scrollable task list */}
+        <div className="flex-1 min-h-0 overflow-y-auto">
+          <div className="px-6 py-4 space-y-6">
+            {groupA.length > 0 && (
+              <section className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <CalendarClock className="h-4 w-4 text-muted-foreground" />
+                  <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+                    Missed Schedule ({groupA.length})
+                  </h3>
                 </div>
+                {groupA.map((task) => (
+                  <GroupACard
+                    key={task.id}
+                    task={task}
+                    tasks={tasks}
+                    decision={decisions[task.id]}
+                    timezone={timezone}
+                    onDecisionChange={(d) => setDecision(task.id, d)}
+                    onDecisionUpdate={(u) => updateDecision(task.id, u)}
+                    onDecisionClear={() => clearDecision(task.id)}
+                  />
+                ))}
+              </section>
+            )}
 
-                {/* Action Selection */}
-                {taskType === "scheduled" ? (
-                  // Scheduled task: carryover, reschedule, and mark complete options
-                  <div className="space-y-2">
-                    <Label>Action</Label>
-                    <div className="flex items-center gap-2 flex-wrap">
-                      {task.status === "pending" && (
-                        <Button
-                          variant={actionState?.action === "reschedule" ? "default" : "outline"}
-                          size="sm"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            handleSelectAction(task.id, "reschedule", e);
-                          }}
-                          className="flex-1"
-                          type="button"
-                        >
-                          <CalendarClock className="h-4 w-4 mr-2" />
-                          Reschedule
-                        </Button>
-                      )}
-                      <Button
-                        variant={actionState?.action === "carryover" ? "default" : "outline"}
-                        size="sm"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          handleSelectAction(task.id, "carryover", e);
-                        }}
-                        className="flex-1"
-                        type="button"
-                        disabled={false}
-                      >
-                        <RotateCcw className="h-4 w-4 mr-2" />
-                        Create Carryover
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={async (e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
+            {groupB.length > 0 && (
+              <section className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <Calendar className="h-4 w-4 text-muted-foreground" />
+                  <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+                    Overdue Deadline ({groupB.length})
+                  </h3>
+                </div>
+                {groupB.map((task) => (
+                  <GroupBCard
+                    key={task.id}
+                    task={task}
+                    tasks={tasks}
+                    decision={decisions[task.id]}
+                    timezone={timezone}
+                    onDecisionChange={(d) => setDecision(task.id, d)}
+                    onDecisionUpdate={(u) => updateDecision(task.id, u)}
+                    onDecisionClear={() => clearDecision(task.id)}
+                  />
+                ))}
+              </section>
+            )}
 
-                          setProcessingTaskId(task.id);
-                          setError(null);
-
-                          try {
-                            const response = await fetch(`/api/tasks/${task.id}`, {
-                              method: "PUT",
-                              headers: { "Content-Type": "application/json" },
-                              body: JSON.stringify({
-                                status: "completed",
-                              }),
-                            });
-
-                            if (!response.ok) {
-                              const data = await response.json();
-                              throw new Error(data.error || `Failed to complete ${task.title}`);
-                            }
-
-                            const responseData = await response.json();
-                            const updatedTask = responseData.task;
-
-                            // Update task locally if callback provided, otherwise refresh all
-                            if (onTaskUpdate && updatedTask) {
-                              onTaskUpdate(task.id, updatedTask);
-                            } else {
-                              onTasksUpdated();
-                            }
-
-                            toast.success(`Task "${task.title}" marked as complete`, {
-                              description:
-                                "The dialog will stay open so you can process more tasks.",
-                            });
-                          } catch (err) {
-                            setError(
-                              err instanceof Error ? err.message : "Failed to mark task as complete"
-                            );
-                          } finally {
-                            setProcessingTaskId(null);
-                          }
-                        }}
-                        className="flex-1"
-                        type="button"
-                        disabled={processingTaskId === task.id}
-                        loading={processingTaskId === task.id}
-                      >
-                        <CheckCircle2 className="h-4 w-4 mr-2" />
-                        Mark Complete
-                      </Button>
-                      {(actionState?.action === "carryover" ||
-                        actionState?.action === "reschedule") && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            handleSelectAction(task.id, null, e);
-                          }}
-                          type="button"
-                        >
-                          <X className="h-4 w-4" />
-                        </Button>
-                      )}
-                    </div>
-
-                    {actionState?.action === "carryover" ? (
-                      <div className="space-y-2 pt-2 border-t">
-                        <div className="border rounded-lg p-4 space-y-3 bg-muted/30">
-                          <div>
-                            <Label htmlFor={`duration-${task.id}`}>
-                              Additional Duration (minutes)
-                            </Label>
-                            <Input
-                              id={`duration-${task.id}`}
-                              type="number"
-                              min="1"
-                              value={actionState.additionalDuration || task.duration || 30}
-                              onChange={(e) =>
-                                updateTaskAction(task.id, {
-                                  additionalDuration: parseInt(e.target.value, 10) || 0,
-                                })
-                              }
-                              className="h-9"
-                              disabled={processingTaskId === task.id}
-                            />
-                          </div>
-                          <div>
-                            <Label htmlFor={`notes-${task.id}`}>Notes (optional)</Label>
-                            <Textarea
-                              id={`notes-${task.id}`}
-                              value={actionState.notes || ""}
-                              onChange={(e) => updateTaskAction(task.id, { notes: e.target.value })}
-                              rows={2}
-                              className="resize-none"
-                              placeholder="What's left to do?"
-                              disabled={processingTaskId === task.id}
-                            />
-                          </div>
-                          <div className="flex items-center space-x-2">
-                            <Checkbox
-                              id={`auto-schedule-${task.id}`}
-                              checked={actionState.autoSchedule ?? false}
-                              onCheckedChange={(checked) =>
-                                updateTaskAction(task.id, { autoSchedule: checked === true })
-                              }
-                              disabled={processingTaskId === task.id}
-                            />
-                            <Label
-                              htmlFor={`auto-schedule-${task.id}`}
-                              className="text-sm font-normal cursor-pointer"
-                            >
-                              Auto-schedule to next available slot
-                            </Label>
-                          </div>
-                          <Button
-                            onClick={async () => {
-                              const duration =
-                                actionState.additionalDuration || task.duration || 30;
-                              if (!duration || duration <= 0) {
-                                setError("Please enter a valid duration");
-                                return;
-                              }
-
-                              setProcessingTaskId(task.id);
-                              setError(null);
-
-                              try {
-                                // First attempt to create carryover
-                                let response = await fetch(`/api/tasks/${task.id}/carryover`, {
-                                  method: "POST",
-                                  headers: { "Content-Type": "application/json" },
-                                  body: JSON.stringify({
-                                    additional_duration: duration,
-                                    notes: actionState.notes,
-                                    auto_schedule: actionState.autoSchedule ?? false,
-                                  }),
-                                });
-
-                                // If it's a subtask and we got an expansion error, show confirmation
-                                if (!response.ok && task.task_type === "subtask") {
-                                  const errorData = await response.json();
-                                  if (errorData.error?.includes("exceeds parent task duration")) {
-                                    // Show confirmation dialog for parent duration expansion
-                                    const confirmed = await confirm({
-                                      title: "Expand Parent Task Duration?",
-                                      description: `Creating this carryover subtask requires expanding the parent task duration from ${errorData.parent_duration} min to ${errorData.total_with_carryover} min (an increase of ${errorData.required_extension} min). Do you want to proceed?`,
-                                      confirmText: "Expand & Create",
-                                      cancelText: "Cancel",
-                                      variant: "default",
-                                    });
-
-                                    if (!confirmed) {
-                                      setProcessingTaskId(null);
-                                      return;
-                                    }
-
-                                    // Retry with extend_parent_duration flag
-                                    response = await fetch(`/api/tasks/${task.id}/carryover`, {
-                                      method: "POST",
-                                      headers: { "Content-Type": "application/json" },
-                                      body: JSON.stringify({
-                                        additional_duration: duration,
-                                        notes: actionState.notes,
-                                        auto_schedule: actionState.autoSchedule ?? false,
-                                        extend_parent_duration: true,
-                                      }),
-                                    });
-                                  }
-                                }
-
-                                if (!response.ok) {
-                                  const data = await response.json();
-                                  throw new Error(
-                                    data.error || `Failed to create carryover for ${task.title}`
-                                  );
-                                }
-
-                                const responseData = await response.json();
-
-                                // Log to scheduler log panel
-                                onSchedulerLog?.({
-                                  operation: "carryover",
-                                  targetDate: "",
-                                  feedback: [
-                                    responseData.message || `Carryover created for "${task.title}"`,
-                                  ],
-                                  movedCount: 1,
-                                  success: true,
-                                  taskName: task.title,
-                                });
-
-                                // Remove this task from the actions map
-                                const newActions = new Map(taskActions);
-                                newActions.delete(task.id);
-                                setTaskActions(newActions);
-                                setSelectedTaskId(null);
-
-                                // Show success message
-                                toast.success(`Carryover created for "${task.title}"`, {
-                                  description:
-                                    "The dialog will stay open so you can process more tasks.",
-                                });
-
-                                // Refresh tasks to update the list (this will filter out rescheduled tasks)
-                                // The task should now be filtered out by getOverdueTasks since it's rescheduled
-                                // Note: Dialog stays open intentionally so user can process more tasks
-                                onTasksUpdated();
-                              } catch (err) {
-                                setError(
-                                  err instanceof Error
-                                    ? err.message
-                                    : "Failed to create carryover task"
-                                );
-                              } finally {
-                                setProcessingTaskId(null);
-                              }
-                            }}
-                            disabled={
-                              processingTaskId === task.id ||
-                              !(actionState.additionalDuration || task.duration || 30)
-                            }
-                            loading={processingTaskId === task.id}
-                            className="w-full"
-                            size="sm"
-                          >
-                            <RotateCcw className="h-4 w-4 mr-2" />
-                            {processingTaskId === task.id ? "Creating..." : "Create"}
-                          </Button>
-                        </div>
-                      </div>
-                    ) : null}
-
-                    {actionState?.action === "reschedule" ? (
-                      <div className="space-y-2 pt-2 border-t">
-                        <div className="border rounded-lg p-4 space-y-3 bg-muted/30">
-                          <div>
-                            <Label>Schedule To</Label>
-                            <Select
-                              value={actionState.scheduleMode || "now"}
-                              onValueChange={(value: SchedulingMode) =>
-                                updateTaskAction(task.id, { scheduleMode: value })
-                              }
-                              disabled={processingTaskId === task.id}
-                            >
-                              <SelectTrigger className="mt-2">
-                                <SelectValue placeholder="Select schedule option" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="now">Schedule Now</SelectItem>
-                                <SelectItem value="today">Schedule Today</SelectItem>
-                                <SelectItem value="tomorrow">Schedule Tomorrow</SelectItem>
-                                <SelectItem value="next-week">Schedule Next Week</SelectItem>
-                                <SelectItem value="next-month">Schedule Next Month</SelectItem>
-                                <SelectItem value="asap">Schedule ASAP (with shuffling)</SelectItem>
-                                <SelectItem value="due-date">Schedule to Due Date</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          <Button
-                            onClick={async () => {
-                              const mode = actionState.scheduleMode || "now";
-                              const endpointMap: Record<SchedulingMode, string> = {
-                                now: "schedule-now",
-                                today: "schedule-today",
-                                tomorrow: "schedule-tomorrow",
-                                "next-week": "schedule-next-week",
-                                "next-month": "schedule-next-month",
-                                asap: "schedule-asap",
-                                "due-date": "schedule-due-date",
-                                smart: "schedule-smart",
-                              };
-
-                              setProcessingTaskId(task.id);
-                              setError(null);
-
-                              try {
-                                const response = await fetch(
-                                  `/api/tasks/${task.id}/${endpointMap[mode]}`,
-                                  {
-                                    method: "POST",
-                                  }
-                                );
-
-                                if (!response.ok) {
-                                  const data = await response.json();
-                                  throw new Error(
-                                    data.error || `Failed to reschedule ${task.title}`
-                                  );
-                                }
-
-                                const responseData = await response.json();
-
-                                // Log to scheduler log panel
-                                const modeToOp: Record<SchedulingMode, string> = {
-                                  now: "schedule-now",
-                                  today: "schedule-today",
-                                  tomorrow: "schedule-tomorrow",
-                                  "next-week": "schedule-next-week",
-                                  "next-month": "schedule-next-month",
-                                  asap: "schedule-asap",
-                                  "due-date": "schedule-due-date",
-                                  smart: "schedule-smart",
-                                };
-                                onSchedulerLog?.({
-                                  operation: (modeToOp[mode] ||
-                                    "reschedule") as SchedulerLogEntry["operation"],
-                                  targetDate: "",
-                                  feedback: responseData.feedback || [],
-                                  movedCount: responseData.shuffledTasks?.length || 0,
-                                  success: true,
-                                  taskName: task.title,
-                                });
-
-                                // Remove this task from the actions map
-                                const newActions = new Map(taskActions);
-                                newActions.delete(task.id);
-                                setTaskActions(newActions);
-                                setSelectedTaskId(null);
-
-                                // Show success message
-                                toast.success(`Task "${task.title}" rescheduled`, {
-                                  description:
-                                    responseData.shuffledTasks?.length > 0
-                                      ? `${responseData.shuffledTasks.length} task(s) were shuffled.`
-                                      : "The dialog will stay open so you can process more tasks.",
-                                });
-
-                                // Refresh tasks
-                                onTasksUpdated();
-                              } catch (err) {
-                                setError(
-                                  err instanceof Error ? err.message : "Failed to reschedule task"
-                                );
-                              } finally {
-                                setProcessingTaskId(null);
-                              }
-                            }}
-                            disabled={processingTaskId === task.id}
-                            loading={processingTaskId === task.id}
-                            className="w-full"
-                            size="sm"
-                          >
-                            <CalendarClock className="h-4 w-4 mr-2" />
-                            {processingTaskId === task.id ? "Rescheduling..." : "Reschedule"}
-                          </Button>
-                        </div>
-                      </div>
-                    ) : null}
-                  </div>
-                ) : (
-                  // Due date task: actions
-                  <div className="space-y-2">
-                    <Label>Action</Label>
-                    <div className="grid grid-cols-3 gap-2">
-                      <Button
-                        variant={actionState?.action === "schedule-now" ? "default" : "outline"}
-                        size="sm"
-                        onClick={(e) => handleSelectAction(task.id, "schedule-now", e)}
-                        className="text-xs"
-                        type="button"
-                      >
-                        <CalendarClock className="h-3 w-3 mr-1" />
-                        Now
-                      </Button>
-                      <Button
-                        variant={
-                          actionState?.action === "schedule-tomorrow" ? "default" : "outline"
-                        }
-                        size="sm"
-                        onClick={(e) => handleSelectAction(task.id, "schedule-tomorrow", e)}
-                        className="text-xs"
-                        type="button"
-                      >
-                        <CalendarClock className="h-3 w-3 mr-1" />
-                        Tomorrow
-                      </Button>
-                      <Button
-                        variant={actionState?.action === "update-due-date" ? "default" : "outline"}
-                        size="sm"
-                        onClick={(e) => handleSelectAction(task.id, "update-due-date", e)}
-                        className="text-xs"
-                        type="button"
-                      >
-                        <Calendar className="h-3 w-3 mr-1" />
-                        Due Date
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={async (e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-
-                          setProcessingTaskId(task.id);
-                          setError(null);
-
-                          try {
-                            const response = await fetch(`/api/tasks/${task.id}`, {
-                              method: "PUT",
-                              headers: { "Content-Type": "application/json" },
-                              body: JSON.stringify({
-                                status: "completed",
-                              }),
-                            });
-
-                            if (!response.ok) {
-                              const data = await response.json();
-                              throw new Error(data.error || `Failed to complete ${task.title}`);
-                            }
-
-                            const responseData = await response.json();
-                            const updatedTask = responseData.task;
-
-                            // Update task locally if callback provided, otherwise refresh all
-                            if (onTaskUpdate && updatedTask) {
-                              onTaskUpdate(task.id, updatedTask);
-                            } else {
-                              onTasksUpdated();
-                            }
-
-                            toast.success(`Task "${task.title}" marked as complete`, {
-                              description:
-                                "The dialog will stay open so you can process more tasks.",
-                            });
-                          } catch (err) {
-                            setError(
-                              err instanceof Error ? err.message : "Failed to mark task as complete"
-                            );
-                          } finally {
-                            setProcessingTaskId(null);
-                          }
-                        }}
-                        className="text-xs"
-                        type="button"
-                        disabled={processingTaskId === task.id}
-                        loading={processingTaskId === task.id}
-                      >
-                        <CheckCircle2 className="h-3 w-3 mr-1" />
-                        Mark Complete
-                      </Button>
-                      <Button
-                        variant={actionState?.action === "ignore" ? "default" : "outline"}
-                        size="sm"
-                        onClick={(e) => handleSelectAction(task.id, "ignore", e)}
-                        className="text-xs"
-                        type="button"
-                      >
-                        <XCircle className="h-3 w-3 mr-1" />
-                        Ignore
-                      </Button>
-                    </div>
-
-                    {actionState?.action === "update-due-date" && (
-                      <div className="pt-2 border-t">
-                        <Label htmlFor={`due-date-${task.id}`}>New Due Date</Label>
-                        <Input
-                          id={`due-date-${task.id}`}
-                          type="datetime-local"
-                          value={
-                            actionState.newDueDate ||
-                            formatDateTimeLocalForTimezone(
-                              task.due_date || new Date().toISOString(),
-                              timezone
-                            )
-                          }
-                          onChange={(e) =>
-                            updateTaskAction(task.id, { newDueDate: e.target.value })
-                          }
-                          className="h-9"
-                          min={formatDateTimeLocalForTimezone(new Date().toISOString(), timezone)}
-                        />
-                      </div>
-                    )}
-                  </div>
-                )}
+            {applyError && (
+              <div className="rounded-md bg-destructive/10 border border-destructive/30 px-4 py-3 text-sm text-destructive">
+                {applyError}
               </div>
-            );
-          })}
-
-          {error && (
-            <div className="text-sm text-destructive bg-destructive/10 rounded-md p-3">{error}</div>
-          )}
+            )}
+          </div>
         </div>
 
-        <DialogFooter className="flex-col sm:flex-row gap-2">
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isProcessing}>
+        {/* Sticky footer */}
+        <DialogFooter className="px-6 py-4 border-t">
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isApplying}>
             Cancel
           </Button>
-          <Button
-            onClick={handleProcessAll}
-            loading={isProcessing}
-            disabled={isProcessing || taskActions.size === 0}
-          >
-            {isProcessing ? "Processing..." : `Process ${taskActions.size} Task(s)`}
+          <Button onClick={handleApplyAll} disabled={!canApply}>
+            {isApplying ? "Applying…" : `Apply All (${resolvedCount} resolved)`}
           </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+// ── Group A Card (Missed Schedule) ───────────────────────────────────────────
+
+interface GroupACardProps {
+  task: Task;
+  tasks: Task[];
+  decision: TaskDecision | undefined;
+  timezone: string;
+  onDecisionChange: (d: TaskDecision) => void;
+  onDecisionUpdate: (u: Partial<TaskDecision>) => void;
+  onDecisionClear: () => void;
+}
+
+function GroupACard({
+  task,
+  tasks,
+  decision,
+  timezone,
+  onDecisionChange,
+  onDecisionUpdate,
+  onDecisionClear,
+}: GroupACardProps) {
+  const isResolved = !!decision;
+  const selectedAction = decision?.action as MissedScheduleAction | undefined;
+
+  const selectAction = (action: MissedScheduleAction) => {
+    if (selectedAction === action) {
+      onDecisionClear();
+      return;
+    }
+    if (action === "carryover") {
+      onDecisionChange({
+        action,
+        carryoverDuration: task.duration ?? 30,
+        carryoverNotes: "",
+      });
+    } else if (action === "reschedule") {
+      onDecisionChange({ action, scheduleMode: decision?.scheduleMode ?? "asap" });
+    } else {
+      onDecisionChange({ action });
+    }
+  };
+
+  const parentTask = task.parent_task_id ? tasks.find((t) => t.id === task.parent_task_id) : null;
+
+  return (
+    <div
+      className={cn(
+        "rounded-lg border p-4 space-y-3 border-l-4 transition-colors",
+        isResolved ? "border-l-primary bg-primary/5" : "border-l-amber-400"
+      )}
+    >
+      <TaskCardHeader
+        task={task}
+        parentTask={parentTask ?? null}
+        timezone={timezone}
+        groupLabel="Missed Schedule"
+      />
+
+      {/* Action buttons */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <ActionButton
+          active={selectedAction === "carryover"}
+          onClick={() => selectAction("carryover")}
+          icon={<RotateCcw className="h-3.5 w-3.5" />}
+          label="Carryover"
+        />
+        <ActionButton
+          active={selectedAction === "reschedule"}
+          onClick={() => selectAction("reschedule")}
+          icon={<Zap className="h-3.5 w-3.5" />}
+          label="Reschedule"
+        />
+        <ActionButton
+          active={selectedAction === "complete"}
+          onClick={() => selectAction("complete")}
+          icon={<CheckCircle2 className="h-3.5 w-3.5" />}
+          label="Complete"
+        />
+      </div>
+
+      {/* Reschedule mode dropdown */}
+      {selectedAction === "reschedule" && (
+        <div className="pt-1 space-y-1">
+          <Label className="text-xs">Schedule mode</Label>
+          <ScheduleModeSelect
+            value={decision?.scheduleMode ?? "asap"}
+            onChange={(mode) => onDecisionUpdate({ scheduleMode: mode })}
+          />
+        </div>
+      )}
+
+      {/* Carryover extra fields */}
+      {selectedAction === "carryover" && (
+        <div className="flex items-end gap-3 pt-1">
+          <div className="space-y-1">
+            <Label className="text-xs">Duration (min)</Label>
+            <Input
+              type="number"
+              min={1}
+              className="w-24 h-8 text-sm"
+              value={decision?.carryoverDuration ?? task.duration ?? 30}
+              onChange={(e) => onDecisionUpdate({ carryoverDuration: Number(e.target.value) })}
+            />
+          </div>
+          <div className="flex-1 space-y-1">
+            <Label className="text-xs">Notes</Label>
+            <Input
+              className="h-8 text-sm"
+              placeholder="Optional notes…"
+              value={decision?.carryoverNotes ?? ""}
+              onChange={(e) => onDecisionUpdate({ carryoverNotes: e.target.value })}
+            />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Group B Card (Overdue Deadline) ──────────────────────────────────────────
+
+interface GroupBCardProps {
+  task: Task;
+  tasks: Task[];
+  decision: TaskDecision | undefined;
+  timezone: string;
+  onDecisionChange: (d: TaskDecision) => void;
+  onDecisionUpdate: (u: Partial<TaskDecision>) => void;
+  onDecisionClear: () => void;
+}
+
+function GroupBCard({
+  task,
+  tasks,
+  decision,
+  timezone,
+  onDecisionChange,
+  onDecisionUpdate,
+  onDecisionClear,
+}: GroupBCardProps) {
+  const isResolved = !!decision;
+  const selectedAction = decision?.action as OverdueDeadlineAction | undefined;
+
+  const selectAction = (action: OverdueDeadlineAction) => {
+    if (selectedAction === action) {
+      onDecisionClear();
+      return;
+    }
+    if (action === "extend-due-date") {
+      onDecisionChange({ action, newDueDate: "" });
+    } else if (action === "schedule") {
+      onDecisionChange({ action, scheduleMode: decision?.scheduleMode ?? "asap" });
+    } else {
+      onDecisionChange({ action });
+    }
+  };
+
+  const applyQuickExtend = (offsetMs: number) => {
+    const base = task.due_date ? new Date(task.due_date) : new Date();
+    const newDate = new Date(base.getTime() + offsetMs);
+    onDecisionUpdate({
+      newDueDate: formatDateTimeLocalForTimezone(newDate.toISOString(), timezone),
+    });
+  };
+
+  const parentTask = task.parent_task_id ? tasks.find((t) => t.id === task.parent_task_id) : null;
+
+  return (
+    <div
+      className={cn(
+        "rounded-lg border p-4 space-y-3 border-l-4 transition-colors",
+        isResolved ? "border-l-primary bg-primary/5" : "border-l-amber-400"
+      )}
+    >
+      <TaskCardHeader
+        task={task}
+        parentTask={parentTask ?? null}
+        timezone={timezone}
+        groupLabel="Overdue Deadline"
+      />
+
+      {/* Action buttons */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <ActionButton
+          active={selectedAction === "extend-due-date"}
+          onClick={() => selectAction("extend-due-date")}
+          icon={<Calendar className="h-3.5 w-3.5" />}
+          label="Extend Due Date"
+        />
+        <ActionButton
+          active={selectedAction === "schedule"}
+          onClick={() => selectAction("schedule")}
+          icon={<Zap className="h-3.5 w-3.5" />}
+          label="Schedule"
+        />
+        <ActionButton
+          active={selectedAction === "complete"}
+          onClick={() => selectAction("complete")}
+          icon={<CheckCircle2 className="h-3.5 w-3.5" />}
+          label="Complete"
+        />
+        <ActionButton
+          active={selectedAction === "ignore"}
+          onClick={() => selectAction("ignore")}
+          label="Ignore"
+        />
+      </div>
+
+      {/* Schedule mode dropdown */}
+      {selectedAction === "schedule" && (
+        <div className="pt-1 space-y-1">
+          <Label className="text-xs">Schedule mode</Label>
+          <ScheduleModeSelect
+            value={decision?.scheduleMode ?? "asap"}
+            onChange={(mode) => onDecisionUpdate({ scheduleMode: mode })}
+          />
+        </div>
+      )}
+
+      {/* Extend due date */}
+      {selectedAction === "extend-due-date" && (
+        <div className="pt-1 space-y-2">
+          {task.due_date && (
+            <p className="text-xs text-muted-foreground">
+              Current deadline:{" "}
+              <span className="font-medium text-foreground">
+                {formatDateInTimezone(task.due_date, timezone, DATE_FORMAT)}
+              </span>
+            </p>
+          )}
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {[
+              { label: "+1d", ms: 86_400_000 },
+              { label: "+3d", ms: 3 * 86_400_000 },
+              { label: "+1w", ms: 7 * 86_400_000 },
+              { label: "+2w", ms: 14 * 86_400_000 },
+              { label: "+1mo", ms: 30 * 86_400_000 },
+            ].map(({ label, ms }) => (
+              <Button
+                key={label}
+                type="button"
+                size="sm"
+                variant="outline"
+                className="h-6 px-2 text-xs"
+                onClick={() => applyQuickExtend(ms)}
+              >
+                {label}
+              </Button>
+            ))}
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs">Or pick a date</Label>
+            <Input
+              type="datetime-local"
+              className="h-8 text-sm w-auto"
+              value={decision?.newDueDate ?? ""}
+              onChange={(e) => onDecisionUpdate({ newDueDate: e.target.value })}
+            />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Shared sub-components ─────────────────────────────────────────────────────
+
+interface TaskCardHeaderProps {
+  task: Task;
+  parentTask: Task | null;
+  timezone: string;
+  groupLabel: string;
+}
+
+const DATE_FORMAT: Intl.DateTimeFormatOptions = {
+  weekday: "short",
+  month: "short",
+  day: "numeric",
+  hour: "numeric",
+  minute: "2-digit",
+};
+
+function TaskCardHeader({ task, parentTask, timezone, groupLabel }: TaskCardHeaderProps) {
+  return (
+    <div className="flex items-start justify-between gap-2">
+      <div className="flex-1 min-w-0">
+        <p className="font-medium truncate">{task.title}</p>
+        {parentTask && (
+          <p className="text-xs text-muted-foreground italic mt-0.5">↳ {parentTask.title}</p>
+        )}
+        <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground flex-wrap">
+          {task.duration && (
+            <span className="flex items-center gap-1">
+              <Clock className="h-3 w-3" />
+              {task.duration} min
+            </span>
+          )}
+          {task.scheduled_end && (
+            <span className="flex items-center gap-1">
+              <CalendarClock className="h-3 w-3" />
+              Scheduled end: {formatDateInTimezone(task.scheduled_end, timezone, DATE_FORMAT)}
+            </span>
+          )}
+          {task.due_date && !task.scheduled_end && (
+            <span className="flex items-center gap-1">
+              <Calendar className="h-3 w-3" />
+              Due: {formatDateInTimezone(task.due_date, timezone, DATE_FORMAT)}
+            </span>
+          )}
+        </div>
+      </div>
+      <span className="shrink-0 text-xs px-2 py-0.5 rounded bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400">
+        {groupLabel}
+      </span>
+    </div>
+  );
+}
+
+interface ActionButtonProps {
+  active: boolean;
+  onClick: () => void;
+  icon?: React.ReactNode;
+  label: string;
+}
+
+function ActionButton({ active, onClick, icon, label }: ActionButtonProps) {
+  return (
+    <Button
+      type="button"
+      size="sm"
+      variant={active ? "default" : "outline"}
+      className="h-7 text-xs gap-1.5"
+      onClick={onClick}
+    >
+      {icon}
+      {label}
+    </Button>
+  );
+}
+
+interface ScheduleModeSelectProps {
+  value: SchedulingMode;
+  onChange: (mode: SchedulingMode) => void;
+}
+
+function ScheduleModeSelect({ value, onChange }: ScheduleModeSelectProps) {
+  return (
+    <Select value={value} onValueChange={(v) => onChange(v as SchedulingMode)}>
+      <SelectTrigger className="h-8 text-sm w-44">
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        {(Object.entries(SCHEDULE_MODE_LABELS) as [SchedulingMode, string][]).map(
+          ([mode, label]) => (
+            <SelectItem key={mode} value={mode}>
+              {label}
+            </SelectItem>
+          )
+        )}
+      </SelectContent>
+    </Select>
   );
 }
