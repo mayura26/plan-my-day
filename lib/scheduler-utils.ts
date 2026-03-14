@@ -1964,15 +1964,13 @@ function scheduleTaskSmartWithShuffling(
 
   // Determine schedule hours (group rules or awake hours)
   const useGroupRules = taskGroup?.auto_schedule_enabled && taskGroup?.auto_schedule_hours;
-  const scheduleHours = useGroupRules ? taskGroup!.auto_schedule_hours! : awakeHours;
+  const scheduleHours = useGroupRules ? (taskGroup?.auto_schedule_hours ?? awakeHours) : awakeHours;
 
   // Determine if due date is today in user's timezone
   const nowTz = getTimeInTimezone(nowUTC, timezone);
   const dueDateTz = getTimeInTimezone(dueDate, timezone);
   const isDueToday =
-    nowTz.year === dueDateTz.year &&
-    nowTz.month === dueDateTz.month &&
-    nowTz.day === dueDateTz.day;
+    nowTz.year === dueDateTz.year && nowTz.month === dueDateTz.month && nowTz.day === dueDateTz.day;
 
   // Build groups map for displaced task lookups
   const groupsMap = new Map<string, TaskGroup>();
@@ -2013,7 +2011,11 @@ function scheduleTaskSmartWithShuffling(
   );
 
   // Recursive shuffle that respects group rules and checks due-date violations
-  const shuffleTask = (conflictingTask: Task, newSlotStart: Date, depth: number): TimeSlot | null => {
+  const shuffleTask = (
+    conflictingTask: Task,
+    newSlotStart: Date,
+    depth: number
+  ): TimeSlot | null => {
     if (Date.now() - startTime > maxTimeout) {
       reportProgress("Shuffling timeout reached");
       return null;
@@ -2054,7 +2056,11 @@ function scheduleTaskSmartWithShuffling(
     // Respect group/awake hours for this displaced task
     const taskGroupHours = getTaskGroupHours(conflictingTask);
     if (!isWithinWorkingHours(candidateSlot, taskGroupHours || awakeHours, timezone)) {
-      candidateSlotStart = getStartOfNextWorkingDay(candidateSlotStart, taskGroupHours || awakeHours, timezone);
+      candidateSlotStart = getStartOfNextWorkingDay(
+        candidateSlotStart,
+        taskGroupHours || awakeHours,
+        timezone
+      );
       candidateSlotEnd = new Date(candidateSlotStart.getTime() + taskDuration);
       candidateSlot = { start: candidateSlotStart, end: candidateSlotEnd };
     }
@@ -2199,9 +2205,7 @@ function scheduleTaskSmartWithShuffling(
 
     // Push blocker to after the due date (or after its current end if later)
     const blockerEnd = blocker.scheduled_end ? new Date(blocker.scheduled_end) : dueDate;
-    const newStart = roundUpTo15Min(
-      new Date(Math.max(blockerEnd.getTime(), dueDate.getTime()))
-    );
+    const newStart = roundUpTo15Min(new Date(Math.max(blockerEnd.getTime(), dueDate.getTime())));
 
     reportProgress(`Attempting to displace blocker "${blocker.title}" to after due date...`);
     const displaced = shuffleTask(blocker, newStart, 0);
@@ -2241,7 +2245,9 @@ function scheduleTaskSmartWithShuffling(
           virtualTasks
         );
         if (extSlot && extSlot.start >= nowUTC) {
-          reportProgress(`Found slot using extended awake hours after displacement: ${extSlot.start.toISOString()}`);
+          reportProgress(
+            `Found slot using extended awake hours after displacement: ${extSlot.start.toISOString()}`
+          );
           return { slot: extSlot, feedback: [], shuffledTasks };
         }
       }
@@ -2877,8 +2883,7 @@ export function pullForwardTasksForGroup(options: PullForwardOptions): PullForwa
       if (isOnDay(slot.start, tYear, tMonth, tDay, timezone)) return true;
       // Future tasks: cap to look-ahead window
       return (
-        slot.start.getTime() > windowStart.getTime() &&
-        slot.start.getTime() <= maxDate.getTime()
+        slot.start.getTime() > windowStart.getTime() && slot.start.getTime() <= maxDate.getTime()
       );
     })
     .sort((a, b) => {
@@ -2940,8 +2945,7 @@ export function pullForwardTasksForGroup(options: PullForwardOptions): PullForwa
     // Stop if placing here would clash with any obstacle (sequential pack — no gap-jumping)
     const clash = obstacles.find(
       (obs) =>
-        candidateStart.getTime() < obs.end.getTime() &&
-        candidateEnd.getTime() > obs.start.getTime()
+        candidateStart.getTime() < obs.end.getTime() && candidateEnd.getTime() > obs.start.getTime()
     );
 
     if (clash) {

@@ -1830,7 +1830,11 @@ export default function CalendarPage() {
             taskGroups={groups}
             queueInfo={
               taskQueue.length > 0
-                ? { current: taskQueueIndex + 1, total: taskQueue.length, onSkip: handleSkipQueueTask }
+                ? {
+                    current: taskQueueIndex + 1,
+                    total: taskQueue.length,
+                    onSkip: handleSkipQueueTask,
+                  }
                 : undefined
             }
           />

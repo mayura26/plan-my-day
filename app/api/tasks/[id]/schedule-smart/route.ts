@@ -160,10 +160,12 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
       for (const row of depsResult.rows) {
         const taskId = row.task_id as string;
         const dependsOnId = row.depends_on_task_id as string;
-        if (!dependencyMap.has(taskId)) {
-          dependencyMap.set(taskId, []);
+        let list = dependencyMap.get(taskId);
+        if (!list) {
+          list = [];
+          dependencyMap.set(taskId, list);
         }
-        dependencyMap.get(taskId)!.push(dependsOnId);
+        list.push(dependsOnId);
       }
 
       // Schedule subtasks in reverse order (backwards from due date), same as schedule-due-date
@@ -336,10 +338,12 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
     for (const row of depsResult.rows) {
       const taskId = row.task_id as string;
       const dependsOnId = row.depends_on_task_id as string;
-      if (!dependencyMap.has(taskId)) {
-        dependencyMap.set(taskId, []);
+      let list = dependencyMap.get(taskId);
+      if (!list) {
+        list = [];
+        dependencyMap.set(taskId, list);
       }
-      dependencyMap.get(taskId)!.push(dependsOnId);
+      list.push(dependsOnId);
     }
 
     // Use unified scheduler with "smart" mode

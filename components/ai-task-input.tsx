@@ -24,6 +24,7 @@ interface PreviewTask {
   task_type?: string;
   priority?: number;
   group_id?: string;
+  _previewId?: string;
   [key: string]: unknown;
 }
 
@@ -329,8 +330,12 @@ export function AITaskInput({
         return;
       }
 
-      setPreviewTasks(data.tasks as PreviewTask[]);
-      setSelectedIndices(new Set(data.tasks.map((_: unknown, i: number) => i)));
+      const tasksWithKeys = (data.tasks as PreviewTask[]).map((t) => ({
+        ...t,
+        _previewId: crypto.randomUUID(),
+      }));
+      setPreviewTasks(tasksWithKeys);
+      setSelectedIndices(new Set(tasksWithKeys.map((_: PreviewTask, i: number) => i)));
       setShowPreview(true);
     } catch {
       setParseError("Network error. Please check your connection and try again.");
@@ -548,7 +553,7 @@ export function AITaskInput({
                 const group = task.group_id ? groups.find((g) => g.id === task.group_id) : null;
                 return (
                   <button
-                    key={`preview-${i}`}
+                    key={task._previewId ?? `preview-${task.title}-${i}`}
                     type="button"
                     onClick={() => toggleIndex(i)}
                     className={cn(
@@ -632,10 +637,7 @@ export function AITaskInput({
                 <span className="text-xs text-muted-foreground">
                   {selectedIndices.size} selected
                 </span>
-                <Button
-                  onClick={handleStartCreating}
-                  disabled={selectedIndices.size === 0}
-                >
+                <Button onClick={handleStartCreating} disabled={selectedIndices.size === 0}>
                   Start Creating →
                 </Button>
               </div>

@@ -17,7 +17,8 @@
       "Bash(cd:*)",
       "WebSearch",
       "Bash(npm run:*)",
-      "Bash(npx tsc:*)"
+      "Bash(npx tsc:*)",
+      "Bash(xargs grep:*)"
     ]
   }
 }

@@ -1,8 +1,8 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/turso";
-import { SCHEDULING_MODES } from "@/lib/types";
 import type { SchedulingMode } from "@/lib/types";
+import { SCHEDULING_MODES } from "@/lib/types";
 
 const VALID_MODES = SCHEDULING_MODES;
 
