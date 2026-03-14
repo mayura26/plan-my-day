@@ -44,6 +44,8 @@ export default function TasksPage() {
   const [aiParsedData, setAIParsedData] = useState<Partial<CreateTaskRequestWithSubtasks> | null>(
     null
   );
+  const [taskQueue, setTaskQueue] = useState<Partial<CreateTaskRequestWithSubtasks>[]>([]);
+  const [taskQueueIndex, setTaskQueueIndex] = useState(0);
   const [editingGroup, setEditingGroup] = useState<TaskGroup | null>(null);
   const [showEditGroupDialog, setShowEditGroupDialog] = useState(false);
   const [showCreateParentDialog, setShowCreateParentDialog] = useState(false);
@@ -182,12 +184,22 @@ export default function TasksPage() {
       }
 
       if (hasSubtasks && wantsAutoSchedule) {
-        setShowCreateForm(false);
-        toast.success("Task created successfully");
+        // handled above via fetchTasks
       } else {
         setTasks((prev) => [createdTask, ...prev]);
+      }
+      toast.success("Task created successfully");
+
+      // Advance queue if active
+      if (taskQueue.length > 0 && taskQueueIndex < taskQueue.length - 1) {
+        const nextIndex = taskQueueIndex + 1;
+        setTaskQueueIndex(nextIndex);
+        handleAIParsed(taskQueue[nextIndex]);
+      } else {
+        setTaskQueue([]);
+        setTaskQueueIndex(0);
         setShowCreateForm(false);
-        toast.success("Task created successfully");
+        setAIParsedData(null);
       }
     } catch (error) {
       console.error("Error creating task:", error);
@@ -442,6 +454,25 @@ export default function TasksPage() {
     setShowCreateForm(true);
   };
 
+  const handleMultipleAIParsed = (tasks: Partial<CreateTaskRequestWithSubtasks>[]) => {
+    setTaskQueue(tasks);
+    setTaskQueueIndex(0);
+    if (tasks.length > 0) handleAIParsed(tasks[0]);
+  };
+
+  const handleSkipQueueTask = () => {
+    if (taskQueueIndex < taskQueue.length - 1) {
+      const nextIndex = taskQueueIndex + 1;
+      setTaskQueueIndex(nextIndex);
+      handleAIParsed(taskQueue[nextIndex]);
+    } else {
+      setTaskQueue([]);
+      setTaskQueueIndex(0);
+      setShowCreateForm(false);
+      setAIParsedData(null);
+    }
+  };
+
   if (status === "loading" || isLoading) {
     return (
       <div className="min-h-screen bg-background">
@@ -510,7 +541,11 @@ export default function TasksPage() {
         open={showCreateForm}
         onOpenChange={(open) => {
           setShowCreateForm(open);
-          if (!open) setAIParsedData(null);
+          if (!open) {
+            setAIParsedData(null);
+            setTaskQueue([]);
+            setTaskQueueIndex(0);
+          }
         }}
       >
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto w-[95vw] md:w-full mx-2 md:mx-auto">
@@ -522,10 +557,17 @@ export default function TasksPage() {
             onCancel={() => {
               setShowCreateForm(false);
               setAIParsedData(null);
+              setTaskQueue([]);
+              setTaskQueueIndex(0);
             }}
             isLoading={isCreating}
             initialData={aiParsedData || undefined}
             taskGroups={groups}
+            queueInfo={
+              taskQueue.length > 0
+                ? { current: taskQueueIndex + 1, total: taskQueue.length, onSkip: handleSkipQueueTask }
+                : undefined
+            }
           />
         </DialogContent>
       </Dialog>
@@ -728,6 +770,7 @@ export default function TasksPage() {
         open={showAIInput}
         onOpenChange={setShowAIInput}
         onParsed={handleAIParsed}
+        onMultipleParsed={handleMultipleAIParsed}
         groups={groups}
       />
     </div>

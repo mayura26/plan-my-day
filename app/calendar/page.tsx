@@ -88,6 +88,8 @@ export default function CalendarPage() {
   const [showAIInput, setShowAIInput] = useState(false);
   const [quickAddInitialData, setQuickAddInitialData] =
     useState<Partial<CreateTaskRequestWithSubtasks> | null>(null);
+  const [taskQueue, setTaskQueue] = useState<Partial<CreateTaskRequestWithSubtasks>[]>([]);
+  const [taskQueueIndex, setTaskQueueIndex] = useState(0);
   const [sidebarWidth, setSidebarWidth] = useState<number>(() => {
     // Load from localStorage or default to 380px (wider for buttons to fit in one row)
     if (typeof window !== "undefined") {
@@ -738,6 +740,25 @@ export default function CalendarPage() {
     setSidebarOpen(false);
   };
 
+  const handleMultipleAIParsed = (tasks: Partial<CreateTaskRequestWithSubtasks>[]) => {
+    setTaskQueue(tasks);
+    setTaskQueueIndex(0);
+    if (tasks.length > 0) handleAIParsed(tasks[0]);
+  };
+
+  const handleSkipQueueTask = () => {
+    if (taskQueueIndex < taskQueue.length - 1) {
+      const nextIndex = taskQueueIndex + 1;
+      setTaskQueueIndex(nextIndex);
+      handleAIParsed(taskQueue[nextIndex]);
+    } else {
+      setTaskQueue([]);
+      setTaskQueueIndex(0);
+      setShowCreateForm(false);
+      setQuickAddInitialData(null);
+    }
+  };
+
   const handleCreateTask = async (taskData: CreateTaskRequestWithSubtasks) => {
     setIsCreating(true);
     try {
@@ -824,10 +845,20 @@ export default function CalendarPage() {
       }
 
       if (hasSubtasks && wantsAutoSchedule) {
-        setShowCreateForm(false);
-        setQuickAddInitialData(null);
+        // handled above via fetchTasks
       } else {
         setTasks((prev) => [createdTask, ...prev]);
+      }
+      toast.success("Task created successfully");
+
+      // Advance queue if active
+      if (taskQueue.length > 0 && taskQueueIndex < taskQueue.length - 1) {
+        const nextIndex = taskQueueIndex + 1;
+        setTaskQueueIndex(nextIndex);
+        handleAIParsed(taskQueue[nextIndex]);
+      } else {
+        setTaskQueue([]);
+        setTaskQueueIndex(0);
         setShowCreateForm(false);
         setQuickAddInitialData(null);
       }
@@ -1772,8 +1803,9 @@ export default function CalendarPage() {
         onOpenChange={(open) => {
           setShowCreateForm(open);
           if (!open) {
-            // Clear quick add data when dialog closes
             setQuickAddInitialData(null);
+            setTaskQueue([]);
+            setTaskQueueIndex(0);
           }
         }}
       >
@@ -1789,10 +1821,17 @@ export default function CalendarPage() {
             onCancel={() => {
               setShowCreateForm(false);
               setQuickAddInitialData(null);
+              setTaskQueue([]);
+              setTaskQueueIndex(0);
             }}
             isLoading={isCreating}
             initialData={quickAddInitialData || undefined}
             taskGroups={groups}
+            queueInfo={
+              taskQueue.length > 0
+                ? { current: taskQueueIndex + 1, total: taskQueue.length, onSkip: handleSkipQueueTask }
+                : undefined
+            }
           />
         </DialogContent>
       </Dialog>
@@ -1801,6 +1840,7 @@ export default function CalendarPage() {
         open={showAIInput}
         onOpenChange={setShowAIInput}
         onParsed={handleAIParsed}
+        onMultipleParsed={handleMultipleAIParsed}
         groups={groups}
       />
 

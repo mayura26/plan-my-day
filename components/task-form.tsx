@@ -66,6 +66,7 @@ interface TaskFormProps {
   initialData?: Partial<CreateTaskRequestWithSubtasks> & { id?: string };
   isLoading?: boolean;
   taskGroups?: TaskGroup[];
+  queueInfo?: { current: number; total: number; onSkip: () => void };
 }
 
 export function TaskForm({
@@ -74,6 +75,7 @@ export function TaskForm({
   initialData,
   isLoading = false,
   taskGroups: propTaskGroups,
+  queueInfo,
 }: TaskFormProps) {
   const { timezone } = useUserTimezone();
 
@@ -495,6 +497,12 @@ export function TaskForm({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
+      {/* Queue progress indicator */}
+      {queueInfo && (
+        <p className="text-xs text-muted-foreground">
+          Task {queueInfo.current} of {queueInfo.total}
+        </p>
+      )}
       {/* Header with Type Selector */}
       <div className="flex items-center gap-2 text-lg font-semibold">
         <span className="text-muted-foreground">{initialData ? "Edit" : "New"}</span>
@@ -1041,6 +1049,17 @@ export function TaskForm({
             className="flex-1 h-11"
           >
             Cancel
+          </Button>
+        )}
+        {queueInfo && (
+          <Button
+            type="button"
+            variant="outline"
+            onClick={queueInfo.onSkip}
+            disabled={isLoading}
+            className="h-11 px-4"
+          >
+            Skip →
           </Button>
         )}
         <Button
