@@ -36,6 +36,48 @@ export interface NotificationPayload {
     icon?: string;
   }>;
   requireInteraction?: boolean;
+  vibrate?: number[];
+  renotify?: boolean;
+  priority?: number;
+}
+
+export function getNotificationUrgency(priority: number) {
+  if (priority === 1)
+    return {
+      titlePrefix: "🔴 URGENT: ",
+      vibrate: [100, 50, 100, 50, 100, 50, 100],
+      requireInteraction: true,
+      renotify: true,
+      webpushUrgency: "high" as const,
+      ttl: 0,
+    };
+  if (priority === 2)
+    return {
+      titlePrefix: "⚠️ ",
+      vibrate: [200, 100, 200, 100, 200],
+      requireInteraction: true,
+      renotify: false,
+      webpushUrgency: "high" as const,
+      ttl: 300,
+    };
+  if (priority >= 4)
+    return {
+      titlePrefix: "",
+      vibrate: [100],
+      requireInteraction: false,
+      renotify: false,
+      webpushUrgency: "normal" as const,
+      ttl: 3600,
+    };
+  // priority 3 — default
+  return {
+    titlePrefix: "",
+    vibrate: [200, 100, 200],
+    requireInteraction: false,
+    renotify: false,
+    webpushUrgency: "normal" as const,
+    ttl: 3600,
+  };
 }
 
 export async function sendPushNotification(
@@ -44,6 +86,7 @@ export async function sendPushNotification(
 ): Promise<void> {
   try {
     initializePushNotifications();
+    const urgency = payload.priority != null ? getNotificationUrgency(payload.priority) : null;
     await webpush.sendNotification(
       subscription,
       JSON.stringify({
@@ -55,7 +98,13 @@ export async function sendPushNotification(
         data: payload.data,
         actions: payload.actions,
         requireInteraction: payload.requireInteraction,
-      })
+        vibrate: payload.vibrate,
+        renotify: payload.renotify,
+      }),
+      {
+        TTL: urgency?.ttl ?? 3600,
+        urgency: urgency?.webpushUrgency ?? "normal",
+      }
     );
   } catch (error) {
     console.error("Error sending push notification:", error);
@@ -66,10 +115,12 @@ export async function sendPushNotification(
 export function createTaskReminderPayload(
   taskTitle: string,
   taskId: string,
-  minutesUntil: number
+  minutesUntil: number,
+  priority?: number
 ): NotificationPayload {
+  const urgency = priority != null ? getNotificationUrgency(priority) : null;
   return {
-    title: `Task Reminder: ${taskTitle}`,
+    title: `${urgency?.titlePrefix ?? ""}Task Reminder: ${taskTitle}`,
     body: `Your task starts in ${minutesUntil} minute${minutesUntil !== 1 ? "s" : ""}`,
     tag: `task-${taskId}`,
     icon: "/web-app-manifest-192x192.png",
@@ -88,16 +139,24 @@ export function createTaskReminderPayload(
         title: "Snooze 5 min",
       },
     ],
+    ...(urgency && {
+      requireInteraction: urgency.requireInteraction,
+      renotify: urgency.renotify,
+      vibrate: urgency.vibrate,
+    }),
+    priority,
   };
 }
 
 export function createLeadReminderPayload(
   taskTitle: string,
   taskId: string,
-  minutesUntil: number
+  minutesUntil: number,
+  priority?: number
 ): NotificationPayload {
+  const urgency = priority != null ? getNotificationUrgency(priority) : null;
   return {
-    title: `Starting soon: ${taskTitle}`,
+    title: `${urgency?.titlePrefix ?? ""}Starting soon: ${taskTitle}`,
     body: `Starts in ${minutesUntil} minute${minutesUntil !== 1 ? "s" : ""}`,
     tag: `task-${taskId}-lead`,
     icon: "/web-app-manifest-192x192.png",
@@ -110,15 +169,23 @@ export function createLeadReminderPayload(
       { action: "view", title: "View Task" },
       { action: "snooze", title: "Snooze 5 min" },
     ],
+    ...(urgency && {
+      requireInteraction: urgency.requireInteraction,
+      renotify: urgency.renotify,
+      vibrate: urgency.vibrate,
+    }),
+    priority,
   };
 }
 
 export function createOnTimeReminderPayload(
   taskTitle: string,
-  taskId: string
+  taskId: string,
+  priority?: number
 ): NotificationPayload {
+  const urgency = priority != null ? getNotificationUrgency(priority) : null;
   return {
-    title: `Starting now: ${taskTitle}`,
+    title: `${urgency?.titlePrefix ?? ""}Starting now: ${taskTitle}`,
     body: "Your task is starting now",
     tag: `task-${taskId}-ontime`,
     icon: "/web-app-manifest-192x192.png",
@@ -131,16 +198,24 @@ export function createOnTimeReminderPayload(
       { action: "view", title: "View Task" },
       { action: "snooze", title: "Snooze 5 min" },
     ],
+    ...(urgency && {
+      requireInteraction: urgency.requireInteraction,
+      renotify: urgency.renotify,
+      vibrate: urgency.vibrate,
+    }),
+    priority,
   };
 }
 
 export function createDueReminderPayload(
   taskTitle: string,
   taskId: string,
-  minutesUntil: number
+  minutesUntil: number,
+  priority?: number
 ): NotificationPayload {
+  const urgency = priority != null ? getNotificationUrgency(priority) : null;
   return {
-    title: `Due soon: ${taskTitle}`,
+    title: `${urgency?.titlePrefix ?? ""}Due soon: ${taskTitle}`,
     body: `Due in ${minutesUntil} minute${minutesUntil !== 1 ? "s" : ""}`,
     tag: `task-${taskId}-due`,
     icon: "/web-app-manifest-192x192.png",
@@ -153,6 +228,12 @@ export function createDueReminderPayload(
       { action: "view", title: "View Task" },
       { action: "snooze", title: "Snooze 5 min" },
     ],
+    ...(urgency && {
+      requireInteraction: urgency.requireInteraction,
+      renotify: urgency.renotify,
+      vibrate: urgency.vibrate,
+    }),
+    priority,
   };
 }
 

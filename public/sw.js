@@ -225,6 +225,7 @@ self.addEventListener("push", (event) => {
     data: data.data || {},
     actions: data.actions || [],
     requireInteraction: data.requireInteraction || false,
+    renotify: data.renotify || false,
     vibrate: data.vibrate || [200, 100, 200],
   };
 
