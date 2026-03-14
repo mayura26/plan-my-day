@@ -84,12 +84,89 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       reminder_settings?: ReminderSettings | null;
     } = await request.json();
 
-    // Check if group exists and belongs to user
-    const existingGroup = await db.execute(
-      "SELECT * FROM task_groups WHERE id = ? AND user_id = ?",
-      [id, session.user.id]
-    );
+    // Check if group exists and belongs to user (owner) or is shared with user
+    const ownerResult = await db.execute("SELECT * FROM task_groups WHERE id = ? AND user_id = ?", [
+      id,
+      session.user.id,
+    ]);
+    const isOwner = ownerResult.rows.length > 0;
 
+    let isSharedUser = false;
+    if (!isOwner) {
+      const sharedResult = await db.execute(
+        `SELECT gs.id FROM group_shares gs
+         WHERE gs.group_id = ?
+           AND gs.shared_with_user_id = ?
+           AND gs.status = 'accepted'`,
+        [id, session.user.id]
+      );
+      isSharedUser = sharedResult.rows.length > 0;
+    }
+
+    if (!isOwner && !isSharedUser) {
+      return NextResponse.json({ error: "Task group not found" }, { status: 404 });
+    }
+
+    // Shared users can only update the 'collapsed' field
+    if (isSharedUser && !isOwner) {
+      const allowedFields = ["collapsed"];
+      const requestedFields = Object.keys(body);
+      const hasDisallowedFields = requestedFields.some((f) => !allowedFields.includes(f));
+      if (hasDisallowedFields) {
+        return NextResponse.json(
+          { error: "Shared users can only update the collapsed field" },
+          { status: 403 }
+        );
+      }
+
+      if (body.collapsed !== undefined) {
+        const now = new Date().toISOString();
+        await db.execute("UPDATE task_groups SET collapsed = ?, updated_at = ? WHERE id = ?", [
+          body.collapsed,
+          now,
+          id,
+        ]);
+      }
+
+      // Fetch and return the updated group
+      const groupResult = await db.execute("SELECT * FROM task_groups WHERE id = ?", [id]);
+      const row = groupResult.rows[0];
+      let autoScheduleHoursShared = null;
+      if (row.auto_schedule_hours) {
+        try {
+          autoScheduleHoursShared = JSON.parse(row.auto_schedule_hours as string);
+        } catch (e) {
+          console.error("Error parsing auto_schedule_hours JSON:", e);
+        }
+      }
+      let reminderSettingsShared: ReminderSettings | null = null;
+      if (row.reminder_settings) {
+        try {
+          reminderSettingsShared = JSON.parse(row.reminder_settings as string);
+        } catch (e) {
+          console.error("Error parsing reminder_settings JSON:", e);
+        }
+      }
+      return NextResponse.json({
+        group: {
+          id: row.id as string,
+          user_id: row.user_id as string,
+          name: row.name as string,
+          color: row.color as string,
+          collapsed: Boolean(row.collapsed),
+          parent_group_id: (row.parent_group_id as string) || null,
+          is_parent_group: Boolean(row.is_parent_group),
+          auto_schedule_enabled: Boolean(row.auto_schedule_enabled ?? false),
+          auto_schedule_hours: autoScheduleHoursShared,
+          priority: row.priority ? (row.priority as number) : undefined,
+          reminder_settings: reminderSettingsShared,
+          created_at: row.created_at as string,
+          updated_at: row.updated_at as string,
+        },
+      });
+    }
+
+    const existingGroup = ownerResult;
     if (existingGroup.rows.length === 0) {
       return NextResponse.json({ error: "Task group not found" }, { status: 404 });
     }

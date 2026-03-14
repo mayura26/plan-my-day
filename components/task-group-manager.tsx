@@ -14,11 +14,13 @@ import {
   EyeOff,
   Folder,
   ListTodo,
+  LogOut,
   Magnet,
   Plus,
   Trash2,
   Zap,
 } from "lucide-react";
+import { useSession } from "next-auth/react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { SlimTaskCard } from "@/components/slim-task-card";
@@ -76,6 +78,7 @@ interface TaskGroupManagerProps {
     mode: SchedulingMode,
     maxTasks: number
   ) => void | Promise<void>;
+  onGroupsChanged?: () => void;
 }
 
 const defaultColors = [
@@ -224,6 +227,7 @@ interface GroupCardProps {
   onTaskClick?: (taskId: string) => void;
   onEdit?: () => void;
   onDelete?: () => void;
+  onLeave?: () => void;
   onQuickAddTask?: (groupId: string | null, taskType?: TaskType) => void;
   onPullForwardTasks?: (groupId: string) => void | Promise<void>;
   onAutoScheduleGroup?: (
@@ -234,6 +238,7 @@ interface GroupCardProps {
   groupId?: string | null;
   isUngrouped?: boolean;
   isParent?: boolean;
+  isShared?: boolean;
   indentLevel?: number;
   children?: React.ReactNode;
   isDeleting?: boolean;
@@ -256,12 +261,14 @@ function GroupCard({
   onTaskClick,
   onEdit,
   onDelete,
+  onLeave,
   onQuickAddTask,
   onPullForwardTasks,
   onAutoScheduleGroup,
   groupId,
   isUngrouped = false,
   isParent = false,
+  isShared = false,
   indentLevel = 0,
   children,
   isDeleting = false,
@@ -362,6 +369,15 @@ function GroupCard({
             <span className="truncate text-sm font-medium" style={{ color: textColor }}>
               {groupName}
             </span>
+            {isShared && (
+              <Badge
+                variant="outline"
+                className="text-[9px] px-1 py-0 h-3.5 ml-1 opacity-70 shrink-0"
+                style={{ color: textColor, borderColor: textColor }}
+              >
+                Shared
+              </Badge>
+            )}
           </div>
           <div className="flex items-center gap-1">
             {criticalCount > 0 && (
@@ -554,7 +570,7 @@ function GroupCard({
           >
             {isHidden ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
           </Button>
-          {!isUngrouped && onEdit && (
+          {!isUngrouped && !isShared && onEdit && (
             <Button
               size="sm"
               variant="ghost"
@@ -568,7 +584,22 @@ function GroupCard({
               <Edit className="h-3.5 w-3.5" />
             </Button>
           )}
-          {!isUngrouped && onDelete && (
+          {!isUngrouped && isShared && onLeave && (
+            <Button
+              size="sm"
+              variant="ghost"
+              className="h-7 w-7 p-0 flex-shrink-0"
+              onClick={(e) => {
+                e.stopPropagation();
+                onLeave();
+              }}
+              title="Leave shared group"
+              loading={isDeleting}
+            >
+              <LogOut className="h-3.5 w-3.5" />
+            </Button>
+          )}
+          {!isUngrouped && !isShared && onDelete && (
             <Button
               size="sm"
               variant="ghost"
@@ -792,6 +823,19 @@ function GroupCard({
   );
 }
 
+interface PendingInvite {
+  id: string;
+  group_id: string;
+  owner_id: string;
+  invited_email: string;
+  status: string;
+  group_name: string;
+  group_color: string;
+  owner_name: string | null;
+  owner_email: string | null;
+  created_at: string;
+}
+
 export function TaskGroupManager({
   onGroupSelect,
   selectedGroupId,
@@ -803,9 +847,15 @@ export function TaskGroupManager({
   onQuickAddTask,
   onPullForwardTasks,
   onAutoScheduleGroup,
+  onGroupsChanged,
 }: TaskGroupManagerProps) {
   const { confirm } = useConfirmDialog();
+  const { data: session } = useSession();
+  const currentUserId = session?.user?.id;
   const [groups, setGroups] = useState<TaskGroup[]>([]);
+  const [pendingInvites, setPendingInvites] = useState<PendingInvite[]>([]);
+  const [isInvitesExpanded, setIsInvitesExpanded] = useState(true);
+  const [processingInviteId, setProcessingInviteId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
@@ -833,12 +883,19 @@ export function TaskGroupManager({
 
     try {
       setIsLoading(true);
-      const response = await fetch("/api/task-groups");
-      if (response.ok) {
-        const data = await response.json();
+      const [groupsResponse, invitesResponse] = await Promise.all([
+        fetch("/api/task-groups"),
+        fetch("/api/group-invites"),
+      ]);
+      if (groupsResponse.ok) {
+        const data = await groupsResponse.json();
         setGroups(data.groups || []);
       } else {
         console.error("Failed to fetch task groups");
+      }
+      if (invitesResponse.ok) {
+        const data = await invitesResponse.json();
+        setPendingInvites(data.invites || []);
       }
     } catch (error) {
       console.error("Error fetching task groups:", error);
@@ -1013,6 +1070,70 @@ export function TaskGroupManager({
     }
   };
 
+  const leaveGroup = async (group: TaskGroup) => {
+    const confirmed = await confirm({
+      title: "Leave Shared Group",
+      description: `Are you sure you want to leave "${group.name}"? You will no longer have access to this group.`,
+      variant: "destructive",
+      confirmText: "Leave",
+    });
+
+    if (!confirmed) return;
+
+    setDeletingGroupId(group.id);
+    try {
+      const response = await fetch(`/api/task-groups/${group.id}/share/${group.share_id}`, {
+        method: "DELETE",
+      });
+
+      if (response.ok) {
+        setGroups((prev) => prev.filter((g) => g.id !== group.id));
+        if (selectedGroupId === group.id) {
+          onGroupSelect?.(null);
+        }
+        toast.success("Left shared group");
+      } else {
+        toast.error("Failed to leave group");
+      }
+    } catch (error) {
+      console.error("Error leaving group:", error);
+      toast.error("An error occurred while leaving the group");
+    } finally {
+      setDeletingGroupId(null);
+    }
+  };
+
+  const processInvite = async (inviteId: string, action: "accept" | "decline") => {
+    setProcessingInviteId(inviteId);
+    try {
+      const response = await fetch(`/api/group-invites/${inviteId}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action }),
+      });
+
+      if (response.ok) {
+        setPendingInvites((prev) => prev.filter((i) => i.id !== inviteId));
+        if (action === "accept") {
+          toast.success("Invite accepted! The group is now in your list.");
+          // Re-fetch groups to include the newly accepted shared group
+          hasFetchedRef.current = false;
+          fetchGroups();
+          onGroupsChanged?.();
+        } else {
+          toast.success("Invite declined");
+        }
+      } else {
+        toast.error(`Failed to ${action} invite`);
+      }
+    } catch (error) {
+      console.error("Error processing invite:", error);
+      toast.error("An error occurred while processing the invite");
+    } finally {
+      setProcessingInviteId(null);
+    }
+  };
+
   const handleEditGroup = (group: TaskGroup) => {
     setEditingGroup(group);
     setNewGroupName(group.name);
@@ -1175,6 +1296,7 @@ export function TaskGroupManager({
     const isParentGroup = group.isParent;
     const childGroupCount = group.children.length;
     const isExpanded = expandedGroups.has(group.id);
+    const isShared = !!group.shared_by_email;
 
     // For parent groups, render children inside the wireframe
     if (isParentGroup) {
@@ -1200,13 +1322,15 @@ export function TaskGroupManager({
               }
             }}
             onTaskClick={onTaskClick}
-            onEdit={() => handleEditGroup(group)}
-            onDelete={() => deleteGroup(group.id)}
+            onEdit={!isShared ? () => handleEditGroup(group) : undefined}
+            onDelete={!isShared ? () => deleteGroup(group.id) : undefined}
+            onLeave={isShared ? () => leaveGroup(group) : undefined}
             onQuickAddTask={onQuickAddTask}
             onPullForwardTasks={onPullForwardTasks}
             onAutoScheduleGroup={onAutoScheduleGroup}
             groupId={group.id}
             isParent={isParentGroup}
+            isShared={isShared}
             indentLevel={level}
             isDeleting={deletingGroupId === group.id}
           >
@@ -1244,13 +1368,15 @@ export function TaskGroupManager({
             }
           }}
           onTaskClick={onTaskClick}
-          onEdit={() => handleEditGroup(group)}
-          onDelete={() => deleteGroup(group.id)}
+          onEdit={!isShared ? () => handleEditGroup(group) : undefined}
+          onDelete={!isShared ? () => deleteGroup(group.id) : undefined}
+          onLeave={isShared ? () => leaveGroup(group) : undefined}
           onQuickAddTask={onQuickAddTask}
           onPullForwardTasks={onPullForwardTasks}
           onAutoScheduleGroup={onAutoScheduleGroup}
           groupId={group.id}
           isParent={isParentGroup}
+          isShared={isShared}
           indentLevel={level}
           isDeleting={deletingGroupId === group.id}
           subtasksMap={subtasksMap}
@@ -1418,6 +1544,69 @@ export function TaskGroupManager({
 
       {/* Content */}
       <div className="space-y-2 overflow-y-auto overflow-x-hidden flex-1 min-h-0 px-3 pb-3">
+        {/* Pending Invites */}
+        {pendingInvites.length > 0 && (
+          <Card className="border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-950/20 pt-0 pb-0 gap-0">
+            <button
+              type="button"
+              className="w-full px-3 py-2 flex items-center justify-between cursor-pointer hover:bg-blue-100/50 dark:hover:bg-blue-900/20 rounded-t-md"
+              onClick={() => setIsInvitesExpanded(!isInvitesExpanded)}
+            >
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-semibold text-blue-700 dark:text-blue-300">
+                  Pending Invites
+                </span>
+                <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-4">
+                  {pendingInvites.length}
+                </Badge>
+              </div>
+              {isInvitesExpanded ? (
+                <ChevronDown className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
+              ) : (
+                <ChevronRight className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
+              )}
+            </button>
+            {isInvitesExpanded && (
+              <CardContent className="px-3 pb-2 pt-0 space-y-2">
+                {pendingInvites.map((invite) => (
+                  <div
+                    key={invite.id}
+                    className="flex items-center justify-between gap-2 py-1 border-t border-blue-200/50 dark:border-blue-800/50 first:border-t-0"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs font-medium truncate">{invite.group_name}</p>
+                      <p className="text-[10px] text-muted-foreground truncate">
+                        from {invite.owner_email || invite.owner_name || "Unknown"}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <Button
+                        size="sm"
+                        className="h-6 px-2 text-[10px]"
+                        onClick={() => processInvite(invite.id, "accept")}
+                        loading={processingInviteId === invite.id}
+                        disabled={processingInviteId === invite.id}
+                      >
+                        Accept
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-6 px-2 text-[10px]"
+                        onClick={() => processInvite(invite.id, "decline")}
+                        loading={processingInviteId === invite.id}
+                        disabled={processingInviteId === invite.id}
+                      >
+                        Decline
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </CardContent>
+            )}
+          </Card>
+        )}
+
         {/* Task Groups - rendered hierarchically */}
         {filteredHierarchicalGroups.map((group) => renderGroup(group))}
 
@@ -1466,6 +1655,7 @@ export function TaskGroupManager({
         group={editingGroup}
         groups={groups}
         onGroupUpdated={fetchGroups}
+        currentUserId={currentUserId}
       />
     </div>
   );

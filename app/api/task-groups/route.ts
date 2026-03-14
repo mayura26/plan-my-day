@@ -14,8 +14,21 @@ export async function GET(_request: NextRequest) {
     }
 
     const result = await db.execute(
-      "SELECT * FROM task_groups WHERE user_id = ? ORDER BY name ASC",
-      [session.user.id]
+      `SELECT tg.*, NULL as share_id, NULL as shared_by_user_id, NULL as shared_by_email
+       FROM task_groups tg
+       WHERE tg.user_id = ?
+
+       UNION ALL
+
+       SELECT tg.*, gs.id as share_id, gs.owner_id as shared_by_user_id, u.email as shared_by_email
+       FROM task_groups tg
+       JOIN group_shares gs ON gs.group_id = tg.id
+       LEFT JOIN users u ON u.id = gs.owner_id
+       WHERE gs.shared_with_user_id = ?
+         AND gs.status = 'accepted'
+
+       ORDER BY name ASC`,
+      [session.user.id, session.user.id]
     );
 
     const groups: TaskGroup[] = result.rows.map((row) => {
@@ -49,6 +62,9 @@ export async function GET(_request: NextRequest) {
         auto_schedule_hours: autoScheduleHours,
         priority: row.priority ? (row.priority as number) : undefined,
         reminder_settings: reminderSettings,
+        share_id: (row.share_id as string) || null,
+        shared_by_user_id: (row.shared_by_user_id as string) || null,
+        shared_by_email: (row.shared_by_email as string) || null,
         created_at: row.created_at as string,
         updated_at: row.updated_at as string,
       };

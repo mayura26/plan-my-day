@@ -114,8 +114,32 @@ export interface TaskGroup {
   auto_schedule_hours?: GroupScheduleHours | null;
   priority?: number; // 1-10 scale (1 = highest priority, 10 = lowest priority)
   reminder_settings?: ReminderSettings | null;
+  // Populated only on groups shared TO the viewer (not their own groups)
+  share_id?: string | null;
+  shared_by_user_id?: string | null;
+  shared_by_email?: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export type GroupShareStatus = "pending" | "accepted" | "declined";
+
+export interface GroupShare {
+  id: string;
+  group_id: string;
+  owner_id: string;
+  shared_with_user_id: string | null;
+  invited_email: string;
+  status: GroupShareStatus;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface GroupShareWithDetails extends GroupShare {
+  group_name: string;
+  group_color: string;
+  owner_name: string | null;
+  owner_email: string | null;
 }
 
 export interface TaskTemplate {

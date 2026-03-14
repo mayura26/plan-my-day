@@ -1537,6 +1537,7 @@ export default function CalendarPage() {
                     }}
                     onPullForwardTasks={handlePullForward}
                     onAutoScheduleGroup={handleAutoScheduleGroup}
+                    onGroupsChanged={fetchGroups}
                   />
                 </div>
               )}

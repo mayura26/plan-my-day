@@ -1,4 +1,3 @@
-- [ ] Improve flow of the overdue page to make it easier to bulk process
 - [ ] AI Planner mode with back and forth to build everything.
 
 

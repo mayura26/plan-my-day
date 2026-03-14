@@ -54,6 +54,18 @@ interface SyncQueueItem {
   retries: number;
 }
 
+interface GroupShareInvite {
+  id: string;
+  group_id: string;
+  group_name: string;
+  group_color: string;
+  owner_name: string | null;
+  owner_email: string | null;
+  invited_email: string;
+  status: string;
+  created_at: string;
+}
+
 interface OfflineDB extends DBSchema {
   tasks: {
     key: string;
@@ -74,10 +86,15 @@ interface OfflineDB extends DBSchema {
     key: string;
     value: SyncQueueItem;
   };
+  groupShareInvites: {
+    key: string;
+    value: GroupShareInvite;
+    indexes: { "by-status": string };
+  };
 }
 
 const DB_NAME = "plan-my-day-offline";
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 let dbInstance: IDBPDatabase<OfflineDB> | null = null;
 
@@ -87,7 +104,7 @@ export async function getDB(): Promise<IDBPDatabase<OfflineDB>> {
   }
 
   dbInstance = await openDB<OfflineDB>(DB_NAME, DB_VERSION, {
-    upgrade(db) {
+    upgrade(db, oldVersion) {
       // Tasks store
       if (!db.objectStoreNames.contains("tasks")) {
         const taskStore = db.createObjectStore("tasks", { keyPath: "id" });
@@ -111,6 +128,14 @@ export async function getDB(): Promise<IDBPDatabase<OfflineDB>> {
       // Sync queue store
       if (!db.objectStoreNames.contains("syncQueue")) {
         db.createObjectStore("syncQueue", { keyPath: "id" });
+      }
+
+      // Version 2: Group share invites store
+      if (oldVersion < 2) {
+        if (!db.objectStoreNames.contains("groupShareInvites")) {
+          const inviteStore = db.createObjectStore("groupShareInvites", { keyPath: "id" });
+          inviteStore.createIndex("by-status", "status");
+        }
       }
     },
   });
@@ -198,10 +223,27 @@ export async function clearSyncQueue(): Promise<void> {
   await tx.done;
 }
 
+// Group share invite operations
+export async function saveGroupShareInvite(invite: GroupShareInvite): Promise<void> {
+  const db = await getDB();
+  await db.put("groupShareInvites", invite);
+}
+
+export async function getPendingGroupShareInvites(): Promise<GroupShareInvite[]> {
+  const db = await getDB();
+  const index = db.transaction("groupShareInvites").store.index("by-status");
+  return index.getAll("pending");
+}
+
+export async function deleteGroupShareInvite(inviteId: string): Promise<void> {
+  const db = await getDB();
+  await db.delete("groupShareInvites", inviteId);
+}
+
 // Clear all data for a user (useful for logout)
 export async function clearUserData(userId: string): Promise<void> {
   const db = await getDB();
-  const tx = db.transaction(["tasks", "taskGroups", "dayNotes"], "readwrite");
+  const tx = db.transaction(["tasks", "taskGroups", "dayNotes", "groupShareInvites"], "readwrite");
 
   // Clear tasks
   const taskIndex = tx.objectStore("tasks").index("by-user");
@@ -223,6 +265,10 @@ export async function clearUserData(userId: string): Promise<void> {
   for (const note of notes) {
     await tx.objectStore("dayNotes").delete(note.id);
   }
+
+  // Clear group share invites (all, since they're for the current user)
+  const inviteStore = tx.objectStore("groupShareInvites");
+  await inviteStore.clear();
 
   await tx.done;
 }

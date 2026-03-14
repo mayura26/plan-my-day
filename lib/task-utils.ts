@@ -65,6 +65,10 @@ export function generateGroupId(): string {
   return `group_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 }
 
+export function generateShareId(): string {
+  return `share_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+}
+
 export function generateTemplateId(): string {
   return `template_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 }

@@ -1,8 +1,9 @@
 "use client";
 
-import { ChevronDown, ChevronRight } from "lucide-react";
+import { ChevronDown, ChevronRight, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -23,12 +24,25 @@ import {
 import { Switch } from "@/components/ui/switch";
 import type { GroupScheduleHours, ReminderSettings, TaskGroup } from "@/lib/types";
 
+interface ShareRow {
+  id: string;
+  group_id: string;
+  owner_id: string;
+  shared_with_user_id: string | null;
+  invited_email: string;
+  status: string;
+  shared_with_name: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 interface EditGroupDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   group: TaskGroup | null;
   groups: TaskGroup[];
   onGroupUpdated?: () => void;
+  currentUserId?: string;
 }
 
 export function EditGroupDialog({
@@ -37,6 +51,7 @@ export function EditGroupDialog({
   group,
   groups,
   onGroupUpdated,
+  currentUserId,
 }: EditGroupDialogProps) {
   const [newGroupName, setNewGroupName] = useState("");
   const [newGroupColor, setNewGroupColor] = useState("#3B82F6");
@@ -48,6 +63,14 @@ export function EditGroupDialog({
   const [priority, setPriority] = useState<number>(5);
   const [reminderSettings, setReminderSettings] = useState<ReminderSettings | null>(null);
   const [isReminderExpanded, setIsReminderExpanded] = useState(false);
+  const [isSharingExpanded, setIsSharingExpanded] = useState(false);
+  const [shares, setShares] = useState<ShareRow[]>([]);
+  const [isLoadingShares, setIsLoadingShares] = useState(false);
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [isInviting, setIsInviting] = useState(false);
+  const [revokingShareId, setRevokingShareId] = useState<string | null>(null);
+
+  const isOwner = group ? group.user_id === currentUserId : false;
 
   // Initialize form when group changes
   useEffect(() => {
@@ -74,8 +97,76 @@ export function EditGroupDialog({
       setPriority(5);
       setReminderSettings(null);
       setIsReminderExpanded(false);
+      setIsSharingExpanded(false);
+      setShares([]);
+      setInviteEmail("");
     }
   }, [open]);
+
+  // Fetch shares when sharing section is expanded (owner only)
+  useEffect(() => {
+    if (isSharingExpanded && isOwner && group) {
+      setIsLoadingShares(true);
+      fetch(`/api/task-groups/${group.id}/share`)
+        .then((res) => res.json())
+        .then((data) => setShares(data.shares || []))
+        .catch((err) => console.error("Error fetching shares:", err))
+        .finally(() => setIsLoadingShares(false));
+    }
+  }, [isSharingExpanded, isOwner, group]);
+
+  const sendInvite = async () => {
+    if (!group || !inviteEmail.trim()) return;
+    setIsInviting(true);
+    try {
+      const res = await fetch(`/api/task-groups/${group.id}/share`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: inviteEmail.trim() }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setShares((prev) => [
+          {
+            ...data.share,
+            shared_with_name: null,
+          },
+          ...prev.filter((s) => s.invited_email !== data.share.invited_email),
+        ]);
+        setInviteEmail("");
+        toast.success("Invite sent successfully");
+      } else {
+        const err = await res.json().catch(() => ({ error: "Failed to send invite" }));
+        toast.error(err.error || "Failed to send invite");
+      }
+    } catch (error) {
+      console.error("Error sending invite:", error);
+      toast.error("An error occurred while sending the invite");
+    } finally {
+      setIsInviting(false);
+    }
+  };
+
+  const revokeShare = async (shareId: string) => {
+    if (!group) return;
+    setRevokingShareId(shareId);
+    try {
+      const res = await fetch(`/api/task-groups/${group.id}/share/${shareId}`, {
+        method: "DELETE",
+      });
+      if (res.ok) {
+        setShares((prev) => prev.filter((s) => s.id !== shareId));
+        toast.success("Share revoked");
+      } else {
+        toast.error("Failed to revoke share");
+      }
+    } catch (error) {
+      console.error("Error revoking share:", error);
+      toast.error("An error occurred while revoking the share");
+    } finally {
+      setRevokingShareId(null);
+    }
+  };
 
   // Get available parent groups (exclude current group and its descendants)
   const getAvailableParentGroups = (excludeGroupId?: string): TaskGroup[] => {
@@ -552,6 +643,97 @@ export function EditGroupDialog({
                         </Select>
                       </div>
                     </div>
+                  )}
+                </div>
+              )}
+            </div>
+            {/* Sharing Section */}
+            <div className="border rounded-lg overflow-hidden">
+              <button
+                type="button"
+                className="w-full px-4 py-3 border-b cursor-pointer hover:bg-accent/50 transition-colors flex items-center justify-between bg-card"
+                onClick={() => setIsSharingExpanded(!isSharingExpanded)}
+              >
+                <div className="flex items-center gap-2">
+                  {isSharingExpanded ? (
+                    <ChevronDown className="h-4 w-4" />
+                  ) : (
+                    <ChevronRight className="h-4 w-4" />
+                  )}
+                  <h3 className="text-sm font-semibold">Sharing</h3>
+                </div>
+              </button>
+              {isSharingExpanded && (
+                <div className="p-4 space-y-3">
+                  {isOwner ? (
+                    <>
+                      {/* Invite form */}
+                      <div className="flex gap-2">
+                        <Input
+                          type="email"
+                          placeholder="Enter email to invite"
+                          value={inviteEmail}
+                          onChange={(e) => setInviteEmail(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              sendInvite();
+                            }
+                          }}
+                          className="flex-1"
+                        />
+                        <Button
+                          size="sm"
+                          onClick={sendInvite}
+                          loading={isInviting}
+                          disabled={!inviteEmail.trim() || isInviting}
+                        >
+                          Send Invite
+                        </Button>
+                      </div>
+                      {/* Current shares list */}
+                      {isLoadingShares ? (
+                        <p className="text-xs text-muted-foreground">Loading shares...</p>
+                      ) : shares.length === 0 ? (
+                        <p className="text-xs text-muted-foreground">
+                          No shares yet. Invite someone by email above.
+                        </p>
+                      ) : (
+                        <div className="space-y-2">
+                          {shares.map((share) => (
+                            <div
+                              key={share.id}
+                              className="flex items-center justify-between gap-2 text-sm py-1"
+                            >
+                              <div className="flex items-center gap-2 min-w-0">
+                                <span className="truncate text-sm">{share.invited_email}</span>
+                                <Badge
+                                  variant={share.status === "accepted" ? "default" : "secondary"}
+                                  className="text-[10px] px-1.5 py-0 h-4 shrink-0"
+                                >
+                                  {share.status}
+                                </Badge>
+                              </div>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-7 w-7 p-0 shrink-0"
+                                onClick={() => revokeShare(share.id)}
+                                loading={revokingShareId === share.id}
+                                title="Revoke share"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">
+                      Shared by:{" "}
+                      <span className="font-medium">{group?.shared_by_email || "Unknown"}</span>
+                    </p>
                   )}
                 </div>
               )}

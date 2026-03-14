@@ -90,10 +90,19 @@ export async function GET(request: NextRequest) {
     const include_subtasks = searchParams.get("include_subtasks"); // Include subtasks in response
 
     let query = `
-      SELECT * FROM tasks 
-      WHERE user_id = ?
+      WITH combined_tasks AS (
+        SELECT t.* FROM tasks t WHERE t.user_id = ?
+        UNION ALL
+        SELECT t.* FROM tasks t
+        JOIN group_shares gs ON gs.group_id = t.group_id
+        WHERE gs.shared_with_user_id = ?
+          AND gs.status = 'accepted'
+          AND t.user_id != ?
+      )
+      SELECT * FROM combined_tasks
+      WHERE 1=1
     `;
-    const params: any[] = [session.user.id];
+    const params: any[] = [session.user.id, session.user.id, session.user.id];
 
     if (status) {
       query += ` AND status = ?`;
@@ -253,11 +262,21 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Validation failed", details: errors }, { status: 400 });
     }
 
-    // Validate group_id - ensure it's not a parent group
+    // Validate group_id - ensure it's not a parent group and user has access
     if (body.group_id) {
       const groupResult = await db.execute(
-        `SELECT is_parent_group FROM task_groups WHERE id = ? AND user_id = ?`,
-        [body.group_id, session.user.id]
+        `SELECT is_parent_group FROM task_groups tg
+         WHERE tg.id = ?
+           AND (
+             tg.user_id = ?
+             OR EXISTS (
+               SELECT 1 FROM group_shares gs
+               WHERE gs.group_id = tg.id
+                 AND gs.shared_with_user_id = ?
+                 AND gs.status = 'accepted'
+             )
+           )`,
+        [body.group_id, session.user.id, session.user.id]
       );
       if (groupResult.rows.length === 0) {
         return NextResponse.json({ error: "Task group not found" }, { status: 404 });
