@@ -1,6 +1,3 @@
-- [ ] AI Planner mode with back and forth to build everything.
-
-
 ### ⏳ Pending
 - [ ] AI-powered task scheduling engine
 - [ ] Automatic rescheduling logic
