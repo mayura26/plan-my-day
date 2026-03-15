@@ -1848,6 +1848,18 @@ export default function CalendarPage() {
         onParsed={handleAIParsed}
         onMultipleParsed={handleMultipleAIParsed}
         groups={groups}
+        existingTasks={tasks.map((t) => ({
+          id: t.id,
+          title: t.title,
+          status: t.status,
+          priority: t.priority,
+          task_type: t.task_type,
+          duration: t.duration,
+          scheduled_start: t.scheduled_start,
+          scheduled_end: t.scheduled_end,
+          due_date: t.due_date,
+          group_id: t.group_id,
+        }))}
       />
 
       {/* Edit Task Dialog */}

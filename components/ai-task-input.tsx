@@ -1,6 +1,6 @@
 "use client";
 
-import { CheckSquare, Lock, Mic, MicOff, Sparkles, Square, X } from "lucide-react";
+import { CheckSquare, Lock, MessageCircle, Mic, MicOff, Sparkles, Square, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -9,15 +9,29 @@ import type { TaskGroup } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import type { CreateTaskRequestWithSubtasks } from "./task-form";
 
+interface ExistingTaskContext {
+  id: string;
+  title: string;
+  status: string;
+  priority: number;
+  task_type?: string | null;
+  duration?: number | null;
+  scheduled_start?: string | null;
+  scheduled_end?: string | null;
+  due_date?: string | null;
+  group_id?: string | null;
+}
+
 interface AITaskInputProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onParsed: (data: Partial<CreateTaskRequestWithSubtasks>) => void;
   onMultipleParsed: (tasks: Partial<CreateTaskRequestWithSubtasks>[]) => void;
   groups?: TaskGroup[];
+  existingTasks?: ExistingTaskContext[];
 }
 
-type Mode = "single" | "braindump";
+type Mode = "single" | "braindump" | "plan";
 
 interface PreviewTask {
   title: string;
@@ -26,6 +40,29 @@ interface PreviewTask {
   group_id?: string;
   _previewId?: string;
   [key: string]: unknown;
+}
+
+interface ProposedTask {
+  action?: "create" | "update";
+  id?: string | null; // existing task id when action === "update"
+  title: string;
+  description?: string | null;
+  task_type?: string;
+  priority?: number;
+  duration?: number;
+  energy_level_required?: number;
+  scheduled_start?: string | null;
+  scheduled_end?: string | null;
+  due_date?: string | null;
+  group_id?: string | null;
+  [key: string]: unknown;
+}
+
+interface PlanMessage {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+  proposedTasks?: ProposedTask[];
 }
 
 const LOCK_THRESHOLD = 60; // px upward drag to lock recording
@@ -50,6 +87,7 @@ export function AITaskInput({
   onParsed,
   onMultipleParsed,
   groups = [],
+  existingTasks,
 }: AITaskInputProps) {
   const [mode, setMode] = useState<Mode>("single");
   const [text, setText] = useState("");
@@ -68,7 +106,15 @@ export function AITaskInput({
   const [selectedIndices, setSelectedIndices] = useState<Set<number>>(new Set());
   const [showPreview, setShowPreview] = useState(false);
 
+  // Plan mode state
+  const [planMessages, setPlanMessages] = useState<PlanMessage[]>([]);
+  const [planInput, setPlanInput] = useState("");
+  const [isPlanLoading, setIsPlanLoading] = useState(false);
+  const [planProposedTasks, setPlanProposedTasks] = useState<ProposedTask[] | null>(null);
+
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const planTextareaRef = useRef<HTMLTextAreaElement>(null);
+  const planMessagesEndRef = useRef<HTMLDivElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -93,10 +139,22 @@ export function AITaskInput({
       setPreviewTasks([]);
       setSelectedIndices(new Set());
       setShowPreview(false);
+      setPlanMessages([]);
+      setPlanInput("");
+      setIsPlanLoading(false);
+      setPlanProposedTasks(null);
     } else {
       setTimeout(() => textareaRef.current?.focus(), 50);
     }
   }, [open, isRecording]);
+
+  // Scroll plan chat to bottom on new messages
+  const planMessageCount = planMessages.length;
+  useEffect(() => {
+    if (mode === "plan") {
+      planMessagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [planMessageCount, isPlanLoading, mode]);
 
   // Frequency-bar visualizer — runs while recording
   useEffect(() => {
@@ -159,6 +217,10 @@ export function AITaskInput({
     setPreviewTasks([]);
     setSelectedIndices(new Set());
     setShowPreview(false);
+    setPlanMessages([]);
+    setPlanInput("");
+    setIsPlanLoading(false);
+    setPlanProposedTasks(null);
   };
 
   const startRecording = async () => {
@@ -203,7 +265,11 @@ export function AITaskInput({
           const res = await fetch("/api/ai/transcribe", { method: "POST", body: fd });
           const data = await res.json();
           if (!res.ok) throw new Error(data.error || "Transcription failed");
-          setText((prev) => (prev ? `${prev} ${data.text}` : data.text));
+          if (mode === "plan") {
+            setPlanInput((prev) => (prev ? `${prev} ${data.text}` : data.text));
+          } else {
+            setText((prev) => (prev ? `${prev} ${data.text}` : data.text));
+          }
         } catch (err) {
           setParseError(err instanceof Error ? err.message : "Transcription failed");
         } finally {
@@ -219,7 +285,7 @@ export function AITaskInput({
   };
 
   const handleMicClick = async () => {
-    if (isParsing || isTranscribing) return;
+    if (isParsing || isTranscribing || isPlanLoading) return;
     if (isRecording) {
       mediaRecorderRef.current?.stop();
     } else {
@@ -229,7 +295,7 @@ export function AITaskInput({
 
   const handlePointerDown = async (e: React.PointerEvent<HTMLButtonElement>) => {
     if (e.pointerType !== "touch") return;
-    if (isParsing || isTranscribing || isRecording) return;
+    if (isParsing || isTranscribing || isRecording || isPlanLoading) return;
     e.preventDefault();
     e.currentTarget.setPointerCapture(e.pointerId);
     pointerStartYRef.current = e.clientY;
@@ -344,11 +410,75 @@ export function AITaskInput({
     }
   };
 
+  const sendPlanMessage = async () => {
+    if (!planInput.trim() || isPlanLoading) return;
+    const userMessage: PlanMessage = {
+      id: crypto.randomUUID(),
+      role: "user",
+      content: planInput.trim(),
+    };
+    const updatedMessages = [...planMessages, userMessage];
+    setPlanMessages(updatedMessages);
+    setPlanInput("");
+    setIsPlanLoading(true);
+    try {
+      const res = await fetch("/api/ai/plan-chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          messages: updatedMessages.map((m) => ({ role: m.role, content: m.content })),
+          groups: groups.filter((g) => !g.is_parent_group).map((g) => ({ id: g.id, name: g.name })),
+          existing_tasks: existingTasks?.slice(0, 20) ?? [],
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setPlanMessages((prev) => [
+          ...prev,
+          {
+            id: crypto.randomUUID(),
+            role: "assistant",
+            content: data.error || "Something went wrong. Please try again.",
+          },
+        ]);
+        return;
+      }
+      const assistantMsg: PlanMessage = {
+        id: crypto.randomUUID(),
+        role: "assistant",
+        content: data.message,
+        proposedTasks: data.ready && data.proposed_tasks ? data.proposed_tasks : undefined,
+      };
+      setPlanMessages((prev) => [...prev, assistantMsg]);
+      if (data.ready && data.proposed_tasks) {
+        setPlanProposedTasks(data.proposed_tasks);
+      }
+    } catch {
+      setPlanMessages((prev) => [
+        ...prev,
+        {
+          id: crypto.randomUUID(),
+          role: "assistant",
+          content: "Network error. Please check your connection and try again.",
+        },
+      ]);
+    } finally {
+      setIsPlanLoading(false);
+    }
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       if (mode === "single") handleParse();
       else handleBrainDump();
+    }
+  };
+
+  const handlePlanKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      sendPlanMessage();
     }
   };
 
@@ -368,6 +498,31 @@ export function AITaskInput({
     onOpenChange(false);
   };
 
+  const handleApplyProposedTasks = async (tasks: ProposedTask[]) => {
+    const creates = tasks.filter((t) => t.action !== "update");
+    const updates = tasks.filter((t) => t.action === "update" && t.id);
+
+    // Fire updates in parallel — best-effort, don't block creates
+    if (updates.length > 0) {
+      await Promise.allSettled(
+        updates.map((t) => {
+          const { action: _action, id, ...fields } = t;
+          return fetch(`/api/tasks/${id}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(fields),
+          });
+        })
+      );
+    }
+
+    if (creates.length > 0) {
+      onMultipleParsed(creates as Partial<CreateTaskRequestWithSubtasks>[]);
+    }
+
+    onOpenChange(false);
+  };
+
   const micButton = (
     <button
       type="button"
@@ -376,7 +531,7 @@ export function AITaskInput({
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
       onPointerCancel={handlePointerCancel}
-      disabled={isParsing || isTranscribing}
+      disabled={isParsing || isTranscribing || isPlanLoading}
       style={{ touchAction: "none" }}
       className={cn(
         "inline-flex items-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium transition-colors",
@@ -454,6 +609,61 @@ export function AITaskInput({
     </div>
   );
 
+  const proposedTaskCard = (task: ProposedTask, idx: number) => {
+    const group = task.group_id ? groups.find((g) => g.id === task.group_id) : null;
+    const isUpdate = task.action === "update";
+    return (
+      <div
+        key={idx}
+        className={cn(
+          "flex items-start gap-2 p-2 rounded-md border",
+          isUpdate
+            ? "bg-amber-50 border-amber-200 dark:bg-amber-950/20 dark:border-amber-800/40"
+            : "bg-muted/40 border-input"
+        )}
+      >
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-medium truncate">{task.title}</p>
+          <div className="flex flex-wrap gap-1 mt-1">
+            <span
+              className={cn(
+                "text-xs px-1.5 py-0.5 rounded font-medium",
+                isUpdate
+                  ? "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400"
+                  : "bg-primary/10 text-primary"
+              )}
+            >
+              {isUpdate ? "Update" : "New"}
+            </span>
+            {task.task_type && task.task_type !== "task" && (
+              <span className="text-xs px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
+                {TYPE_CHIP[task.task_type] ?? task.task_type}
+              </span>
+            )}
+            {task.priority && task.priority !== 3 && (
+              <span className="text-xs px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
+                {PRIORITY_CHIP[task.priority as number] ?? `P${task.priority}`}
+              </span>
+            )}
+            {task.scheduled_start && (
+              <span className="text-xs px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
+                {task.scheduled_start.slice(11, 16)}
+              </span>
+            )}
+            {group && (
+              <span
+                className="text-xs px-1.5 py-0.5 rounded text-white"
+                style={{ backgroundColor: group.color || "#6b7280" }}
+              >
+                {group.name}
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg max-h-[90vh] w-[95vw] md:w-full mx-2 md:mx-auto flex flex-col">
@@ -491,11 +701,24 @@ export function AITaskInput({
             >
               Brain dump
             </button>
+            <button
+              type="button"
+              onClick={() => switchMode("plan")}
+              className={cn(
+                "flex-1 px-3 py-1.5 text-sm font-medium transition-colors border-l border-input flex items-center justify-center gap-1.5",
+                mode === "plan"
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-background text-muted-foreground hover:text-foreground"
+              )}
+            >
+              <MessageCircle className="h-3.5 w-3.5" />
+              Plan
+            </button>
           </div>
         )}
 
-        {/* View 1 & 2: input views */}
-        {!showPreview && (
+        {/* View 1 & 2: single / braindump input views */}
+        {!showPreview && mode !== "plan" && (
           <div className="space-y-4 flex-1 overflow-y-auto min-h-0">
             <div className="flex flex-col h-44">
               <textarea
@@ -600,9 +823,122 @@ export function AITaskInput({
           </div>
         )}
 
+        {/* View 4: Plan mode chat */}
+        {!showPreview && mode === "plan" && (
+          <div className="flex-1 flex flex-col min-h-0 gap-3">
+            {/* Message history */}
+            <div className="flex-1 overflow-y-auto space-y-3 min-h-0 pr-1">
+              {planMessages.length === 0 && (
+                <p className="text-sm text-muted-foreground text-center pt-4">
+                  Describe what you need to plan and I'll help you break it down into tasks.
+                </p>
+              )}
+              {planMessages.map((msg) => (
+                <div
+                  key={msg.id}
+                  className={cn(
+                    "flex flex-col gap-1",
+                    msg.role === "user" ? "items-end" : "items-start"
+                  )}
+                >
+                  <div
+                    className={cn(
+                      "max-w-[85%] rounded-2xl px-3 py-2 text-sm",
+                      msg.role === "user"
+                        ? "bg-primary text-primary-foreground rounded-br-sm"
+                        : "bg-muted text-foreground rounded-bl-sm"
+                    )}
+                  >
+                    {msg.content}
+                  </div>
+                  {msg.proposedTasks && msg.proposedTasks.length > 0 && (
+                    <div className="w-full max-w-[95%] mt-1 space-y-1.5">
+                      <p className="text-xs text-muted-foreground font-medium px-1">
+                        {(() => {
+                          const creates = msg.proposedTasks.filter(
+                            (t) => t.action !== "update"
+                          ).length;
+                          const updates = msg.proposedTasks.filter(
+                            (t) => t.action === "update"
+                          ).length;
+                          const parts = [];
+                          if (creates > 0)
+                            parts.push(`${creates} new task${creates !== 1 ? "s" : ""}`);
+                          if (updates > 0)
+                            parts.push(`${updates} update${updates !== 1 ? "s" : ""}`);
+                          return parts.join(", ");
+                        })()}:
+                      </p>
+                      {msg.proposedTasks.map((t, idx) => proposedTaskCard(t, idx))}
+                      <div className="flex items-center gap-3 pt-1">
+                        <Button
+                          size="sm"
+                          onClick={() => handleApplyProposedTasks(msg.proposedTasks!)}
+                        >
+                          Apply all →
+                        </Button>
+                        <button
+                          type="button"
+                          onClick={() => setPlanProposedTasks(null)}
+                          className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+                        >
+                          Keep chatting
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+              {isPlanLoading && (
+                <div className="flex items-start">
+                  <div className="bg-muted rounded-2xl rounded-bl-sm px-3 py-2 flex items-center gap-1">
+                    <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/60 animate-bounce [animation-delay:0ms]" />
+                    <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/60 animate-bounce [animation-delay:150ms]" />
+                    <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/60 animate-bounce [animation-delay:300ms]" />
+                  </div>
+                </div>
+              )}
+              <div ref={planMessagesEndRef} />
+            </div>
+
+            {/* Plan input */}
+            <div className="shrink-0 space-y-1.5">
+              <div className="flex gap-2">
+                <textarea
+                  ref={planTextareaRef}
+                  value={planInput}
+                  onChange={(e) => setPlanInput(e.target.value)}
+                  onKeyDown={handlePlanKeyDown}
+                  placeholder="Type your message…"
+                  rows={2}
+                  className="flex-1 resize-none rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                  disabled={isPlanLoading || isTranscribing}
+                />
+                <div className="flex flex-col gap-1.5">
+                  {micButton}
+                  <Button
+                    size="sm"
+                    onClick={sendPlanMessage}
+                    disabled={!planInput.trim() || isPlanLoading || isTranscribing}
+                    className="h-auto px-3 py-2"
+                  >
+                    Send →
+                  </Button>
+                </div>
+              </div>
+              {recordingVisualizer}
+              {parseError && <p className="text-sm text-destructive">{parseError}</p>}
+            </div>
+          </div>
+        )}
+
         {/* Footer */}
         <div className="shrink-0 flex items-center justify-between pt-3 border-t">
-          {!showPreview ? (
+          {mode === "plan" && !showPreview ? (
+            <Button variant="ghost" onClick={() => onOpenChange(false)}>
+              Cancel
+            </Button>
+          ) : !showPreview ? (
             <>
               {micButton}
               <div className="flex gap-2">
