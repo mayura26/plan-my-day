@@ -80,7 +80,7 @@ export function GroupedTaskList({
   }> => {
     const parentGroups = groups.filter((g) => g.is_parent_group);
     const regularGroups = groups.filter((g) => !g.is_parent_group);
-    const topLevelGroups = regularGroups.filter((g) => !g.parent_group_id);
+    const topLevelGroups = regularGroups.filter((g) => !g.parent_group_id || g.share_id);
 
     // Build hierarchy
     const hierarchy: Array<{

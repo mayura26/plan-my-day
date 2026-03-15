@@ -58,6 +58,17 @@ export default function CalendarPage() {
 
   const [tasks, setTasks] = useState<Task[]>([]);
   const [groups, setGroups] = useState<TaskGroup[]>([]);
+
+  interface PendingInvite {
+    id: string;
+    group_id: string;
+    group_name: string;
+    group_color: string;
+    owner_name: string | null;
+    owner_email: string | null;
+  }
+
+  const [pendingInvites, setPendingInvites] = useState<PendingInvite[]>([]);
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [showCreateForm, setShowCreateForm] = useState(false);
@@ -230,6 +241,42 @@ export default function CalendarPage() {
       isFetchingGroupsRef.current = false;
     }
   }, []);
+
+  const fetchPendingInvites = useCallback(async () => {
+    try {
+      const res = await fetch("/api/group-invites");
+      if (res.ok) {
+        const data = await res.json();
+        setPendingInvites(data.invites || []);
+      }
+    } catch (error) {
+      console.error("Error fetching pending invites:", error);
+    }
+  }, []);
+
+  const handleAcceptInvite = async (inviteId: string) => {
+    const res = await fetch(`/api/group-invites/${inviteId}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "accept" }),
+    });
+    if (res.ok) {
+      setPendingInvites((prev) => prev.filter((i) => i.id !== inviteId));
+      fetchTasks();
+      fetchGroups();
+    }
+  };
+
+  const handleDeclineInvite = async (inviteId: string) => {
+    const res = await fetch(`/api/group-invites/${inviteId}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "decline" }),
+    });
+    if (res.ok) {
+      setPendingInvites((prev) => prev.filter((i) => i.id !== inviteId));
+    }
+  };
 
   // Helper function to format date to YYYY-MM-DD in user's timezone
   const formatDateKey = useCallback(
@@ -438,6 +485,9 @@ export default function CalendarPage() {
         fetchedGroupsUserIdRef.current = currentUserId;
         fetchGroups();
       }
+
+      // Fetch pending invites
+      fetchPendingInvites();
     }
 
     // Reset the ref if user logs out (but only if we actually had data fetched)
@@ -451,6 +501,7 @@ export default function CalendarPage() {
     timezoneLoading,
     fetchGroups, // Fetch tasks
     fetchTasks,
+    fetchPendingInvites,
     router.push,
     session?.user?.id,
   ]);
@@ -1427,6 +1478,47 @@ export default function CalendarPage() {
                 <X className="h-4 w-4" />
               </Button>
             </div>
+            {/* Pending Group Invites */}
+            {pendingInvites.length > 0 && (
+              <div className="rounded-lg border border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950/20 p-3 space-y-2">
+                <p className="text-sm font-medium text-blue-800 dark:text-blue-300">
+                  You have {pendingInvites.length} pending group invite
+                  {pendingInvites.length !== 1 ? "s" : ""}
+                </p>
+                {pendingInvites.map((invite) => (
+                  <div key={invite.id} className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div
+                        className="w-2.5 h-2.5 rounded-full shrink-0"
+                        style={{ backgroundColor: invite.group_color }}
+                      />
+                      <span className="text-sm truncate font-medium">{invite.group_name}</span>
+                      <span className="text-xs text-muted-foreground truncate">
+                        from {invite.owner_name || invite.owner_email || "Unknown"}
+                      </span>
+                    </div>
+                    <div className="flex gap-1.5 shrink-0">
+                      <Button
+                        size="sm"
+                        className="h-7 px-3 text-xs"
+                        onClick={() => handleAcceptInvite(invite.id)}
+                      >
+                        Accept
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-7 px-3 text-xs"
+                        onClick={() => handleDeclineInvite(invite.id)}
+                      >
+                        Decline
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
             {/* Add Task / Add with AI */}
             <div className="flex gap-2">
               <Button
