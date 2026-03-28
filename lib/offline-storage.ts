@@ -17,6 +17,10 @@ interface TaskData {
   task_type: string;
   google_calendar_event_id: string | null;
   notification_sent: boolean;
+  lead_reminder_sent?: boolean;
+  due_reminder_sent?: boolean;
+  critical_reminder_snoozed_until?: string | null;
+  critical_reminder_last_sent_at?: string | null;
   depends_on_task_id: string | null;
   energy_level_required: number;
   parent_task_id: string | null;

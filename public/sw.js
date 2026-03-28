@@ -245,17 +245,28 @@ self.addEventListener("notificationclick", (event) => {
     const notificationData = event.notification.data || {};
 
     if (action === "view" && notificationData.url) {
-      event.waitUntil(clients.openWindow(notificationData.url));
+      const u = notificationData.url.startsWith("http")
+        ? notificationData.url
+        : new URL(notificationData.url, self.location.origin).href;
+      event.waitUntil(clients.openWindow(u));
       return;
-    } else if (action === "snooze" && notificationData.taskId) {
-      // You could send a message to the client to handle snooze
-      // For now, just close the notification
+    }
+    if (action === "snooze15" && notificationData.snoozeUrl15) {
+      event.waitUntil(clients.openWindow(notificationData.snoozeUrl15));
+      return;
+    }
+    if (action === "snooze60" && notificationData.snoozeUrl60) {
+      event.waitUntil(clients.openWindow(notificationData.snoozeUrl60));
+      return;
+    }
+    if (action === "snooze" && notificationData.taskId) {
       return;
     }
   }
 
   // Default: open the URL from notification data, or home page
-  const urlToOpen = event.notification.data?.url || "/";
+  const rawUrl = event.notification.data?.url || "/";
+  const urlToOpen = rawUrl.startsWith("http") ? rawUrl : new URL(rawUrl, self.location.origin).href;
 
   event.waitUntil(
     clients
@@ -264,14 +275,12 @@ self.addEventListener("notificationclick", (event) => {
         includeUncontrolled: true,
       })
       .then((clientList) => {
-        // Check if there's already a window/tab open with the target URL
         for (let i = 0; i < clientList.length; i++) {
           const client = clientList[i];
           if (client.url === urlToOpen && "focus" in client) {
             return client.focus();
           }
         }
-        // If not, open a new window/tab
         if (clients.openWindow) {
           return clients.openWindow(urlToOpen);
         }

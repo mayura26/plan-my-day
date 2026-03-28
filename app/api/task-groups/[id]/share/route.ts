@@ -152,7 +152,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     if (sharedWithUserId) {
       try {
         const subscriptionsResult = await db.execute(
-          "SELECT endpoint, p256dh_key, auth_key FROM notification_subscriptions WHERE user_id = ?",
+          "SELECT endpoint, p256dh_key, auth_key FROM push_subscriptions WHERE user_id = ? AND is_active = 1",
           [sharedWithUserId]
         );
         for (const sub of subscriptionsResult.rows) {

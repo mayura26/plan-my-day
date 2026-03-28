@@ -283,6 +283,15 @@ export function PushNotificationManager() {
           push notifications.
         </p>
       )}
+
+      <p className="text-sm text-muted-foreground border-t pt-3 border-border">
+        <span className="font-medium text-foreground">Mobile / PWA:</span> On iOS, add this site to
+        your Home Screen (Share → Add to Home Screen) and use iOS 16.4 or later for Web Push.
+        Notifications may not work in Safari without installing the app. Android Chrome generally
+        supports push when notifications are allowed. Task reminders require the server to run the
+        reminder job on a schedule (for example Vercel Cron with{" "}
+        <code className="text-xs">CRON_SECRET</code>).
+      </p>
     </div>
   );
 }

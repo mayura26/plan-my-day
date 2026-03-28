@@ -7,6 +7,7 @@ import { useEffect } from "react";
 import { AIPreferencesSelector } from "@/components/ai-preferences-selector";
 import { APIKeyManager } from "@/components/api-key-manager";
 import { AwakeHoursSelector } from "@/components/awake-hours-selector";
+import { CriticalReminderSettings } from "@/components/critical-reminder-settings";
 import { ForceUpdateButton } from "@/components/force-update-button";
 import { GroupReminderSettings } from "@/components/group-reminder-settings";
 import { PushNotificationManager } from "@/components/push-notification-manager";
@@ -172,6 +173,25 @@ export default function SettingsPage() {
 
         {/* Push Subscription List */}
         <PushSubscriptionList />
+
+        <Separator />
+
+        {/* Critical overdue reminders */}
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <Bell className="h-5 w-5" />
+              <CardTitle>Critical task reminders</CardTitle>
+            </div>
+            <CardDescription>
+              Overdue priority-1 (Critical) tasks can repeat push notifications until you finish or
+              snooze.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <CriticalReminderSettings />
+          </CardContent>
+        </Card>
 
         <Separator />
 

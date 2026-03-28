@@ -21,8 +21,9 @@
     "db:migrate:reminder-settings": "node scripts/migrate-add-reminder-settings.mjs",
     "db:migrate:scheduling-preferences": "node scripts/migrate-add-scheduling-preferences.mjs",
     "db:migrate:ai-preferences": "node scripts/migrate-add-ai-preferences.mjs",
-    "reminders:process": "node scripts/process-reminders.mjs",
-    "db:migrate:group-shares": "node scripts/migrate-add-group-shares.mjs"
+    "db:migrate:group-shares": "node scripts/migrate-add-group-shares.mjs",
+    "db:migrate:critical-reminders": "node scripts/migrate-add-critical-reminders.mjs",
+    "reminders:process": "tsx scripts/process-reminders.ts"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
@@ -58,6 +59,7 @@
     "react-dom": "^19.1.2",
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.3.1",
+    "tsx": "^4.19.2",
     "web-push": "^3.6.7"
   },
   "devDependencies": {

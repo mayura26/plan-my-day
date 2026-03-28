@@ -15,7 +15,7 @@ export async function GET() {
     }
 
     const result = await db.execute(
-      "SELECT auto_schedule_new_tasks, default_schedule_mode, default_ai_group_id FROM users WHERE id = ?",
+      "SELECT auto_schedule_new_tasks, default_schedule_mode, default_ai_group_id, critical_reminder_enabled, critical_reminder_interval_minutes FROM users WHERE id = ?",
       [session.user.id]
     );
 
@@ -31,11 +31,22 @@ export async function GET() {
         ? (rawMode as SchedulingMode)
         : "now";
     const default_ai_group_id = (row.default_ai_group_id as string | null) ?? null;
+    const critical_reminder_enabled =
+      row.critical_reminder_enabled == null ? true : Boolean(row.critical_reminder_enabled);
+    const rawInterval = row.critical_reminder_interval_minutes;
+    const critical_reminder_interval_minutes =
+      typeof rawInterval === "number"
+        ? Math.max(1, Math.min(120, rawInterval))
+        : typeof rawInterval === "bigint"
+          ? Math.max(1, Math.min(120, Number(rawInterval)))
+          : 15;
 
     return NextResponse.json({
       auto_schedule_new_tasks,
       default_schedule_mode,
       default_ai_group_id,
+      critical_reminder_enabled,
+      critical_reminder_interval_minutes,
     });
   } catch (error) {
     console.error("Error fetching scheduling preferences:", error);
@@ -55,6 +66,8 @@ export async function PUT(request: NextRequest) {
       auto_schedule_new_tasks?: boolean;
       default_schedule_mode?: string;
       default_ai_group_id?: string | null;
+      critical_reminder_enabled?: boolean;
+      critical_reminder_interval_minutes?: number;
     } = await request.json();
 
     if (body.default_schedule_mode !== undefined) {
@@ -100,11 +113,28 @@ export async function PUT(request: NextRequest) {
       }
     }
 
+    if (body.critical_reminder_enabled !== undefined) {
+      updates.push("critical_reminder_enabled = ?");
+      args.push(body.critical_reminder_enabled ? 1 : 0);
+    }
+
+    if (body.critical_reminder_interval_minutes !== undefined) {
+      const n = Number(body.critical_reminder_interval_minutes);
+      if (!Number.isFinite(n) || n < 1 || n > 120) {
+        return NextResponse.json(
+          { error: "critical_reminder_interval_minutes must be between 1 and 120" },
+          { status: 400 }
+        );
+      }
+      updates.push("critical_reminder_interval_minutes = ?");
+      args.push(Math.floor(n));
+    }
+
     if (updates.length === 0) {
       return NextResponse.json(
         {
           error:
-            "Provide at least one of: auto_schedule_new_tasks, default_schedule_mode, default_ai_group_id",
+            "Provide at least one of: auto_schedule_new_tasks, default_schedule_mode, default_ai_group_id, critical_reminder_enabled, critical_reminder_interval_minutes",
         },
         { status: 400 }
       );
@@ -116,7 +146,7 @@ export async function PUT(request: NextRequest) {
     await db.execute(`UPDATE users SET ${updates.join(", ")} WHERE id = ?`, args);
 
     const getResult = await db.execute(
-      "SELECT auto_schedule_new_tasks, default_schedule_mode, default_ai_group_id FROM users WHERE id = ?",
+      "SELECT auto_schedule_new_tasks, default_schedule_mode, default_ai_group_id, critical_reminder_enabled, critical_reminder_interval_minutes FROM users WHERE id = ?",
       [session.user.id]
     );
     const row = getResult.rows[0];
@@ -127,11 +157,22 @@ export async function PUT(request: NextRequest) {
         ? (rawMode as SchedulingMode)
         : "now";
     const default_ai_group_id = (row?.default_ai_group_id as string | null) ?? null;
+    const critical_reminder_enabled =
+      row?.critical_reminder_enabled == null ? true : Boolean(row.critical_reminder_enabled);
+    const rawInterval = row?.critical_reminder_interval_minutes;
+    const critical_reminder_interval_minutes =
+      typeof rawInterval === "number"
+        ? Math.max(1, Math.min(120, rawInterval))
+        : typeof rawInterval === "bigint"
+          ? Math.max(1, Math.min(120, Number(rawInterval)))
+          : 15;
 
     return NextResponse.json({
       auto_schedule_new_tasks,
       default_schedule_mode,
       default_ai_group_id,
+      critical_reminder_enabled,
+      critical_reminder_interval_minutes,
     });
   } catch (error) {
     console.error("Error updating scheduling preferences:", error);

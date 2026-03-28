@@ -9,6 +9,9 @@ export interface User {
   awake_hours?: GroupScheduleHours | null;
   auto_schedule_new_tasks?: boolean;
   default_schedule_mode?: SchedulingMode;
+  /** Repeat push for overdue priority-1 tasks until done or snoozed */
+  critical_reminder_enabled?: boolean;
+  critical_reminder_interval_minutes?: number;
   created_at: string;
   updated_at: string;
 }
@@ -32,6 +35,9 @@ export interface Task {
   notification_sent: boolean;
   lead_reminder_sent: boolean;
   due_reminder_sent: boolean;
+  /** Suppress critical repeat pushes until this time (ISO) */
+  critical_reminder_snoozed_until?: string | null;
+  critical_reminder_last_sent_at?: string | null;
   depends_on_task_id?: string | null; // Legacy single dependency (kept for backward compatibility)
   energy_level_required: number; // 1-5 scale (1 = low energy, 5 = high energy)
   parent_task_id?: string | null; // For subtasks - links to parent task

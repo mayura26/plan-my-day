@@ -207,6 +207,40 @@ export function createOnTimeReminderPayload(
   };
 }
 
+/** Critical tasks that are overdue: repeat nag with unique tag so OS does not collapse repeats. */
+export function createCriticalNagPayload(
+  taskTitle: string,
+  taskId: string,
+  snoozeUrl15: string,
+  snoozeUrl60: string,
+  priority = 1
+): NotificationPayload {
+  const urgency = getNotificationUrgency(priority);
+  const uniqueTag = `task-${taskId}-critical-${Date.now()}`;
+  return {
+    title: `${urgency.titlePrefix}Overdue: ${taskTitle}`,
+    body: "This critical task is overdue. Mark it done or snooze reminders.",
+    tag: uniqueTag,
+    icon: "/web-app-manifest-192x192.png",
+    data: {
+      type: "task-critical-nag",
+      taskId,
+      url: `/tasks?task=${taskId}`,
+      snoozeUrl15,
+      snoozeUrl60,
+    },
+    actions: [
+      { action: "view", title: "View Task" },
+      { action: "snooze15", title: "Snooze 15m" },
+      { action: "snooze60", title: "Snooze 60m" },
+    ],
+    requireInteraction: urgency.requireInteraction,
+    renotify: urgency.renotify,
+    vibrate: urgency.vibrate,
+    priority,
+  };
+}
+
 export function createDueReminderPayload(
   taskTitle: string,
   taskId: string,

@@ -34,6 +34,8 @@ function mapRowToTask(row: any): Task {
     notification_sent: Boolean(row.notification_sent),
     lead_reminder_sent: Boolean(row.lead_reminder_sent ?? 0),
     due_reminder_sent: Boolean(row.due_reminder_sent ?? 0),
+    critical_reminder_snoozed_until: (row.critical_reminder_snoozed_until as string | null) ?? null,
+    critical_reminder_last_sent_at: (row.critical_reminder_last_sent_at as string | null) ?? null,
     depends_on_task_id: row.depends_on_task_id as string | null,
     energy_level_required: row.energy_level_required as number,
     parent_task_id: row.parent_task_id as string | null,
