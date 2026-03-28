@@ -87,6 +87,31 @@ async function sendToUserSubscriptions(
   return successCount;
 }
 
+/** Critical nag uses columns from scripts/migrate-add-critical-reminders.mjs — skip if not migrated yet. */
+async function hasCriticalReminderSchema(): Promise<boolean> {
+  try {
+    const tasksInfo = await db.execute("PRAGMA table_info(tasks)");
+    const taskCols = new Set(tasksInfo.rows.map((r) => String(r.name)));
+    if (
+      !taskCols.has("critical_reminder_snoozed_until") ||
+      !taskCols.has("critical_reminder_last_sent_at")
+    ) {
+      return false;
+    }
+    const usersInfo = await db.execute("PRAGMA table_info(users)");
+    const userCols = new Set(usersInfo.rows.map((r) => String(r.name)));
+    if (
+      !userCols.has("critical_reminder_enabled") ||
+      !userCols.has("critical_reminder_interval_minutes")
+    ) {
+      return false;
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export async function processReminders(): Promise<ProcessRemindersResult> {
   const nowMs = Date.now();
   const windowStart = new Date(nowMs - 2 * 60 * 1000).toISOString();
@@ -267,8 +292,14 @@ export async function processReminders(): Promise<ProcessRemindersResult> {
 
   const baseUrl = getAppBaseUrl();
 
-  const criticalResult = await db.execute({
-    sql: `
+  const criticalSchemaOk = await hasCriticalReminderSchema();
+  if (!criticalSchemaOk) {
+    console.warn(
+      "[reminders] Skipping critical overdue reminders: migration not applied. Run on the server: npm run db:migrate:critical-reminders"
+    );
+  } else {
+    const criticalResult = await db.execute({
+      sql: `
       SELECT t.id, t.user_id, t.title, t.priority, t.scheduled_start, t.due_date,
              t.critical_reminder_snoozed_until, t.critical_reminder_last_sent_at,
              tg.reminder_settings,
@@ -282,76 +313,77 @@ export async function processReminders(): Promise<ProcessRemindersResult> {
         AND t.group_id IS NOT NULL
         AND COALESCE(u.critical_reminder_enabled, 1) = 1
     `,
-  });
+    });
 
-  results.critical_checked = criticalResult.rows.length;
+    results.critical_checked = criticalResult.rows.length;
 
-  for (const row of criticalResult.rows) {
-    const taskId = row.id as string;
-    const userId = row.user_id as string;
-    const title = row.title as string;
-    const scheduledStart = row.scheduled_start as string | null;
-    const dueDate = row.due_date as string | null;
-    const snoozedUntil = row.critical_reminder_snoozed_until as string | null;
-    const lastSent = row.critical_reminder_last_sent_at as string | null;
-    const intervalMinutes = Math.max(
-      1,
-      Math.min(120, Number(row.critical_reminder_interval_minutes) || 15)
-    );
+    for (const row of criticalResult.rows) {
+      const taskId = row.id as string;
+      const userId = row.user_id as string;
+      const title = row.title as string;
+      const scheduledStart = row.scheduled_start as string | null;
+      const dueDate = row.due_date as string | null;
+      const snoozedUntil = row.critical_reminder_snoozed_until as string | null;
+      const lastSent = row.critical_reminder_last_sent_at as string | null;
+      const intervalMinutes = Math.max(
+        1,
+        Math.min(120, Number(row.critical_reminder_interval_minutes) || 15)
+      );
 
-    let settings: ReminderSettingsParsed | null = null;
-    try {
-      if (row.reminder_settings) {
-        settings = JSON.parse(row.reminder_settings as string);
+      let settings: ReminderSettingsParsed | null = null;
+      try {
+        if (row.reminder_settings) {
+          settings = JSON.parse(row.reminder_settings as string);
+        }
+      } catch {
+        /* ignore */
       }
-    } catch {
-      /* ignore */
-    }
 
-    if (!settings?.enabled) {
-      continue;
-    }
-    if (1 > (settings.min_priority ?? 5)) {
-      continue;
-    }
-
-    if (snoozedUntil) {
-      const snoozeEnd = new Date(snoozedUntil).getTime();
-      if (nowMs < snoozeEnd) {
+      if (!settings?.enabled) {
         continue;
       }
-    }
-
-    let isLate = false;
-    if (scheduledStart) {
-      isLate = new Date(scheduledStart).getTime() < nowMs;
-    } else if (dueDate) {
-      isLate = new Date(dueDate).getTime() < nowMs;
-    } else {
-      continue;
-    }
-
-    if (!isLate) {
-      continue;
-    }
-
-    const intervalMs = intervalMinutes * 60 * 1000;
-    if (lastSent) {
-      const last = new Date(lastSent).getTime();
-      if (nowMs - last < intervalMs) {
+      if (1 > (settings.min_priority ?? 5)) {
         continue;
       }
-    }
 
-    const snoozeUrl15 = buildSnoozeApiUrl(baseUrl, taskId, userId, "snooze15");
-    const snoozeUrl60 = buildSnoozeApiUrl(baseUrl, taskId, userId, "snooze60");
-    const payload = createCriticalNagPayload(title, taskId, snoozeUrl15, snoozeUrl60, 1);
-    const n = await sendToUserSubscriptions(userId, payload, results);
-    if (n > 0) {
-      await db.execute({
-        sql: `UPDATE tasks SET critical_reminder_last_sent_at = datetime('now') WHERE id = ?`,
-        args: [taskId],
-      });
+      if (snoozedUntil) {
+        const snoozeEnd = new Date(snoozedUntil).getTime();
+        if (nowMs < snoozeEnd) {
+          continue;
+        }
+      }
+
+      let isLate = false;
+      if (scheduledStart) {
+        isLate = new Date(scheduledStart).getTime() < nowMs;
+      } else if (dueDate) {
+        isLate = new Date(dueDate).getTime() < nowMs;
+      } else {
+        continue;
+      }
+
+      if (!isLate) {
+        continue;
+      }
+
+      const intervalMs = intervalMinutes * 60 * 1000;
+      if (lastSent) {
+        const last = new Date(lastSent).getTime();
+        if (nowMs - last < intervalMs) {
+          continue;
+        }
+      }
+
+      const snoozeUrl15 = buildSnoozeApiUrl(baseUrl, taskId, userId, "snooze15");
+      const snoozeUrl60 = buildSnoozeApiUrl(baseUrl, taskId, userId, "snooze60");
+      const payload = createCriticalNagPayload(title, taskId, snoozeUrl15, snoozeUrl60, 1);
+      const n = await sendToUserSubscriptions(userId, payload, results);
+      if (n > 0) {
+        await db.execute({
+          sql: `UPDATE tasks SET critical_reminder_last_sent_at = datetime('now') WHERE id = ?`,
+          args: [taskId],
+        });
+      }
     }
   }
 
