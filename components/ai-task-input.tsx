@@ -110,7 +110,6 @@ export function AITaskInput({
   const [planMessages, setPlanMessages] = useState<PlanMessage[]>([]);
   const [planInput, setPlanInput] = useState("");
   const [isPlanLoading, setIsPlanLoading] = useState(false);
-  const [planProposedTasks, setPlanProposedTasks] = useState<ProposedTask[] | null>(null);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const planTextareaRef = useRef<HTMLTextAreaElement>(null);
@@ -142,19 +141,18 @@ export function AITaskInput({
       setPlanMessages([]);
       setPlanInput("");
       setIsPlanLoading(false);
-      setPlanProposedTasks(null);
     } else {
       setTimeout(() => textareaRef.current?.focus(), 50);
     }
   }, [open, isRecording]);
 
-  // Scroll plan chat to bottom on new messages
-  const planMessageCount = planMessages.length;
+  // Scroll plan chat to bottom on new messages or when loading state changes
+  // biome-ignore lint/correctness/useExhaustiveDependencies: ref scroll must run when message list or loading changes, not derivable from effect body for static analysis
   useEffect(() => {
     if (mode === "plan") {
       planMessagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     }
-  }, [planMessageCount, isPlanLoading, mode]);
+  }, [mode, planMessages.length, isPlanLoading]);
 
   // Frequency-bar visualizer — runs while recording
   useEffect(() => {
@@ -220,7 +218,6 @@ export function AITaskInput({
     setPlanMessages([]);
     setPlanInput("");
     setIsPlanLoading(false);
-    setPlanProposedTasks(null);
   };
 
   const startRecording = async () => {
@@ -450,9 +447,6 @@ export function AITaskInput({
         proposedTasks: data.ready && data.proposed_tasks ? data.proposed_tasks : undefined,
       };
       setPlanMessages((prev) => [...prev, assistantMsg]);
-      if (data.ready && data.proposed_tasks) {
-        setPlanProposedTasks(data.proposed_tasks);
-      }
     } catch {
       setPlanMessages((prev) => [
         ...prev,
@@ -873,13 +867,18 @@ export function AITaskInput({
                       <div className="flex items-center gap-3 pt-1">
                         <Button
                           size="sm"
-                          onClick={() => handleApplyProposedTasks(msg.proposedTasks!)}
+                          onClick={() => {
+                            const tasks = msg.proposedTasks;
+                            if (tasks && tasks.length > 0) {
+                              handleApplyProposedTasks(tasks);
+                            }
+                          }}
                         >
                           Apply all →
                         </Button>
                         <button
                           type="button"
-                          onClick={() => setPlanProposedTasks(null)}
+                          onClick={() => planTextareaRef.current?.focus()}
                           className="text-xs text-muted-foreground hover:text-foreground transition-colors"
                         >
                           Keep chatting
