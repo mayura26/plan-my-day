@@ -1,4 +1,4 @@
-import { buildSnoozeApiUrl } from "@/lib/push-action-token";
+import { buildCompleteApiUrl, buildSnoozeApiUrl } from "@/lib/push-action-token";
 import {
   createCriticalNagPayload,
   createDueReminderPayload,
@@ -374,9 +374,17 @@ export async function processReminders(): Promise<ProcessRemindersResult> {
         }
       }
 
+      const completeUrl = buildCompleteApiUrl(baseUrl, taskId, userId);
       const snoozeUrl15 = buildSnoozeApiUrl(baseUrl, taskId, userId, "snooze15");
       const snoozeUrl60 = buildSnoozeApiUrl(baseUrl, taskId, userId, "snooze60");
-      const payload = createCriticalNagPayload(title, taskId, snoozeUrl15, snoozeUrl60, 1);
+      const payload = createCriticalNagPayload(
+        title,
+        taskId,
+        completeUrl,
+        snoozeUrl15,
+        snoozeUrl60,
+        1
+      );
       const n = await sendToUserSubscriptions(userId, payload, results);
       if (n > 0) {
         await db.execute({

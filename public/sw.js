@@ -239,24 +239,50 @@ self.addEventListener("notificationclick", (event) => {
 
   event.notification.close();
 
+  const notificationData = event.notification.data || {};
+  const openUrl = (rawUrl) => {
+    if (!rawUrl) {
+      return Promise.resolve();
+    }
+    const resolvedUrl = rawUrl.startsWith("http")
+      ? rawUrl
+      : new URL(rawUrl, self.location.origin).href;
+    return clients
+      .matchAll({
+        type: "window",
+        includeUncontrolled: true,
+      })
+      .then((clientList) => {
+        for (let i = 0; i < clientList.length; i++) {
+          const client = clientList[i];
+          if (client.url === resolvedUrl && "focus" in client) {
+            return client.focus();
+          }
+        }
+        if (clients.openWindow) {
+          return clients.openWindow(resolvedUrl);
+        }
+      });
+  };
+
   // Handle action clicks (view, snooze, etc.)
   if (event.action) {
     const action = event.action;
-    const notificationData = event.notification.data || {};
 
     if (action === "view" && notificationData.url) {
-      const u = notificationData.url.startsWith("http")
-        ? notificationData.url
-        : new URL(notificationData.url, self.location.origin).href;
-      event.waitUntil(clients.openWindow(u));
+      event.waitUntil(openUrl(notificationData.url));
+      return;
+    }
+    if (action === "complete" && notificationData.completeUrl) {
+      event.waitUntil(openUrl(notificationData.completeUrl));
       return;
     }
     if (action === "snooze15" && notificationData.snoozeUrl15) {
-      event.waitUntil(clients.openWindow(notificationData.snoozeUrl15));
+      event.waitUntil(openUrl(notificationData.snoozeUrl15));
       return;
     }
     if (action === "snooze60" && notificationData.snoozeUrl60) {
-      event.waitUntil(clients.openWindow(notificationData.snoozeUrl60));
+      event.waitUntil(openUrl(notificationData.snoozeUrl60));
       return;
     }
     if (action === "snooze" && notificationData.taskId) {
@@ -266,26 +292,7 @@ self.addEventListener("notificationclick", (event) => {
 
   // Default: open the URL from notification data, or home page
   const rawUrl = event.notification.data?.url || "/";
-  const urlToOpen = rawUrl.startsWith("http") ? rawUrl : new URL(rawUrl, self.location.origin).href;
-
-  event.waitUntil(
-    clients
-      .matchAll({
-        type: "window",
-        includeUncontrolled: true,
-      })
-      .then((clientList) => {
-        for (let i = 0; i < clientList.length; i++) {
-          const client = clientList[i];
-          if (client.url === urlToOpen && "focus" in client) {
-            return client.focus();
-          }
-        }
-        if (clients.openWindow) {
-          return clients.openWindow(urlToOpen);
-        }
-      })
-  );
+  event.waitUntil(openUrl(rawUrl));
 });
 
 // Handle messages from the client (e.g., skip waiting)

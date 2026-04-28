@@ -1,7 +1,7 @@
 "use client";
 
 import { Folder, Trash2 } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -28,6 +28,7 @@ export default function TasksPage() {
   const { confirm } = useConfirmDialog();
   const { data: session, status } = useSession();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showCreateForm, setShowCreateForm] = useState(false);
@@ -63,6 +64,7 @@ export default function TasksPage() {
   const [activeTab, setActiveTab] = useState("create");
   const [newGroupName, setNewGroupName] = useState("");
   const [newGroupColor, setNewGroupColor] = useState("#3B82F6");
+  const [handledTaskFromUrl, setHandledTaskFromUrl] = useState<string | null>(null);
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -144,6 +146,21 @@ export default function TasksPage() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session, fetchGroups, fetchTasks, fetchPendingInvites]);
+
+  // Open task details when navigated from push deep links like /tasks?task=<id>
+  useEffect(() => {
+    const taskId = searchParams.get("task");
+    if (!taskId || tasks.length === 0 || handledTaskFromUrl === taskId) {
+      return;
+    }
+
+    const linkedTask = tasks.find((task) => task.id === taskId);
+    if (linkedTask) {
+      setSelectedTask(linkedTask);
+      setShowTaskDetail(true);
+      setHandledTaskFromUrl(taskId);
+    }
+  }, [searchParams, tasks, handledTaskFromUrl]);
 
   // Create task
   const handleCreateTask = async (taskData: CreateTaskRequestWithSubtasks) => {

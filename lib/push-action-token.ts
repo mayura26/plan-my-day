@@ -1,6 +1,6 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 
-export type PushActionType = "snooze15" | "snooze60";
+export type PushActionType = "snooze15" | "snooze60" | "complete";
 
 export interface PushActionPayload {
   taskId: string;
@@ -70,6 +70,8 @@ export function snoozeMinutesForAction(action: PushActionType): number {
       return 15;
     case "snooze60":
       return 60;
+    case "complete":
+      return 0;
     default:
       return 15;
   }
@@ -83,6 +85,13 @@ export function buildSnoozeApiUrl(
 ): string {
   const token = encodePushActionToken({ taskId, userId, action });
   const u = new URL("/api/push/snooze", baseUrl.replace(/\/$/, ""));
+  u.searchParams.set("token", token);
+  return u.href;
+}
+
+export function buildCompleteApiUrl(baseUrl: string, taskId: string, userId: string): string {
+  const token = encodePushActionToken({ taskId, userId, action: "complete" });
+  const u = new URL("/api/push/complete", baseUrl.replace(/\/$/, ""));
   u.searchParams.set("token", token);
   return u.href;
 }

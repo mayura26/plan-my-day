@@ -211,6 +211,7 @@ export function createOnTimeReminderPayload(
 export function createCriticalNagPayload(
   taskTitle: string,
   taskId: string,
+  completeUrl: string,
   snoozeUrl15: string,
   snoozeUrl60: string,
   priority = 1
@@ -226,11 +227,13 @@ export function createCriticalNagPayload(
       type: "task-critical-nag",
       taskId,
       url: `/tasks?task=${taskId}`,
+      completeUrl,
       snoozeUrl15,
       snoozeUrl60,
     },
     actions: [
       { action: "view", title: "View Task" },
+      { action: "complete", title: "Complete Task" },
       { action: "snooze15", title: "Snooze 15m" },
       { action: "snooze60", title: "Snooze 60m" },
     ],

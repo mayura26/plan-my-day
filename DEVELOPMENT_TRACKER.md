@@ -1,3 +1,5 @@
+[ ] Rework AI task entry to be more streamlined
+
 ### ⏳ Pending
 - [ ] AI-powered task scheduling engine
 - [ ] Automatic rescheduling logic
