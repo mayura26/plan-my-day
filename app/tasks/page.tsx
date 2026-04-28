@@ -3,7 +3,7 @@
 import { Folder, Trash2 } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useSession } from "next-auth/react";
-import { useCallback, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { AITaskInput } from "@/components/ai-task-input";
 import { EditGroupDialog } from "@/components/edit-group-dialog";
@@ -24,7 +24,7 @@ import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { CreateTaskGroupRequest, CreateTaskRequest, Task, TaskGroup } from "@/lib/types";
 
-export default function TasksPage() {
+function TasksPageContent() {
   const { confirm } = useConfirmDialog();
   const { data: session, status } = useSession();
   const router = useRouter();
@@ -895,5 +895,26 @@ export default function TasksPage() {
         }))}
       />
     </div>
+  );
+}
+
+export default function TasksPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-background">
+          <div className="container mx-auto px-4 py-8">
+            <div className="flex items-center justify-center h-64">
+              <div className="text-center">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+                <p className="text-muted-foreground">Loading tasks...</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      }
+    >
+      <TasksPageContent />
+    </Suspense>
   );
 }
