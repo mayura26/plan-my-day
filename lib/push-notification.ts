@@ -232,8 +232,7 @@ export function createCriticalNagPayload(
       snoozeUrl60,
     },
     actions: [
-      { action: "view", title: "View Task" },
-      { action: "complete", title: "Complete Task" },
+      { action: "complete", title: "Complete task" },
       { action: "snooze15", title: "Snooze 15m" },
       { action: "snooze60", title: "Snooze 60m" },
     ],

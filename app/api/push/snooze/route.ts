@@ -4,6 +4,7 @@ import {
   type PushActionType,
   snoozeMinutesForAction,
 } from "@/lib/push-action-token";
+import { getPublicOriginFromRequest } from "@/lib/request-public-origin";
 import { db } from "@/lib/turso";
 
 function sqliteSnoozeModifier(action: PushActionType): string {
@@ -16,14 +17,16 @@ function sqliteSnoozeModifier(action: PushActionType): string {
  * Redirects to the task after updating the DB.
  */
 export async function GET(request: NextRequest) {
+  const origin = getPublicOriginFromRequest(request);
+
   const token = request.nextUrl.searchParams.get("token");
   if (!token) {
-    return NextResponse.redirect(new URL("/settings", request.url));
+    return NextResponse.redirect(new URL("/settings", origin));
   }
 
   const payload = decodePushActionToken(token);
   if (!payload) {
-    return NextResponse.redirect(new URL("/settings", request.url));
+    return NextResponse.redirect(new URL("/settings", origin));
   }
 
   const taskResult = await db.execute({
@@ -32,12 +35,12 @@ export async function GET(request: NextRequest) {
   });
 
   if (taskResult.rows.length === 0) {
-    return NextResponse.redirect(new URL("/tasks", request.url));
+    return NextResponse.redirect(new URL("/tasks", origin));
   }
 
   const ownerId = taskResult.rows[0].user_id as string;
   if (ownerId !== payload.userId) {
-    return NextResponse.json({ error: "Invalid token" }, { status: 403 });
+    return NextResponse.redirect(new URL("/tasks?push=invalid", origin));
   }
 
   const modifier = sqliteSnoozeModifier(payload.action);
@@ -46,7 +49,7 @@ export async function GET(request: NextRequest) {
     args: [modifier, payload.taskId],
   });
 
-  const dest = new URL(`/tasks`, request.url);
+  const dest = new URL(`/tasks`, origin);
   dest.searchParams.set("task", payload.taskId);
   dest.searchParams.set("snoozed", "1");
   return NextResponse.redirect(dest);

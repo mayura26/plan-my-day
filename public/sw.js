@@ -285,7 +285,12 @@ self.addEventListener("notificationclick", (event) => {
       event.waitUntil(openUrl(notificationData.snoozeUrl60));
       return;
     }
-    if (action === "snooze" && notificationData.taskId) {
+    // Legacy: critical nag used a single snoozeUrl
+    if (action === "snooze" && notificationData.snoozeUrl) {
+      event.waitUntil(openUrl(notificationData.snoozeUrl));
+      return;
+    }
+    if (action === "snooze" && notificationData.taskId && !notificationData.snoozeUrl) {
       return;
     }
   }
