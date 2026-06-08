@@ -25,10 +25,12 @@ function signPayload(payload: string): string {
  * Signed token for one-click snooze from push notifications (no session cookie).
  * Token is URL-safe base64 JSON + hex signature.
  */
+const PUSH_ACTION_TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+
 export function encodePushActionToken(
   p: Omit<PushActionPayload, "exp"> & { exp?: number }
 ): string {
-  const exp = p.exp ?? Date.now() + 60 * 60 * 1000;
+  const exp = p.exp ?? Date.now() + PUSH_ACTION_TOKEN_TTL_MS;
   const body: PushActionPayload = {
     taskId: p.taskId,
     userId: p.userId,
@@ -77,18 +79,17 @@ export function snoozeMinutesForAction(action: PushActionType): number {
   }
 }
 
-export function buildSnoozeApiUrl(
-  baseUrl: string,
-  taskId: string,
-  userId: string,
-  action: PushActionType
-): string {
+export function buildSnoozeApiUrl(taskId: string, userId: string, action: PushActionType): string {
   const token = encodePushActionToken({ taskId, userId, action });
-  const u = new URL("/api/push/snooze", baseUrl.replace(/\/$/, ""));
-  u.searchParams.set("token", token);
-  return u.href;
+  return `/api/push/snooze?token=${encodeURIComponent(token)}`;
 }
 
+export function buildCompletePageUrl(taskId: string, userId: string): string {
+  const token = encodePushActionToken({ taskId, userId, action: "complete" });
+  return `/push/complete?token=${encodeURIComponent(token)}`;
+}
+
+/** @deprecated Use buildCompletePageUrl — kept for old notifications pointing at the API route */
 export function buildCompleteApiUrl(baseUrl: string, taskId: string, userId: string): string {
   const token = encodePushActionToken({ taskId, userId, action: "complete" });
   const u = new URL("/api/push/complete", baseUrl.replace(/\/$/, ""));

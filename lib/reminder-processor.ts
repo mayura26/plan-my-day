@@ -1,4 +1,4 @@
-import { buildCompleteApiUrl, buildSnoozeApiUrl } from "@/lib/push-action-token";
+import { buildCompletePageUrl, buildSnoozeApiUrl } from "@/lib/push-action-token";
 import {
   createCriticalNagPayload,
   createDueReminderPayload,
@@ -11,18 +11,6 @@ import { db } from "@/lib/turso";
 
 /** Match window in minutes — use 3 so a cron running every 1–5 minutes still catches reminders. */
 const REMINDER_MATCH_WINDOW_MINUTES = 3;
-
-function getAppBaseUrl(): string {
-  const n = process.env.NEXTAUTH_URL?.replace(/\/$/, "");
-  if (n) {
-    return n;
-  }
-  const v = process.env.VERCEL_URL;
-  if (v) {
-    return `https://${v.replace(/^https?:\/\//, "")}`;
-  }
-  return "http://localhost:3000";
-}
 
 interface ReminderSettingsParsed {
   enabled?: boolean;
@@ -290,8 +278,6 @@ export async function processReminders(): Promise<ProcessRemindersResult> {
     });
   }
 
-  const baseUrl = getAppBaseUrl();
-
   const criticalSchemaOk = await hasCriticalReminderSchema();
   if (!criticalSchemaOk) {
     console.warn(
@@ -374,9 +360,9 @@ export async function processReminders(): Promise<ProcessRemindersResult> {
         }
       }
 
-      const completeUrl = buildCompleteApiUrl(baseUrl, taskId, userId);
-      const snoozeUrl15 = buildSnoozeApiUrl(baseUrl, taskId, userId, "snooze15");
-      const snoozeUrl60 = buildSnoozeApiUrl(baseUrl, taskId, userId, "snooze60");
+      const completeUrl = buildCompletePageUrl(taskId, userId);
+      const snoozeUrl15 = buildSnoozeApiUrl(taskId, userId, "snooze15");
+      const snoozeUrl60 = buildSnoozeApiUrl(taskId, userId, "snooze60");
       const payload = createCriticalNagPayload(
         title,
         taskId,

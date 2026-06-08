@@ -240,13 +240,17 @@ self.addEventListener("notificationclick", (event) => {
   event.notification.close();
 
   const notificationData = event.notification.data || {};
-  const openUrl = (rawUrl) => {
+  const resolveUrl = (rawUrl) => {
     if (!rawUrl) {
+      return null;
+    }
+    return rawUrl.startsWith("http") ? rawUrl : new URL(rawUrl, self.location.origin).href;
+  };
+  const openUrl = (rawUrl) => {
+    const resolvedUrl = resolveUrl(rawUrl);
+    if (!resolvedUrl) {
       return Promise.resolve();
     }
-    const resolvedUrl = rawUrl.startsWith("http")
-      ? rawUrl
-      : new URL(rawUrl, self.location.origin).href;
     return clients
       .matchAll({
         type: "window",
@@ -264,6 +268,31 @@ self.addEventListener("notificationclick", (event) => {
         }
       });
   };
+  const snoozeHeadless = async (rawUrl) => {
+    const resolvedUrl = resolveUrl(rawUrl);
+    if (!resolvedUrl) {
+      return;
+    }
+    try {
+      const res = await fetch(resolvedUrl, {
+        headers: {
+          Accept: "application/json",
+          "X-Push-Action": "1",
+        },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const minutes = data.minutes ?? 15;
+        await self.registration.showNotification("Reminder snoozed", {
+          body: `Critical reminders paused for ${minutes} minutes.`,
+          tag: "push-snooze-ack",
+          renotify: false,
+        });
+      }
+    } catch (err) {
+      console.error("Service Worker: Headless snooze failed", err);
+    }
+  };
 
   // Handle action clicks (view, snooze, etc.)
   if (event.action) {
@@ -278,16 +307,16 @@ self.addEventListener("notificationclick", (event) => {
       return;
     }
     if (action === "snooze15" && notificationData.snoozeUrl15) {
-      event.waitUntil(openUrl(notificationData.snoozeUrl15));
+      event.waitUntil(snoozeHeadless(notificationData.snoozeUrl15));
       return;
     }
     if (action === "snooze60" && notificationData.snoozeUrl60) {
-      event.waitUntil(openUrl(notificationData.snoozeUrl60));
+      event.waitUntil(snoozeHeadless(notificationData.snoozeUrl60));
       return;
     }
     // Legacy: critical nag used a single snoozeUrl
     if (action === "snooze" && notificationData.snoozeUrl) {
-      event.waitUntil(openUrl(notificationData.snoozeUrl));
+      event.waitUntil(snoozeHeadless(notificationData.snoozeUrl));
       return;
     }
     if (action === "snooze" && notificationData.taskId && !notificationData.snoozeUrl) {
