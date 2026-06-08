@@ -217,13 +217,17 @@ self.addEventListener("push", (event) => {
   const iconPath = data.icon || "/web-app-manifest-192x192.png";
   const badgePath = data.badge || "/badge-icon.svg";
 
+  const maxActions =
+    typeof self.Notification !== "undefined" && self.Notification.maxActions > 0
+      ? self.Notification.maxActions
+      : 2;
   const options = {
     body: data.body || "You have a new notification",
     icon: toAbsoluteUrl(iconPath),
     badge: toAbsoluteUrl(badgePath),
     tag: data.tag || "default",
     data: data.data || {},
-    actions: data.actions || [],
+    actions: (data.actions || []).slice(0, maxActions),
     requireInteraction: data.requireInteraction || false,
     renotify: data.renotify || false,
     vibrate: data.vibrate || [200, 100, 200],
@@ -280,14 +284,8 @@ self.addEventListener("notificationclick", (event) => {
           "X-Push-Action": "1",
         },
       });
-      if (res.ok) {
-        const data = await res.json();
-        const minutes = data.minutes ?? 15;
-        await self.registration.showNotification("Reminder snoozed", {
-          body: `Critical reminders paused for ${minutes} minutes.`,
-          tag: "push-snooze-ack",
-          renotify: false,
-        });
+      if (!res.ok) {
+        console.error("Service Worker: Headless snooze failed", res.status);
       }
     } catch (err) {
       console.error("Service Worker: Headless snooze failed", err);
@@ -324,8 +322,11 @@ self.addEventListener("notificationclick", (event) => {
     }
   }
 
-  // Default: open the URL from notification data, or home page
-  const rawUrl = event.notification.data?.url || "/";
+  // Default: body tap — critical nags open complete page; others use url or home
+  const rawUrl =
+    notificationData.type === "task-critical-nag" && notificationData.completeUrl
+      ? notificationData.completeUrl
+      : notificationData.url || "/";
   event.waitUntil(openUrl(rawUrl));
 });
 

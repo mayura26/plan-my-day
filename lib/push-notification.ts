@@ -213,7 +213,6 @@ export function createCriticalNagPayload(
   taskId: string,
   completeUrl: string,
   snoozeUrl15: string,
-  snoozeUrl60: string,
   priority = 1
 ): NotificationPayload {
   const urgency = getNotificationUrgency(priority);
@@ -226,15 +225,15 @@ export function createCriticalNagPayload(
     data: {
       type: "task-critical-nag",
       taskId,
-      url: `/tasks?task=${taskId}`,
+      // Body tap fallback: complete page (Android Chrome shows max 2 action buttons)
+      url: completeUrl,
       completeUrl,
       snoozeUrl15,
-      snoozeUrl60,
     },
+    // Chrome on Android supports at most 2 action buttons (Notification.maxActions)
     actions: [
       { action: "complete", title: "Complete task" },
       { action: "snooze15", title: "Snooze 15m" },
-      { action: "snooze60", title: "Snooze 60m" },
     ],
     requireInteraction: urgency.requireInteraction,
     renotify: urgency.renotify,

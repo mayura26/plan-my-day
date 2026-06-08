@@ -362,15 +362,7 @@ export async function processReminders(): Promise<ProcessRemindersResult> {
 
       const completeUrl = buildCompletePageUrl(taskId, userId);
       const snoozeUrl15 = buildSnoozeApiUrl(taskId, userId, "snooze15");
-      const snoozeUrl60 = buildSnoozeApiUrl(taskId, userId, "snooze60");
-      const payload = createCriticalNagPayload(
-        title,
-        taskId,
-        completeUrl,
-        snoozeUrl15,
-        snoozeUrl60,
-        1
-      );
+      const payload = createCriticalNagPayload(title, taskId, completeUrl, snoozeUrl15, 1);
       const n = await sendToUserSubscriptions(userId, payload, results);
       if (n > 0) {
         await db.execute({
