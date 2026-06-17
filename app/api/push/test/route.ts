@@ -30,20 +30,56 @@ export async function POST(request: NextRequest) {
       },
     };
 
+    let sent = 0;
+    const staleEndpoints: string[] = [];
+
     for (const row of result.rows) {
-      await sendPushNotification(
-        {
-          endpoint: row.endpoint as string,
-          keys: {
-            p256dh: row.p256dh_key as string,
-            auth: row.auth_key as string,
+      try {
+        await sendPushNotification(
+          {
+            endpoint: row.endpoint as string,
+            keys: {
+              p256dh: row.p256dh_key as string,
+              auth: row.auth_key as string,
+            },
           },
+          payload
+        );
+        sent++;
+      } catch (error) {
+        const statusCode = (error as { statusCode?: number })?.statusCode;
+        if (statusCode === 410 || statusCode === 404) {
+          staleEndpoints.push(row.endpoint as string);
+          continue;
+        }
+        throw error;
+      }
+    }
+
+    if (staleEndpoints.length > 0) {
+      for (const endpoint of staleEndpoints) {
+        await db.execute(
+          "UPDATE push_subscriptions SET is_active = 0, updated_at = datetime('now') WHERE user_id = ? AND endpoint = ?",
+          [session.user.id, endpoint]
+        );
+      }
+    }
+
+    if (sent === 0) {
+      return NextResponse.json(
+        {
+          error: "No active push subscriptions available",
+          staleRemoved: staleEndpoints.length,
         },
-        payload
+        { status: 404 }
       );
     }
 
-    return NextResponse.json({ success: true, devices: result.rows.length });
+    return NextResponse.json({
+      success: true,
+      devices: sent,
+      staleRemoved: staleEndpoints.length,
+    });
   } catch (error) {
     console.error("Error sending test notification:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

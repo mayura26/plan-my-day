@@ -73,58 +73,65 @@ export async function POST(request: NextRequest) {
     const deviceName = body.deviceName || generateDeviceName(userAgent);
     const subscriptionData = JSON.stringify(subscription);
 
-    // Check if subscription already exists
-    const existing = await db.execute("SELECT id FROM push_subscriptions WHERE endpoint = ?", [
-      subscription.endpoint,
-    ]);
-
-    if (existing.rows.length > 0) {
-      // Update existing subscription
-      await db.execute(
-        `
-        UPDATE push_subscriptions
-        SET user_id = ?, p256dh_key = ?, auth_key = ?, subscription_data = ?, 
-            device_name = ?, user_agent = ?, last_seen = datetime('now'), 
-            is_active = TRUE, updated_at = datetime('now')
-        WHERE endpoint = ?
-      `,
-        [
-          session.user.id,
-          subscription.keys.p256dh,
-          subscription.keys.auth,
-          subscriptionData,
-          deviceName,
-          userAgent,
-          subscription.endpoint,
-        ]
-      );
-    } else {
-      // Create new subscription
-      const subscriptionId = `push-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-      await db.execute(
-        `
-        INSERT INTO push_subscriptions (
-          id, user_id, endpoint, p256dh_key, auth_key, subscription_data,
-          device_name, user_agent, last_seen, is_active, created_at, updated_at
-        )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), TRUE, datetime('now'), datetime('now'))
-      `,
-        [
-          subscriptionId,
-          session.user.id,
-          subscription.endpoint,
-          subscription.keys.p256dh,
-          subscription.keys.auth,
-          subscriptionData,
-          deviceName,
-          userAgent,
-        ]
-      );
-    }
+    // Atomic upsert prevents race-condition UNIQUE errors on endpoint.
+    const subscriptionId = `push-${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
+    await db.execute(
+      `
+      INSERT INTO push_subscriptions (
+        id, user_id, endpoint, p256dh_key, auth_key, subscription_data,
+        device_name, user_agent, last_seen, is_active, created_at, updated_at
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), TRUE, datetime('now'), datetime('now'))
+      ON CONFLICT(endpoint) DO UPDATE SET
+        user_id = excluded.user_id,
+        p256dh_key = excluded.p256dh_key,
+        auth_key = excluded.auth_key,
+        subscription_data = excluded.subscription_data,
+        device_name = excluded.device_name,
+        user_agent = excluded.user_agent,
+        last_seen = datetime('now'),
+        is_active = TRUE,
+        updated_at = datetime('now')
+    `,
+      [
+        subscriptionId,
+        session.user.id,
+        subscription.endpoint,
+        subscription.keys.p256dh,
+        subscription.keys.auth,
+        subscriptionData,
+        deviceName,
+        userAgent,
+      ]
+    );
 
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Error subscribing to push notifications:", error);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+  }
+}
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const { endpoint } = (await request.json()) as { endpoint?: string };
+    if (!endpoint) {
+      return NextResponse.json({ error: "Endpoint is required" }, { status: 400 });
+    }
+
+    await db.execute("DELETE FROM push_subscriptions WHERE endpoint = ? AND user_id = ?", [
+      endpoint,
+      session.user.id,
+    ]);
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error("Error unsubscribing from push notifications:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
