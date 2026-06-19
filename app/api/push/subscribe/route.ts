@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
+import { detectPushPlatform } from "@/lib/notification-platform";
 import { db } from "@/lib/turso";
 
 interface PushSubscriptionData {
@@ -17,6 +18,7 @@ interface PushSubscriptionData {
   };
   deviceName?: string;
   userAgent?: string;
+  platform?: string;
 }
 
 function generateDeviceName(userAgent: string): string {
@@ -71,6 +73,7 @@ export async function POST(request: NextRequest) {
 
     const userAgent = body.userAgent || request.headers.get("user-agent") || "";
     const deviceName = body.deviceName || generateDeviceName(userAgent);
+    const platform = body.platform || detectPushPlatform(userAgent);
     const subscriptionData = JSON.stringify(subscription);
 
     // Atomic upsert prevents race-condition UNIQUE errors on endpoint.
@@ -79,9 +82,9 @@ export async function POST(request: NextRequest) {
       `
       INSERT INTO push_subscriptions (
         id, user_id, endpoint, p256dh_key, auth_key, subscription_data,
-        device_name, user_agent, last_seen, is_active, created_at, updated_at
+        device_name, user_agent, platform, last_seen, is_active, created_at, updated_at
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), TRUE, datetime('now'), datetime('now'))
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), TRUE, datetime('now'), datetime('now'))
       ON CONFLICT(endpoint) DO UPDATE SET
         user_id = excluded.user_id,
         p256dh_key = excluded.p256dh_key,
@@ -89,6 +92,7 @@ export async function POST(request: NextRequest) {
         subscription_data = excluded.subscription_data,
         device_name = excluded.device_name,
         user_agent = excluded.user_agent,
+        platform = excluded.platform,
         last_seen = datetime('now'),
         is_active = TRUE,
         updated_at = datetime('now')
@@ -102,6 +106,7 @@ export async function POST(request: NextRequest) {
         subscriptionData,
         deviceName,
         userAgent,
+        platform,
       ]
     );
 

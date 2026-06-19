@@ -188,23 +188,101 @@ self.addEventListener("fetch", (event) => {
   );
 });
 
-// Push notification event
-// Following Next.js PWA guide: https://nextjs.org/docs/app/guides/progressive-web-apps
-self.addEventListener("push", (event) => {
-  console.log("Service Worker: Push notification received");
+// Push notification handling (v5 — URL-as-action pattern, track-my-habits style)
+const SW_VERSION = "5";
 
-  let data = {};
+function sameOriginUrl(path) {
+  const url = new URL(path, self.location.origin);
+  if (url.origin !== self.location.origin) {
+    return new URL("/", self.location.origin).toString();
+  }
+  return url.toString();
+}
+
+function buildReminderActions(actionUrls, singleAction) {
+  if (!actionUrls?.complete) return undefined;
+
+  const completeUrl = sameOriginUrl(actionUrls.complete);
+
+  if (singleAction) {
+    return [{ action: completeUrl, title: "Done", navigate: completeUrl }];
+  }
+
+  if (!actionUrls?.snooze) return undefined;
+
+  const snoozeUrl = sameOriginUrl(actionUrls.snooze);
+
+  return [
+    { action: completeUrl, title: "Done", navigate: completeUrl },
+    { action: snoozeUrl, title: "Snooze", navigate: snoozeUrl },
+  ];
+}
+
+async function openAppUrl(url) {
+  const resolved = sameOriginUrl(url);
+  const windowClients = await clients.matchAll({
+    type: "window",
+    includeUncontrolled: true,
+  });
+
+  for (const client of windowClients) {
+    if (client.url.startsWith(self.location.origin) && "focus" in client) {
+      if ("navigate" in client) {
+        await client.navigate(resolved);
+      }
+      return client.focus();
+    }
+  }
+
+  if (clients.openWindow) {
+    return clients.openWindow(resolved);
+  }
+}
+
+function resolveNotificationActionTarget(action, data) {
+  if (typeof action !== "string" || !action) return null;
+
+  if (action.startsWith("http://") || action.startsWith("https://")) {
+    return action;
+  }
+
+  if (action.startsWith("/reminder/") || action.startsWith("/push/")) {
+    return sameOriginUrl(action);
+  }
+
+  if (action === "complete" && data.completeUrl) {
+    return sameOriginUrl(data.completeUrl);
+  }
+
+  if (action === "snooze15" && data.snoozeUrl15) {
+    return sameOriginUrl(data.snoozeUrl15);
+  }
+
+  if (!data.singleAction && action === "snooze" && data.snoozeUrl) {
+    return sameOriginUrl(data.snoozeUrl);
+  }
+
+  if (action === "view" && data.url) {
+    return sameOriginUrl(data.url);
+  }
+
+  return null;
+}
+
+// Push notification event
+self.addEventListener("push", (event) => {
+  console.log("Service Worker: Push notification received", SW_VERSION);
+
+  let payload = {};
 
   if (event.data) {
     try {
-      data = event.data.json();
+      payload = event.data.json();
     } catch (_e) {
-      // If data is not JSON, try text
       try {
-        data = JSON.parse(event.data.text());
+        payload = JSON.parse(event.data.text());
       } catch (_e2) {
-        // If still not parseable, use default
-        data = {
+        payload = {
           title: "Plan My Day",
           body: event.data.text() || "You have a new notification",
         };
@@ -212,122 +290,56 @@ self.addEventListener("push", (event) => {
     }
   }
 
-  // Resolve icon and badge to absolute URLs so Android (and others) load them correctly
   const toAbsoluteUrl = (path) => new URL(path, self.location.origin).href;
-  const iconPath = data.icon || "/web-app-manifest-192x192.png";
-  const badgePath = data.badge || "/badge-icon.svg";
+  const iconPath = payload.icon || "/web-app-manifest-192x192.png";
+  const badgePath = payload.badge || "/badge-icon.svg";
+  const actionUrls = payload.actionUrls;
+  const singleAction = Boolean(payload.singleAction);
 
-  const maxActions =
-    typeof self.Notification !== "undefined" && self.Notification.maxActions > 0
-      ? self.Notification.maxActions
-      : 2;
   const options = {
-    body: data.body || "You have a new notification",
+    body: payload.body || "You have a new notification",
     icon: toAbsoluteUrl(iconPath),
     badge: toAbsoluteUrl(badgePath),
-    tag: data.tag || "default",
-    data: data.data || {},
-    actions: (data.actions || []).slice(0, maxActions),
-    requireInteraction: data.requireInteraction || false,
-    renotify: data.renotify || false,
-    vibrate: data.vibrate || [200, 100, 200],
+    tag: payload.tag || "default",
+    data: {
+      ...(payload.data || {}),
+      url: payload.url || "/tasks",
+      entityType: payload.entityType,
+      entityId: payload.entityId,
+      actionUrls,
+      completeUrl: actionUrls?.complete,
+      snoozeUrl: actionUrls?.snooze,
+      singleAction,
+      swVersion: SW_VERSION,
+    },
+    requireInteraction: payload.requireInteraction || false,
+    renotify: payload.renotify || false,
+    vibrate: payload.vibrate || [200, 100, 200],
   };
 
-  event.waitUntil(self.registration.showNotification(data.title || "Plan My Day", options));
+  const actions = buildReminderActions(actionUrls, singleAction);
+  if (actions) {
+    options.actions = actions;
+  }
+
+  event.waitUntil(self.registration.showNotification(payload.title || "Plan My Day", options));
 });
 
-// Notification click event
-// Following Next.js PWA guide: https://nextjs.org/docs/app/guides/progressive-web-apps
 self.addEventListener("notificationclick", (event) => {
   console.log("Service Worker: Notification clicked", event.action);
 
   event.notification.close();
 
-  const notificationData = event.notification.data || {};
-  const resolveUrl = (rawUrl) => {
-    if (!rawUrl) {
-      return null;
-    }
-    return rawUrl.startsWith("http") ? rawUrl : new URL(rawUrl, self.location.origin).href;
-  };
-  const openUrl = (rawUrl) => {
-    const resolvedUrl = resolveUrl(rawUrl);
-    if (!resolvedUrl) {
-      return Promise.resolve();
-    }
-    return clients
-      .matchAll({
-        type: "window",
-        includeUncontrolled: true,
-      })
-      .then((clientList) => {
-        for (let i = 0; i < clientList.length; i++) {
-          const client = clientList[i];
-          if (client.url === resolvedUrl && "focus" in client) {
-            return client.focus();
-          }
-        }
-        if (clients.openWindow) {
-          return clients.openWindow(resolvedUrl);
-        }
-      });
-  };
-  const snoozeHeadless = async (rawUrl) => {
-    const resolvedUrl = resolveUrl(rawUrl);
-    if (!resolvedUrl) {
-      return;
-    }
-    try {
-      const res = await fetch(resolvedUrl, {
-        headers: {
-          Accept: "application/json",
-          "X-Push-Action": "1",
-        },
-      });
-      if (!res.ok) {
-        console.error("Service Worker: Headless snooze failed", res.status);
-      }
-    } catch (err) {
-      console.error("Service Worker: Headless snooze failed", err);
-    }
-  };
+  const data = event.notification.data || {};
+  const fallbackUrl = data.url || data.completeUrl || "/tasks";
+  const actionTarget = resolveNotificationActionTarget(event.action, data);
 
-  // Handle action clicks (view, snooze, etc.)
-  if (event.action) {
-    const action = event.action;
-
-    if (action === "view" && notificationData.url) {
-      event.waitUntil(openUrl(notificationData.url));
-      return;
-    }
-    if (action === "complete" && notificationData.completeUrl) {
-      event.waitUntil(openUrl(notificationData.completeUrl));
-      return;
-    }
-    if (action === "snooze15" && notificationData.snoozeUrl15) {
-      event.waitUntil(snoozeHeadless(notificationData.snoozeUrl15));
-      return;
-    }
-    if (action === "snooze60" && notificationData.snoozeUrl60) {
-      event.waitUntil(snoozeHeadless(notificationData.snoozeUrl60));
-      return;
-    }
-    // Legacy: critical nag used a single snoozeUrl
-    if (action === "snooze" && notificationData.snoozeUrl) {
-      event.waitUntil(snoozeHeadless(notificationData.snoozeUrl));
-      return;
-    }
-    if (action === "snooze" && notificationData.taskId && !notificationData.snoozeUrl) {
-      return;
-    }
+  if (actionTarget) {
+    event.waitUntil(openAppUrl(actionTarget));
+    return;
   }
 
-  // Default: body tap — critical nags open complete page; others use url or home
-  const rawUrl =
-    notificationData.type === "task-critical-nag" && notificationData.completeUrl
-      ? notificationData.completeUrl
-      : notificationData.url || "/";
-  event.waitUntil(openUrl(rawUrl));
+  event.waitUntil(openAppUrl(fallbackUrl));
 });
 
 // Handle messages from the client (e.g., skip waiting)

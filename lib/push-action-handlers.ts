@@ -1,6 +1,7 @@
 import {
   decodePushActionToken,
-  type PushActionType,
+  type ReminderEntityType,
+  type ReminderNotificationAction,
   snoozeMinutesForAction,
 } from "@/lib/push-action-token";
 import {
@@ -10,21 +11,24 @@ import {
 } from "@/lib/task-completion";
 import { db } from "@/lib/turso";
 
-export type PushActionError = "missing_token" | "invalid_token" | "task_not_found" | "forbidden";
+export type ReminderActionErrorCode = "invalid" | "unauthorized" | "not_found" | "missing_token";
 
-export interface PushCompleteResult {
-  ok: boolean;
+export type ReminderActionSuccess = {
+  ok: true;
+  action: ReminderNotificationAction;
+  entityType: ReminderEntityType;
   taskTitle?: string;
   alreadyCompleted?: boolean;
-  error?: PushActionError;
-}
-
-export interface PushSnoozeResult {
-  ok: boolean;
   minutes?: number;
-  taskTitle?: string;
-  error?: PushActionError;
-}
+  message?: string;
+};
+
+export type ReminderActionFailure = {
+  ok: false;
+  error: ReminderActionErrorCode;
+};
+
+export type ReminderActionOutcome = ReminderActionSuccess | ReminderActionFailure;
 
 interface TaskRow {
   user_id: string;
@@ -55,32 +59,40 @@ async function loadTask(taskId: string): Promise<TaskRow | null> {
   };
 }
 
-function sqliteSnoozeModifier(action: PushActionType): string {
-  const m = snoozeMinutesForAction(action);
-  return `+${m} minutes`;
+async function verifySubscription(userId: string, subscriptionId?: string): Promise<boolean> {
+  if (!subscriptionId) {
+    return true;
+  }
+
+  const result = await db.execute({
+    sql: "SELECT id FROM push_subscriptions WHERE id = ? AND user_id = ? AND is_active = 1",
+    args: [subscriptionId, userId],
+  });
+  return result.rows.length > 0;
 }
 
-export async function executePushComplete(token: string | null): Promise<PushCompleteResult> {
-  if (!token) {
-    return { ok: false, error: "missing_token" };
-  }
-
-  const payload = decodePushActionToken(token);
-  if (!payload || payload.action !== "complete") {
-    return { ok: false, error: "invalid_token" };
-  }
-
-  const task = await loadTask(payload.taskId);
+async function executeComplete(
+  taskId: string,
+  userId: string
+): Promise<ReminderActionSuccess | ReminderActionFailure> {
+  const task = await loadTask(taskId);
   if (!task) {
-    return { ok: false, error: "task_not_found" };
+    return { ok: false, error: "not_found" };
   }
 
-  if (task.user_id !== payload.userId) {
-    return { ok: false, error: "forbidden" };
+  if (task.user_id !== userId) {
+    return { ok: false, error: "unauthorized" };
   }
 
   if (task.status === "completed") {
-    return { ok: true, taskTitle: task.title, alreadyCompleted: true };
+    return {
+      ok: true,
+      action: "complete",
+      entityType: "task-critical",
+      taskTitle: task.title,
+      alreadyCompleted: true,
+      message: `"${task.title}" was already marked as done.`,
+    };
   }
 
   await db.execute({
@@ -91,50 +103,120 @@ export async function executePushComplete(token: string | null): Promise<PushCom
               critical_reminder_last_sent_at = NULL,
               updated_at = datetime('now')
           WHERE id = ?`,
-    args: [payload.taskId],
+    args: [taskId],
   });
 
   if (task.parent_task_id) {
-    await checkAndUpdateParentStatus(task.parent_task_id, payload.userId);
+    await checkAndUpdateParentStatus(task.parent_task_id, userId);
   } else {
-    await completeAllSubtasks(payload.taskId, payload.userId);
+    await completeAllSubtasks(taskId, userId);
   }
 
   if (task.continued_from_task_id) {
-    await checkAndCompleteOriginalTask(payload.taskId, payload.userId);
+    await checkAndCompleteOriginalTask(taskId, userId);
   }
 
-  return { ok: true, taskTitle: task.title, alreadyCompleted: false };
+  return {
+    ok: true,
+    action: "complete",
+    entityType: "task-critical",
+    taskTitle: task.title,
+    alreadyCompleted: false,
+    message: `"${task.title}" has been marked as complete.`,
+  };
 }
 
-export async function executePushSnooze(token: string | null): Promise<PushSnoozeResult> {
+async function executeSnooze(
+  taskId: string,
+  userId: string
+): Promise<ReminderActionSuccess | ReminderActionFailure> {
+  const task = await loadTask(taskId);
+  if (!task) {
+    return { ok: false, error: "not_found" };
+  }
+
+  if (task.user_id !== userId) {
+    return { ok: false, error: "unauthorized" };
+  }
+
+  const minutes = snoozeMinutesForAction("snooze");
+  await db.execute({
+    sql: `UPDATE tasks SET critical_reminder_snoozed_until = datetime('now', ?), updated_at = datetime('now') WHERE id = ?`,
+    args: [`+${minutes} minutes`, taskId],
+  });
+
+  return {
+    ok: true,
+    action: "snooze",
+    entityType: "task-critical",
+    taskTitle: task.title,
+    minutes,
+    message: `Critical reminders paused for ${minutes} minutes.`,
+  };
+}
+
+export async function performReminderActionFromToken(
+  token: string | null | undefined
+): Promise<ReminderActionOutcome> {
   if (!token) {
     return { ok: false, error: "missing_token" };
   }
 
   const payload = decodePushActionToken(token);
-  if (!payload || (payload.action !== "snooze15" && payload.action !== "snooze60")) {
-    return { ok: false, error: "invalid_token" };
+  if (!payload) {
+    return { ok: false, error: "invalid" };
   }
 
-  const task = await loadTask(payload.taskId);
-  if (!task) {
-    return { ok: false, error: "task_not_found" };
+  const subscriptionOk = await verifySubscription(payload.userId, payload.subscriptionId);
+  if (!subscriptionOk) {
+    return { ok: false, error: "unauthorized" };
   }
 
-  if (task.user_id !== payload.userId) {
-    return { ok: false, error: "forbidden" };
+  if (payload.entityType === "test") {
+    return {
+      ok: true,
+      action: payload.action,
+      entityType: "test",
+      message:
+        payload.action === "complete" ? "Done reached the server." : "Snooze reached the server.",
+    };
   }
 
-  const modifier = sqliteSnoozeModifier(payload.action);
-  await db.execute({
-    sql: `UPDATE tasks SET critical_reminder_snoozed_until = datetime('now', ?), updated_at = datetime('now') WHERE id = ?`,
-    args: [modifier, payload.taskId],
-  });
+  if (payload.action === "complete") {
+    return executeComplete(payload.entityId, payload.userId);
+  }
 
+  return executeSnooze(payload.entityId, payload.userId);
+}
+
+/** @deprecated Use performReminderActionFromToken */
+export async function executePushComplete(token: string | null) {
+  const outcome = await performReminderActionFromToken(token);
+  if (!outcome.ok) {
+    const errorMap: Record<ReminderActionErrorCode, string> = {
+      missing_token: "missing_token",
+      invalid: "invalid_token",
+      unauthorized: "forbidden",
+      not_found: "task_not_found",
+    };
+    return { ok: false as const, error: errorMap[outcome.error] as "missing_token" };
+  }
   return {
-    ok: true,
-    minutes: snoozeMinutesForAction(payload.action),
-    taskTitle: task.title,
+    ok: true as const,
+    taskTitle: outcome.taskTitle,
+    alreadyCompleted: outcome.alreadyCompleted,
+  };
+}
+
+/** @deprecated Use performReminderActionFromToken */
+export async function executePushSnooze(token: string | null) {
+  const outcome = await performReminderActionFromToken(token);
+  if (!outcome.ok) {
+    return { ok: false as const, error: "invalid_token" as const };
+  }
+  return {
+    ok: true as const,
+    minutes: outcome.minutes,
+    taskTitle: outcome.taskTitle,
   };
 }

@@ -1,5 +1,7 @@
 "use client";
 
+import { SERVICE_WORKER_URL } from "@/lib/service-worker-registration";
+
 export interface PushSubscriptionData {
   endpoint: string;
   keys: {
@@ -66,7 +68,7 @@ class PushNotificationService {
       // Following Next.js best practices with updateViaCache: 'none'
       let registration = await navigator.serviceWorker.getRegistration();
       if (!registration && !isDevelopment) {
-        registration = await navigator.serviceWorker.register("/sw.js", {
+        registration = await navigator.serviceWorker.register(SERVICE_WORKER_URL, {
           scope: "/",
           updateViaCache: "none", // Prevent caching issues per Next.js docs
         });

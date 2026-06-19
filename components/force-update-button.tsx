@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { VersionIndicator } from "@/components/version-indicator";
+import { SERVICE_WORKER_URL } from "@/lib/service-worker-registration";
 
 interface ServiceWorkerState {
   status: "active" | "installing" | "waiting" | "redundant" | null;
@@ -226,7 +227,7 @@ export function ForceUpdateButton() {
       // Register service worker if not already registered (following Next.js pattern)
       let registration = await navigator.serviceWorker.getRegistration();
       if (!registration) {
-        registration = await navigator.serviceWorker.register("/sw.js", {
+        registration = await navigator.serviceWorker.register(SERVICE_WORKER_URL, {
           scope: "/",
           updateViaCache: "none",
         });

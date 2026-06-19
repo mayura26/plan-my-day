@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { executePushSnooze } from "@/lib/push-action-handlers";
+import { performReminderActionFromToken } from "@/lib/push-action-handlers";
 import { getPublicOriginFromRequest } from "@/lib/request-public-origin";
 
 function wantsJsonResponse(request: NextRequest): boolean {
@@ -8,39 +8,34 @@ function wantsJsonResponse(request: NextRequest): boolean {
 }
 
 /**
- * One-click snooze from push notification (signed token, no session).
- * Returns JSON for headless service worker fetch; redirects for direct browser opens.
+ * Legacy snooze API — redirects to token page for browser opens; JSON for headless clients.
  */
 export async function GET(request: NextRequest) {
   const token = request.nextUrl.searchParams.get("token");
-  const result = await executePushSnooze(token);
+  const outcome = await performReminderActionFromToken(token);
 
   if (wantsJsonResponse(request)) {
-    if (!result.ok) {
+    if (!outcome.ok) {
       const status =
-        result.error === "forbidden" ? 403 : result.error === "task_not_found" ? 404 : 400;
-      return NextResponse.json({ ok: false, error: result.error }, { status });
+        outcome.error === "unauthorized" ? 403 : outcome.error === "not_found" ? 404 : 400;
+      return NextResponse.json({ ok: false, error: outcome.error }, { status });
     }
     return NextResponse.json({
       ok: true,
-      minutes: result.minutes,
-      taskTitle: result.taskTitle,
+      minutes: outcome.minutes,
+      taskTitle: outcome.taskTitle,
     });
   }
 
   const origin = getPublicOriginFromRequest(request);
 
-  if (!result.ok) {
-    if (result.error === "missing_token" || result.error === "invalid_token") {
-      return NextResponse.redirect(new URL("/settings", origin));
-    }
-    if (result.error === "forbidden") {
-      return NextResponse.redirect(new URL("/tasks?push=invalid", origin));
-    }
-    return NextResponse.redirect(new URL("/tasks", origin));
+  if (token) {
+    return NextResponse.redirect(new URL(`/reminder/a/${token}`, origin));
   }
 
-  const dest = new URL("/tasks", origin);
-  dest.searchParams.set("snoozed", "1");
-  return NextResponse.redirect(dest);
+  if (!outcome.ok) {
+    return NextResponse.redirect(new URL("/settings", origin));
+  }
+
+  return NextResponse.redirect(new URL("/tasks?snoozed=1", origin));
 }

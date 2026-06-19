@@ -1,12 +1,18 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 
+export type ReminderEntityType = "task-critical" | "test";
+export type ReminderNotificationAction = "complete" | "snooze";
+
+/** @deprecated Legacy action types for old notification links */
 export type PushActionType = "snooze15" | "snooze60" | "complete";
 
 export interface PushActionPayload {
-  taskId: string;
+  entityType: ReminderEntityType;
+  entityId: string;
   userId: string;
-  action: PushActionType;
+  action: ReminderNotificationAction;
   exp: number;
+  subscriptionId?: string;
 }
 
 function getSecret(): string {
@@ -21,10 +27,6 @@ function signPayload(payload: string): string {
   return createHmac("sha256", getSecret()).update(payload).digest("hex");
 }
 
-/**
- * Signed token for one-click snooze from push notifications (no session cookie).
- * Token is URL-safe base64 JSON + hex signature.
- */
 const PUSH_ACTION_TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
 export function encodePushActionToken(
@@ -32,10 +34,12 @@ export function encodePushActionToken(
 ): string {
   const exp = p.exp ?? Date.now() + PUSH_ACTION_TOKEN_TTL_MS;
   const body: PushActionPayload = {
-    taskId: p.taskId,
+    entityType: p.entityType,
+    entityId: p.entityId,
     userId: p.userId,
     action: p.action,
     exp,
+    ...(p.subscriptionId ? { subscriptionId: p.subscriptionId } : {}),
   };
   const json = JSON.stringify(body);
   const sig = signPayload(json);
@@ -47,9 +51,26 @@ export function decodePushActionToken(token: string): PushActionPayload | null {
   try {
     const combined = Buffer.from(token, "base64url").toString("utf8");
     const { p, s } = JSON.parse(combined) as { p: PushActionPayload; s: string };
-    if (!p?.taskId || !p?.userId || !p?.action || typeof p.exp !== "number") {
+    if (!p?.userId || !p?.action || typeof p.exp !== "number") {
       return null;
     }
+
+    // Support legacy tokens that used taskId instead of entityId
+    const entityId = p.entityId ?? (p as { taskId?: string }).taskId;
+    const entityType = p.entityType ?? "task-critical";
+    if (!entityId) {
+      return null;
+    }
+
+    const normalized: PushActionPayload = {
+      entityType,
+      entityId,
+      userId: p.userId,
+      action: normalizeAction(p.action),
+      exp: p.exp,
+      subscriptionId: p.subscriptionId,
+    };
+
     const json = JSON.stringify(p);
     const expected = signPayload(json);
     const a = Buffer.from(expected, "hex");
@@ -57,42 +78,44 @@ export function decodePushActionToken(token: string): PushActionPayload | null {
     if (a.length !== b.length || !timingSafeEqual(a, b)) {
       return null;
     }
-    if (Date.now() > p.exp) {
+    if (Date.now() > normalized.exp) {
       return null;
     }
-    return p;
+    return normalized;
   } catch {
     return null;
   }
 }
 
-export function snoozeMinutesForAction(action: PushActionType): number {
-  switch (action) {
-    case "snooze15":
-      return 15;
-    case "snooze60":
-      return 60;
-    case "complete":
-      return 0;
-    default:
-      return 15;
+function normalizeAction(action: string): ReminderNotificationAction {
+  if (action === "snooze" || action === "snooze15" || action === "snooze60") {
+    return "snooze";
   }
+  return "complete";
 }
 
+export function snoozeMinutesForAction(_action?: ReminderNotificationAction): number {
+  return 15;
+}
+
+/** @deprecated Use buildReminderActionPaths — kept for old links */
 export function buildSnoozeApiUrl(taskId: string, userId: string, action: PushActionType): string {
-  const token = encodePushActionToken({ taskId, userId, action });
+  const token = encodePushActionToken({
+    entityType: "task-critical",
+    entityId: taskId,
+    userId,
+    action: action === "complete" ? "complete" : "snooze",
+  });
   return `/api/push/snooze?token=${encodeURIComponent(token)}`;
 }
 
+/** @deprecated Use buildReminderActionPaths — kept for old links */
 export function buildCompletePageUrl(taskId: string, userId: string): string {
-  const token = encodePushActionToken({ taskId, userId, action: "complete" });
+  const token = encodePushActionToken({
+    entityType: "task-critical",
+    entityId: taskId,
+    userId,
+    action: "complete",
+  });
   return `/push/complete?token=${encodeURIComponent(token)}`;
-}
-
-/** @deprecated Use buildCompletePageUrl — kept for old notifications pointing at the API route */
-export function buildCompleteApiUrl(baseUrl: string, taskId: string, userId: string): string {
-  const token = encodePushActionToken({ taskId, userId, action: "complete" });
-  const u = new URL("/api/push/complete", baseUrl.replace(/\/$/, ""));
-  u.searchParams.set("token", token);
-  return u.href;
 }

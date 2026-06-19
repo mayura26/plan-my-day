@@ -4,6 +4,8 @@ import { Bell, BellOff, CheckCircle2, XCircle } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { detectPushPlatform } from "@/lib/notification-platform";
+import { SERVICE_WORKER_URL } from "@/lib/service-worker-registration";
 
 const VAPID_PUBLIC_KEY = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
 
@@ -109,7 +111,7 @@ export function PushNotificationManager() {
       // Following Next.js best practices with updateViaCache: 'none'
       let registration = await navigator.serviceWorker.getRegistration();
       if (!registration) {
-        registration = await navigator.serviceWorker.register("/sw.js", {
+        registration = await navigator.serviceWorker.register(SERVICE_WORKER_URL, {
           scope: "/",
           updateViaCache: "none", // Prevent caching issues per Next.js docs
         });
@@ -137,6 +139,7 @@ export function PushNotificationManager() {
             p256dh: arrayBufferToBase64(subscription.getKey("p256dh") || new ArrayBuffer(0)),
             auth: arrayBufferToBase64(subscription.getKey("auth") || new ArrayBuffer(0)),
           },
+          platform: detectPushPlatform(navigator.userAgent),
         }),
       });
 

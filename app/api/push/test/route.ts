@@ -1,6 +1,8 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
+import { shouldUseSingleReminderAction } from "@/lib/notification-platform";
 import { sendPushNotification } from "@/lib/push-notification";
+import { buildReminderActionPaths } from "@/lib/reminder-action-urls";
 import { db } from "@/lib/turso";
 
 // biome-ignore lint/correctness/noUnusedFunctionParameters: Next.js route handler requires request parameter
@@ -12,7 +14,7 @@ export async function POST(request: NextRequest) {
     }
 
     const result = await db.execute(
-      "SELECT endpoint, p256dh_key, auth_key FROM push_subscriptions WHERE user_id = ? AND is_active = 1",
+      "SELECT id, endpoint, p256dh_key, auth_key, platform FROM push_subscriptions WHERE user_id = ? AND is_active = 1",
       [session.user.id]
     );
 
@@ -20,20 +22,33 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "No push subscription found" }, { status: 404 });
     }
 
-    const payload = {
-      title: "Test Notification",
-      body: "This is a test notification from Plan My Day!",
-      icon: "/web-app-manifest-192x192.png",
-      tag: `test-notification-${Date.now()}`,
-      data: {
-        type: "test",
-      },
-    };
-
     let sent = 0;
     const staleEndpoints: string[] = [];
 
     for (const row of result.rows) {
+      const subscriptionId = row.id as string;
+      const platform = row.platform as string | null;
+      const actionUrls = buildReminderActionPaths({
+        entityType: "test",
+        entityId: "test",
+        userId: session.user.id,
+        subscriptionId,
+      });
+      const singleAction = shouldUseSingleReminderAction(platform);
+
+      const payload = {
+        title: "Test Reminder",
+        body: "Tap Done to verify notification actions work.",
+        icon: "/web-app-manifest-192x192.png",
+        tag: `test-notification-${Date.now()}`,
+        url: actionUrls.complete,
+        entityType: "test" as const,
+        entityId: "test",
+        actionUrls,
+        singleAction,
+        requireInteraction: true,
+      };
+
       try {
         await sendPushNotification(
           {

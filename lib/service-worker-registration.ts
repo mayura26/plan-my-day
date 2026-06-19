@@ -8,6 +8,8 @@
  * Service worker registration is disabled in development mode to prevent caching issues
  */
 
+export const SERVICE_WORKER_URL = "/sw.js?v=5";
+
 export async function registerServiceWorker(): Promise<ServiceWorkerRegistration | null> {
   if (typeof window === "undefined" || !("serviceWorker" in navigator)) {
     return null;
@@ -24,11 +26,9 @@ export async function registerServiceWorker(): Promise<ServiceWorkerRegistration
   }
 
   try {
-    // Manual registration following Next.js best practices
-    // updateViaCache: 'none' prevents the service worker from being cached
-    const registration = await navigator.serviceWorker.register("/sw.js", {
+    const registration = await navigator.serviceWorker.register(SERVICE_WORKER_URL, {
       scope: "/",
-      updateViaCache: "none", // Key difference from next-pwa auto-registration
+      updateViaCache: "none",
     });
 
     console.log("Service Worker registered successfully:", registration);

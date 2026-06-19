@@ -1,4 +1,4 @@
-import { buildCompletePageUrl, buildSnoozeApiUrl } from "@/lib/push-action-token";
+import { shouldUseSingleReminderAction } from "@/lib/notification-platform";
 import {
   createCriticalNagPayload,
   createDueReminderPayload,
@@ -7,6 +7,7 @@ import {
   type NotificationPayload,
   sendPushNotification,
 } from "@/lib/push-notification";
+import { buildReminderActionPaths } from "@/lib/reminder-action-urls";
 import { db } from "@/lib/turso";
 
 /** Match window in minutes — use 3 so a cron running every 1–5 minutes still catches reminders. */
@@ -29,9 +30,11 @@ export interface ProcessRemindersResult {
 }
 
 interface PushSubscriptionRow {
+  id: string;
   endpoint: string;
   p256dh_key: string;
   auth_key: string;
+  platform: string | null;
 }
 
 async function sendToUserSubscriptions(
@@ -40,7 +43,7 @@ async function sendToUserSubscriptions(
   results: ProcessRemindersResult
 ): Promise<number> {
   const subsResult = await db.execute({
-    sql: "SELECT endpoint, p256dh_key, auth_key FROM push_subscriptions WHERE user_id = ? AND is_active = 1",
+    sql: "SELECT id, endpoint, p256dh_key, auth_key, platform FROM push_subscriptions WHERE user_id = ? AND is_active = 1",
     args: [userId],
   });
 
@@ -55,8 +58,26 @@ async function sendToUserSubscriptions(
       endpoint: row.endpoint,
       keys: { p256dh: row.p256dh_key, auth: row.auth_key },
     };
+
+    let notificationPayload: NotificationPayload = payload;
+    if (payload.entityType && payload.entityId) {
+      const actionUrls = buildReminderActionPaths({
+        entityType: payload.entityType,
+        entityId: payload.entityId,
+        userId,
+        subscriptionId: row.id,
+      });
+      const singleAction = shouldUseSingleReminderAction(row.platform);
+      notificationPayload = {
+        ...payload,
+        url: actionUrls.complete,
+        actionUrls,
+        singleAction,
+      };
+    }
+
     try {
-      await sendPushNotification(subscription, payload);
+      await sendPushNotification(subscription, notificationPayload);
       results.sent++;
       successCount++;
     } catch (err) {
@@ -360,9 +381,7 @@ export async function processReminders(): Promise<ProcessRemindersResult> {
         }
       }
 
-      const completeUrl = buildCompletePageUrl(taskId, userId);
-      const snoozeUrl15 = buildSnoozeApiUrl(taskId, userId, "snooze15");
-      const payload = createCriticalNagPayload(title, taskId, completeUrl, snoozeUrl15, 1);
+      const payload = createCriticalNagPayload(title, taskId, 1);
       const n = await sendToUserSubscriptions(userId, payload, results);
       if (n > 0) {
         await db.execute({

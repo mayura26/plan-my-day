@@ -39,6 +39,14 @@ export interface NotificationPayload {
   vibrate?: number[];
   renotify?: boolean;
   priority?: number;
+  url?: string;
+  entityType?: "task-critical" | "test";
+  entityId?: string;
+  actionUrls?: {
+    complete: string;
+    snooze: string;
+  };
+  singleAction?: boolean;
 }
 
 export function getNotificationUrgency(priority: number) {
@@ -95,6 +103,11 @@ export async function sendPushNotification(
         icon: payload.icon || "/web-app-manifest-192x192.png",
         badge: payload.badge || "/badge-icon.svg",
         tag: payload.tag,
+        url: payload.url,
+        entityType: payload.entityType,
+        entityId: payload.entityId,
+        actionUrls: payload.actionUrls,
+        singleAction: payload.singleAction,
         data: payload.data,
         actions: payload.actions,
         requireInteraction: payload.requireInteraction,
@@ -211,30 +224,21 @@ export function createOnTimeReminderPayload(
 export function createCriticalNagPayload(
   taskTitle: string,
   taskId: string,
-  completeUrl: string,
-  snoozeUrl15: string,
   priority = 1
 ): NotificationPayload {
   const urgency = getNotificationUrgency(priority);
   const uniqueTag = `task-${taskId}-critical-${Date.now()}`;
   return {
     title: `${urgency.titlePrefix}Overdue: ${taskTitle}`,
-    body: "This critical task is overdue. Mark it done or snooze reminders.",
+    body: "This critical task is overdue. Tap Done to complete or open for details.",
     tag: uniqueTag,
     icon: "/web-app-manifest-192x192.png",
+    entityType: "task-critical",
+    entityId: taskId,
     data: {
       type: "task-critical-nag",
       taskId,
-      // Body tap fallback: complete page (Android Chrome shows max 2 action buttons)
-      url: completeUrl,
-      completeUrl,
-      snoozeUrl15,
     },
-    // Chrome on Android supports at most 2 action buttons (Notification.maxActions)
-    actions: [
-      { action: "complete", title: "Complete task" },
-      { action: "snooze15", title: "Snooze 15m" },
-    ],
     requireInteraction: urgency.requireInteraction,
     renotify: urgency.renotify,
     vibrate: urgency.vibrate,

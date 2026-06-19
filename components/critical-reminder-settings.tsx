@@ -88,6 +88,11 @@ export function CriticalReminderSettings() {
             task or snooze from the notification.
           </p>
           <p>
+            On Android, notifications show a single{" "}
+            <span className="font-medium text-foreground">Done</span> button; tap the notification
+            body to complete from there. Desktop shows Done and Snooze.
+          </p>
+          <p>
             Requires push enabled, group reminders on, and min priority including Critical. Deploy
             with <code className="text-xs bg-muted px-1 rounded">CRON_SECRET</code> and scheduled
             cron (see Vercel or run{" "}
