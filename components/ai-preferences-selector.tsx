@@ -16,6 +16,7 @@ import type { TaskGroup } from "@/lib/types";
 export function AIPreferencesSelector() {
   const [groups, setGroups] = useState<TaskGroup[]>([]);
   const [defaultGroupId, setDefaultGroupId] = useState<string>("none");
+  const [aiModel, setAiModel] = useState<"full" | "mini">("mini");
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -34,6 +35,9 @@ export function AIPreferencesSelector() {
         if (prefsRes.ok) {
           const data = await prefsRes.json();
           setDefaultGroupId(data.default_ai_group_id ?? "none");
+          if (data.ai_model === "full" || data.ai_model === "mini") {
+            setAiModel(data.ai_model);
+          }
         }
       } catch (error) {
         console.error("Error loading AI preferences:", error);
@@ -52,6 +56,7 @@ export function AIPreferencesSelector() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           default_ai_group_id: defaultGroupId === "none" ? null : defaultGroupId,
+          ai_model: aiModel,
         }),
       });
       if (response.ok) {
@@ -78,6 +83,23 @@ export function AIPreferencesSelector() {
 
   return (
     <div className="space-y-4">
+      <div className="space-y-2">
+        <Label htmlFor="ai_model">AI model</Label>
+        <p className="text-xs text-muted-foreground">
+          Used for Quick add and the AI assistant. The Pro model reasons more deeply for complex or
+          multi-step requests; the mini model is faster for everyday adds.
+        </p>
+        <Select value={aiModel} onValueChange={(v) => setAiModel(v as "full" | "mini")}>
+          <SelectTrigger id="ai_model" className="w-full max-w-xs">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="mini">GPT-5.4 mini (faster)</SelectItem>
+            <SelectItem value="full">GPT-5.4 (Pro, deeper reasoning)</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
       <div className="space-y-2">
         <Label htmlFor="default_ai_group">Default group when AI is uncertain</Label>
         <p className="text-xs text-muted-foreground">

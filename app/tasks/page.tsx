@@ -520,12 +520,6 @@ function TasksPageContent() {
     setShowCreateForm(true);
   };
 
-  const handleMultipleAIParsed = (tasks: Partial<CreateTaskRequestWithSubtasks>[]) => {
-    setTaskQueue(tasks);
-    setTaskQueueIndex(0);
-    if (tasks.length > 0) handleAIParsed(tasks[0]);
-  };
-
   const handleSkipQueueTask = () => {
     if (taskQueueIndex < taskQueue.length - 1) {
       const nextIndex = taskQueueIndex + 1;
@@ -879,7 +873,7 @@ function TasksPageContent() {
         open={showAIInput}
         onOpenChange={setShowAIInput}
         onParsed={handleAIParsed}
-        onMultipleParsed={handleMultipleAIParsed}
+        onApplied={fetchTasks}
         groups={groups}
         existingTasks={tasks.map((t) => ({
           id: t.id,

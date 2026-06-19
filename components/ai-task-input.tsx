@@ -1,10 +1,12 @@
 "use client";
 
-import { CheckSquare, Lock, MessageCircle, Mic, MicOff, Sparkles, Square, X } from "lucide-react";
+import { Check, Lock, MessageCircle, Mic, MicOff, Sparkles, Square, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { useUserTimezone } from "@/hooks/use-user-timezone";
+import { formatDateTimeLocalForTimezone, parseDateTimeLocalToUTC } from "@/lib/timezone-utils";
 import type { TaskGroup } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import type { CreateTaskRequestWithSubtasks } from "./task-form";
@@ -25,45 +27,41 @@ interface ExistingTaskContext {
 interface AITaskInputProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** Quick add: opens the task form prefilled with a single parsed task. */
   onParsed: (data: Partial<CreateTaskRequestWithSubtasks>) => void;
-  onMultipleParsed: (tasks: Partial<CreateTaskRequestWithSubtasks>[]) => void;
+  /** Called after the assistant applies (creates/updates) a task, to refresh the list. */
+  onApplied?: () => void | Promise<void>;
   groups?: TaskGroup[];
   existingTasks?: ExistingTaskContext[];
 }
 
-type Mode = "single" | "braindump" | "plan";
+type Mode = "quick" | "assistant";
 
-interface PreviewTask {
-  title: string;
-  task_type?: string;
-  priority?: number;
-  group_id?: string;
-  _previewId?: string;
-  [key: string]: unknown;
-}
-
-interface ProposedTask {
-  action?: "create" | "update";
-  id?: string | null; // existing task id when action === "update"
+interface ProposedAction {
+  _id: string;
+  action: "create" | "update";
+  id?: string | null;
   title: string;
   description?: string | null;
   task_type?: string;
   priority?: number;
-  duration?: number;
+  duration?: number | null;
   energy_level_required?: number;
   scheduled_start?: string | null;
   scheduled_end?: string | null;
   due_date?: string | null;
   group_id?: string | null;
-  [key: string]: unknown;
+  subtasks?: { title: string; duration?: number | null }[];
 }
 
-interface PlanMessage {
+interface AssistantMessage {
   id: string;
   role: "user" | "assistant";
   content: string;
-  proposedTasks?: ProposedTask[];
+  actions?: ProposedAction[];
 }
+
+type ActionStatus = "applying" | "applied" | "rejected" | "error";
 
 const LOCK_THRESHOLD = 60; // px upward drag to lock recording
 
@@ -85,35 +83,37 @@ export function AITaskInput({
   open,
   onOpenChange,
   onParsed,
-  onMultipleParsed,
+  onApplied,
   groups = [],
   existingTasks,
 }: AITaskInputProps) {
-  const [mode, setMode] = useState<Mode>("single");
+  const { timezone } = useUserTimezone();
+
+  const [mode, setMode] = useState<Mode>("quick");
+
+  // Quick add state
   const [text, setText] = useState("");
   const [generateSubtasks, setGenerateSubtasks] = useState(false);
   const [isParsing, setIsParsing] = useState(false);
   const [parseError, setParseError] = useState<string | null>(null);
   const [partialWarning, setPartialWarning] = useState<string[] | null>(null);
+
+  // Voice state (shared)
   const [isRecording, setIsRecording] = useState(false);
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [isLocked, setIsLocked] = useState(false);
   const [dragProgress, setDragProgress] = useState(0);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
 
-  // Brain dump preview state
-  const [previewTasks, setPreviewTasks] = useState<PreviewTask[]>([]);
-  const [selectedIndices, setSelectedIndices] = useState<Set<number>>(new Set());
-  const [showPreview, setShowPreview] = useState(false);
-
-  // Plan mode state
-  const [planMessages, setPlanMessages] = useState<PlanMessage[]>([]);
-  const [planInput, setPlanInput] = useState("");
-  const [isPlanLoading, setIsPlanLoading] = useState(false);
+  // Assistant state
+  const [messages, setMessages] = useState<AssistantMessage[]>([]);
+  const [assistantInput, setAssistantInput] = useState("");
+  const [isAssistantLoading, setIsAssistantLoading] = useState(false);
+  const [actionStatus, setActionStatus] = useState<Record<string, ActionStatus>>({});
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const planTextareaRef = useRef<HTMLTextAreaElement>(null);
-  const planMessagesEndRef = useRef<HTMLDivElement>(null);
+  const assistantTextareaRef = useRef<HTMLTextAreaElement>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -121,6 +121,8 @@ export function AITaskInput({
   const animationFrameRef = useRef<number | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const pointerStartYRef = useRef<number>(0);
+  const modeRef = useRef<Mode>(mode);
+  modeRef.current = mode;
 
   // Reset state when dialog closes
   useEffect(() => {
@@ -135,24 +137,22 @@ export function AITaskInput({
       setIsLocked(false);
       setDragProgress(0);
       setRecordingSeconds(0);
-      setPreviewTasks([]);
-      setSelectedIndices(new Set());
-      setShowPreview(false);
-      setPlanMessages([]);
-      setPlanInput("");
-      setIsPlanLoading(false);
+      setMessages([]);
+      setAssistantInput("");
+      setIsAssistantLoading(false);
+      setActionStatus({});
     } else {
       setTimeout(() => textareaRef.current?.focus(), 50);
     }
   }, [open, isRecording]);
 
-  // Scroll plan chat to bottom on new messages or when loading state changes
-  // biome-ignore lint/correctness/useExhaustiveDependencies: ref scroll must run when message list or loading changes, not derivable from effect body for static analysis
+  // Scroll assistant chat to bottom on new messages or loading change
+  // biome-ignore lint/correctness/useExhaustiveDependencies: scroll must run when message list or loading changes
   useEffect(() => {
-    if (mode === "plan") {
-      planMessagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    if (mode === "assistant") {
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     }
-  }, [mode, planMessages.length, isPlanLoading]);
+  }, [mode, messages.length, isAssistantLoading]);
 
   // Frequency-bar visualizer — runs while recording
   useEffect(() => {
@@ -209,15 +209,8 @@ export function AITaskInput({
 
   const switchMode = (next: Mode) => {
     setMode(next);
-    setText("");
     setParseError(null);
     setPartialWarning(null);
-    setPreviewTasks([]);
-    setSelectedIndices(new Set());
-    setShowPreview(false);
-    setPlanMessages([]);
-    setPlanInput("");
-    setIsPlanLoading(false);
   };
 
   const startRecording = async () => {
@@ -262,8 +255,8 @@ export function AITaskInput({
           const res = await fetch("/api/ai/transcribe", { method: "POST", body: fd });
           const data = await res.json();
           if (!res.ok) throw new Error(data.error || "Transcription failed");
-          if (mode === "plan") {
-            setPlanInput((prev) => (prev ? `${prev} ${data.text}` : data.text));
+          if (modeRef.current === "assistant") {
+            setAssistantInput((prev) => (prev ? `${prev} ${data.text}` : data.text));
           } else {
             setText((prev) => (prev ? `${prev} ${data.text}` : data.text));
           }
@@ -282,7 +275,7 @@ export function AITaskInput({
   };
 
   const handleMicClick = async () => {
-    if (isParsing || isTranscribing || isPlanLoading) return;
+    if (isParsing || isTranscribing || isAssistantLoading) return;
     if (isRecording) {
       mediaRecorderRef.current?.stop();
     } else {
@@ -292,7 +285,7 @@ export function AITaskInput({
 
   const handlePointerDown = async (e: React.PointerEvent<HTMLButtonElement>) => {
     if (e.pointerType !== "touch") return;
-    if (isParsing || isTranscribing || isRecording || isPlanLoading) return;
+    if (isParsing || isTranscribing || isRecording || isAssistantLoading) return;
     e.preventDefault();
     e.currentTarget.setPointerCapture(e.pointerId);
     pointerStartYRef.current = e.clientY;
@@ -365,72 +358,30 @@ export function AITaskInput({
     }
   };
 
-  const handleBrainDump = async () => {
-    if (!text.trim() || isParsing) return;
-
-    setIsParsing(true);
-    setParseError(null);
-
-    try {
-      const response = await fetch("/api/ai/parse-tasks-batch", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          text: text.trim(),
-          groups: groups.map((g) => ({ id: g.id, name: g.name })),
-        }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        setParseError(data.error || "Failed to parse tasks");
-        return;
-      }
-
-      if (!Array.isArray(data.tasks) || data.tasks.length === 0) {
-        setParseError("Could not extract any tasks. Please add more detail.");
-        return;
-      }
-
-      const tasksWithKeys = (data.tasks as PreviewTask[]).map((t) => ({
-        ...t,
-        _previewId: crypto.randomUUID(),
-      }));
-      setPreviewTasks(tasksWithKeys);
-      setSelectedIndices(new Set(tasksWithKeys.map((_: PreviewTask, i: number) => i)));
-      setShowPreview(true);
-    } catch {
-      setParseError("Network error. Please check your connection and try again.");
-    } finally {
-      setIsParsing(false);
-    }
-  };
-
-  const sendPlanMessage = async () => {
-    if (!planInput.trim() || isPlanLoading) return;
-    const userMessage: PlanMessage = {
+  const sendAssistantMessage = async () => {
+    if (!assistantInput.trim() || isAssistantLoading) return;
+    const userMessage: AssistantMessage = {
       id: crypto.randomUUID(),
       role: "user",
-      content: planInput.trim(),
+      content: assistantInput.trim(),
     };
-    const updatedMessages = [...planMessages, userMessage];
-    setPlanMessages(updatedMessages);
-    setPlanInput("");
-    setIsPlanLoading(true);
+    const updatedMessages = [...messages, userMessage];
+    setMessages(updatedMessages);
+    setAssistantInput("");
+    setIsAssistantLoading(true);
     try {
-      const res = await fetch("/api/ai/plan-chat", {
+      const res = await fetch("/api/ai/assistant", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           messages: updatedMessages.map((m) => ({ role: m.role, content: m.content })),
           groups: groups.filter((g) => !g.is_parent_group).map((g) => ({ id: g.id, name: g.name })),
-          existing_tasks: existingTasks?.slice(0, 20) ?? [],
+          existing_tasks: existingTasks?.slice(0, 50) ?? [],
         }),
       });
       const data = await res.json();
       if (!res.ok) {
-        setPlanMessages((prev) => [
+        setMessages((prev) => [
           ...prev,
           {
             id: crypto.randomUUID(),
@@ -440,15 +391,23 @@ export function AITaskInput({
         ]);
         return;
       }
-      const assistantMsg: PlanMessage = {
-        id: crypto.randomUUID(),
-        role: "assistant",
-        content: data.message,
-        proposedTasks: data.ready && data.proposed_tasks ? data.proposed_tasks : undefined,
-      };
-      setPlanMessages((prev) => [...prev, assistantMsg]);
+      const rawActions: ProposedAction[] = Array.isArray(data.proposed_actions)
+        ? data.proposed_actions.map((a: Omit<ProposedAction, "_id">) => ({
+            ...a,
+            _id: crypto.randomUUID(),
+          }))
+        : [];
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: crypto.randomUUID(),
+          role: "assistant",
+          content: data.message,
+          actions: rawActions.length > 0 ? rawActions : undefined,
+        },
+      ]);
     } catch {
-      setPlanMessages((prev) => [
+      setMessages((prev) => [
         ...prev,
         {
           id: crypto.randomUUID(),
@@ -457,64 +416,102 @@ export function AITaskInput({
         },
       ]);
     } finally {
-      setIsPlanLoading(false);
+      setIsAssistantLoading(false);
     }
+  };
+
+  const applyAction = async (action: ProposedAction) => {
+    setActionStatus((s) => ({ ...s, [action._id]: "applying" }));
+    try {
+      // All AI datetimes are local "YYYY-MM-DDTHH:MM" in the user's timezone —
+      // convert to UTC before writing to the DB.
+      const startUTC = parseDateTimeLocalToUTC(action.scheduled_start ?? undefined, timezone);
+      const endUTC = parseDateTimeLocalToUTC(action.scheduled_end ?? undefined, timezone);
+      const dueUTC = parseDateTimeLocalToUTC(action.due_date ?? undefined, timezone);
+
+      if (action.action === "update" && action.id) {
+        // Only send fields the AI provided (non-null). Avoids clearing unrelated fields.
+        const payload: Record<string, unknown> = {};
+        if (action.title) payload.title = action.title;
+        if (action.description != null) payload.description = action.description;
+        if (action.task_type) payload.task_type = action.task_type;
+        if (action.priority) payload.priority = action.priority;
+        if (action.duration != null) payload.duration = action.duration;
+        if (action.energy_level_required)
+          payload.energy_level_required = action.energy_level_required;
+        if (startUTC) payload.scheduled_start = startUTC;
+        if (endUTC) payload.scheduled_end = endUTC;
+        if (dueUTC) payload.due_date = dueUTC;
+        if (action.group_id) payload.group_id = action.group_id;
+
+        const res = await fetch(`/api/tasks/${action.id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        if (!res.ok) throw new Error("update failed");
+      } else {
+        const payload: Record<string, unknown> = {
+          title: action.title,
+          task_type: action.task_type ?? "task",
+        };
+        if (action.description != null) payload.description = action.description;
+        if (action.priority) payload.priority = action.priority;
+        if (action.duration != null) payload.duration = action.duration;
+        if (action.energy_level_required)
+          payload.energy_level_required = action.energy_level_required;
+        if (startUTC) payload.scheduled_start = startUTC;
+        if (endUTC) payload.scheduled_end = endUTC;
+        if (dueUTC) payload.due_date = dueUTC;
+        if (action.group_id) payload.group_id = action.group_id;
+
+        const res = await fetch("/api/tasks", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        if (!res.ok) throw new Error("create failed");
+        const data = await res.json();
+        const createdId: string | undefined = data.task?.id;
+
+        if (createdId && action.subtasks?.length) {
+          for (const st of action.subtasks) {
+            await fetch(`/api/tasks/${createdId}/subtasks`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                title: st.title,
+                duration: st.duration ?? 30,
+                extend_parent_duration: true,
+              }),
+            });
+          }
+        }
+      }
+
+      setActionStatus((s) => ({ ...s, [action._id]: "applied" }));
+      await onApplied?.();
+    } catch {
+      setActionStatus((s) => ({ ...s, [action._id]: "error" }));
+    }
+  };
+
+  const rejectAction = (action: ProposedAction) => {
+    setActionStatus((s) => ({ ...s, [action._id]: "rejected" }));
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
-      if (mode === "single") handleParse();
-      else handleBrainDump();
+      handleParse();
     }
   };
 
-  const handlePlanKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+  const handleAssistantKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
-      sendPlanMessage();
+      sendAssistantMessage();
     }
-  };
-
-  const toggleIndex = (i: number) => {
-    setSelectedIndices((prev) => {
-      const next = new Set(prev);
-      if (next.has(i)) next.delete(i);
-      else next.add(i);
-      return next;
-    });
-  };
-
-  const handleStartCreating = () => {
-    const selected = previewTasks.filter((_, i) => selectedIndices.has(i));
-    if (selected.length === 0) return;
-    onMultipleParsed(selected as Partial<CreateTaskRequestWithSubtasks>[]);
-    onOpenChange(false);
-  };
-
-  const handleApplyProposedTasks = async (tasks: ProposedTask[]) => {
-    const creates = tasks.filter((t) => t.action !== "update");
-    const updates = tasks.filter((t) => t.action === "update" && t.id);
-
-    // Fire updates in parallel — best-effort, don't block creates
-    if (updates.length > 0) {
-      await Promise.allSettled(
-        updates.map((t) => {
-          const { action: _action, id, ...fields } = t;
-          return fetch(`/api/tasks/${id}`, {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(fields),
-          });
-        })
-      );
-    }
-
-    if (creates.length > 0) {
-      onMultipleParsed(creates as Partial<CreateTaskRequestWithSubtasks>[]);
-    }
-
-    onOpenChange(false);
   };
 
   const micButton = (
@@ -525,7 +522,7 @@ export function AITaskInput({
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
       onPointerCancel={handlePointerCancel}
-      disabled={isParsing || isTranscribing || isPlanLoading}
+      disabled={isParsing || isTranscribing || isAssistantLoading}
       style={{ touchAction: "none" }}
       className={cn(
         "inline-flex items-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium transition-colors",
@@ -603,57 +600,135 @@ export function AITaskInput({
     </div>
   );
 
-  const proposedTaskCard = (task: ProposedTask, idx: number) => {
-    const group = task.group_id ? groups.find((g) => g.id === task.group_id) : null;
-    const isUpdate = task.action === "update";
+  const formatLocalTime = (iso: string | null | undefined): string | null => {
+    if (!iso) return null;
+    const local = formatDateTimeLocalForTimezone(iso, timezone);
+    return local ? local.slice(0, 16).replace("T", " ") : null;
+  };
+
+  const actionCard = (action: ProposedAction) => {
+    const group = action.group_id ? groups.find((g) => g.id === action.group_id) : null;
+    const isUpdate = action.action === "update";
+    const status = actionStatus[action._id];
+    const existing = isUpdate && action.id ? existingTasks?.find((t) => t.id === action.id) : null;
+
+    const newStart = action.scheduled_start
+      ? action.scheduled_start.slice(0, 16).replace("T", " ")
+      : null;
+    const oldStart = existing ? formatLocalTime(existing.scheduled_start) : null;
+    const showReschedule = isUpdate && newStart && newStart !== oldStart;
+    const showDuration =
+      isUpdate &&
+      action.duration != null &&
+      existing?.duration != null &&
+      action.duration !== existing.duration;
+
     return (
       <div
-        key={idx}
+        key={action._id}
         className={cn(
-          "flex items-start gap-2 p-2 rounded-md border",
+          "p-2.5 rounded-md border transition-opacity",
+          status === "rejected" && "opacity-50",
           isUpdate
             ? "bg-amber-50 border-amber-200 dark:bg-amber-950/20 dark:border-amber-800/40"
             : "bg-muted/40 border-input"
         )}
       >
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium truncate">{task.title}</p>
-          <div className="flex flex-wrap gap-1 mt-1">
-            <span
-              className={cn(
-                "text-xs px-1.5 py-0.5 rounded font-medium",
-                isUpdate
-                  ? "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400"
-                  : "bg-primary/10 text-primary"
-              )}
-            >
-              {isUpdate ? "Update" : "New"}
-            </span>
-            {task.task_type && task.task_type !== "task" && (
-              <span className="text-xs px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
-                {TYPE_CHIP[task.task_type] ?? task.task_type}
-              </span>
-            )}
-            {task.priority && task.priority !== 3 && (
-              <span className="text-xs px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
-                {PRIORITY_CHIP[task.priority as number] ?? `P${task.priority}`}
-              </span>
-            )}
-            {task.scheduled_start && (
-              <span className="text-xs px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
-                {task.scheduled_start.slice(11, 16)}
-              </span>
-            )}
-            {group && (
+        <div className="flex items-start gap-2">
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium truncate">{action.title}</p>
+            <div className="flex flex-wrap gap-1 mt-1">
               <span
-                className="text-xs px-1.5 py-0.5 rounded text-white"
-                style={{ backgroundColor: group.color || "#6b7280" }}
+                className={cn(
+                  "text-xs px-1.5 py-0.5 rounded font-medium",
+                  isUpdate
+                    ? "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400"
+                    : "bg-primary/10 text-primary"
+                )}
               >
-                {group.name}
+                {isUpdate ? "Edit" : "New"}
               </span>
+              {action.task_type && action.task_type !== "task" && (
+                <span className="text-xs px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
+                  {TYPE_CHIP[action.task_type] ?? action.task_type}
+                </span>
+              )}
+              {action.priority && action.priority !== 3 && (
+                <span className="text-xs px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
+                  {PRIORITY_CHIP[action.priority] ?? `P${action.priority}`}
+                </span>
+              )}
+              {!isUpdate && newStart && (
+                <span className="text-xs px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
+                  {newStart}
+                </span>
+              )}
+              {group && (
+                <span
+                  className="text-xs px-1.5 py-0.5 rounded text-white"
+                  style={{ backgroundColor: group.color || "#6b7280" }}
+                >
+                  {group.name}
+                </span>
+              )}
+            </div>
+            {showReschedule && (
+              <p className="text-xs text-muted-foreground mt-1">
+                {oldStart ? `${oldStart} → ` : "→ "}
+                <span className="text-foreground font-medium">{newStart}</span>
+              </p>
+            )}
+            {showDuration && (
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {existing?.duration}min →{" "}
+                <span className="text-foreground font-medium">{action.duration}min</span>
+              </p>
+            )}
+            {!isUpdate && action.subtasks && action.subtasks.length > 0 && (
+              <p className="text-xs text-muted-foreground mt-1">
+                {action.subtasks.length} subtask{action.subtasks.length !== 1 ? "s" : ""}:{" "}
+                {action.subtasks.map((s) => s.title).join(", ")}
+              </p>
+            )}
+          </div>
+
+          {/* Per-item accept / reject */}
+          <div className="flex items-center gap-1 shrink-0">
+            {status === "applied" ? (
+              <span className="text-xs text-green-600 dark:text-green-400 flex items-center gap-1">
+                <Check className="h-3.5 w-3.5" /> Applied
+              </span>
+            ) : status === "rejected" ? (
+              <span className="text-xs text-muted-foreground">Dismissed</span>
+            ) : status === "applying" ? (
+              <span className="h-4 w-4 block animate-spin rounded-full border-2 border-current border-t-transparent text-muted-foreground" />
+            ) : (
+              <>
+                <button
+                  type="button"
+                  onClick={() => applyAction(action)}
+                  className="inline-flex items-center justify-center h-7 w-7 rounded-md bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
+                  title="Accept"
+                  aria-label="Accept"
+                >
+                  <Check className="h-4 w-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => rejectAction(action)}
+                  className="inline-flex items-center justify-center h-7 w-7 rounded-md bg-muted text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
+                  title="Reject"
+                  aria-label="Reject"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </>
             )}
           </div>
         </div>
+        {status === "error" && (
+          <p className="text-xs text-destructive mt-1">Failed to apply — try again.</p>
+        )}
       </div>
     );
   };
@@ -664,55 +739,42 @@ export function AITaskInput({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Sparkles className="w-5 h-5" />
-            Add Task with AI
+            {mode === "quick" ? "Add Task with AI" : "AI Assistant"}
           </DialogTitle>
         </DialogHeader>
 
         {/* Mode toggle */}
-        {!showPreview && (
-          <div className="flex rounded-md border border-input overflow-hidden shrink-0">
-            <button
-              type="button"
-              onClick={() => switchMode("single")}
-              className={cn(
-                "flex-1 px-3 py-1.5 text-sm font-medium transition-colors",
-                mode === "single"
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-background text-muted-foreground hover:text-foreground"
-              )}
-            >
-              Single task
-            </button>
-            <button
-              type="button"
-              onClick={() => switchMode("braindump")}
-              className={cn(
-                "flex-1 px-3 py-1.5 text-sm font-medium transition-colors border-l border-input",
-                mode === "braindump"
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-background text-muted-foreground hover:text-foreground"
-              )}
-            >
-              Brain dump
-            </button>
-            <button
-              type="button"
-              onClick={() => switchMode("plan")}
-              className={cn(
-                "flex-1 px-3 py-1.5 text-sm font-medium transition-colors border-l border-input flex items-center justify-center gap-1.5",
-                mode === "plan"
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-background text-muted-foreground hover:text-foreground"
-              )}
-            >
-              <MessageCircle className="h-3.5 w-3.5" />
-              Plan
-            </button>
-          </div>
-        )}
+        <div className="flex rounded-md border border-input overflow-hidden shrink-0">
+          <button
+            type="button"
+            onClick={() => switchMode("quick")}
+            className={cn(
+              "flex-1 px-3 py-1.5 text-sm font-medium transition-colors flex items-center justify-center gap-1.5",
+              mode === "quick"
+                ? "bg-primary text-primary-foreground"
+                : "bg-background text-muted-foreground hover:text-foreground"
+            )}
+          >
+            <Sparkles className="h-3.5 w-3.5" />
+            Quick add
+          </button>
+          <button
+            type="button"
+            onClick={() => switchMode("assistant")}
+            className={cn(
+              "flex-1 px-3 py-1.5 text-sm font-medium transition-colors border-l border-input flex items-center justify-center gap-1.5",
+              mode === "assistant"
+                ? "bg-primary text-primary-foreground"
+                : "bg-background text-muted-foreground hover:text-foreground"
+            )}
+          >
+            <MessageCircle className="h-3.5 w-3.5" />
+            Assistant
+          </button>
+        </div>
 
-        {/* View 1 & 2: single / braindump input views */}
-        {!showPreview && mode !== "plan" && (
+        {/* Quick add view */}
+        {mode === "quick" && (
           <div className="space-y-4 flex-1 overflow-y-auto min-h-0">
             <div className="flex flex-col h-44">
               <textarea
@@ -720,36 +782,27 @@ export function AITaskInput({
                 value={text}
                 onChange={(e) => setText(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder={
-                  mode === "single"
-                    ? "Describe your task in plain English..."
-                    : "Describe everything you need to get done…"
-                }
+                placeholder="Describe your task in plain English…"
                 className="flex-1 min-h-0 w-full resize-none rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                 disabled={isParsing || isTranscribing}
               />
               {recordingVisualizer}
             </div>
 
-            {/* Generate subtasks — single mode only */}
-            {mode === "single" && (
-              <div className="flex items-center gap-2">
-                <Checkbox
-                  id="generate-subtasks"
-                  checked={generateSubtasks}
-                  onCheckedChange={(checked) => setGenerateSubtasks(checked === true)}
-                  disabled={isParsing}
-                />
-                <label htmlFor="generate-subtasks" className="text-sm cursor-pointer select-none">
-                  Generate subtasks
-                </label>
-              </div>
-            )}
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id="generate-subtasks"
+                checked={generateSubtasks}
+                onCheckedChange={(checked) => setGenerateSubtasks(checked === true)}
+                disabled={isParsing}
+              />
+              <label htmlFor="generate-subtasks" className="text-sm cursor-pointer select-none">
+                Generate subtasks
+              </label>
+            </div>
 
-            {/* Error */}
             {parseError && <p className="text-sm text-destructive">{parseError}</p>}
 
-            {/* Partial warning */}
             {partialWarning && (
               <p className="text-sm text-amber-600 dark:text-amber-400">
                 Could not extract: {partialWarning.join(", ")}. You can fill these in the form.
@@ -758,76 +811,18 @@ export function AITaskInput({
           </div>
         )}
 
-        {/* View 3: preview list */}
-        {showPreview && (
-          <div className="flex-1 flex flex-col min-h-0">
-            <p className="text-sm text-muted-foreground shrink-0 mb-3">
-              {previewTasks.length} task{previewTasks.length !== 1 ? "s" : ""} from your brain dump
-              — uncheck any you don't want.
-            </p>
-            <div className="flex-1 overflow-y-auto space-y-2 min-h-0">
-              {previewTasks.map((task, i) => {
-                const group = task.group_id ? groups.find((g) => g.id === task.group_id) : null;
-                return (
-                  <button
-                    key={task._previewId ?? `preview-${task.title}-${i}`}
-                    type="button"
-                    onClick={() => toggleIndex(i)}
-                    className={cn(
-                      "w-full text-left flex items-start gap-3 p-3 rounded-lg border transition-colors",
-                      selectedIndices.has(i)
-                        ? "border-primary/40 bg-primary/5"
-                        : "border-input bg-muted/30 opacity-60"
-                    )}
-                  >
-                    <div className="mt-0.5 shrink-0">
-                      {selectedIndices.has(i) ? (
-                        <CheckSquare className="h-4 w-4 text-primary" />
-                      ) : (
-                        <div className="h-4 w-4 rounded border-2 border-muted-foreground/40" />
-                      )}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">{task.title}</p>
-                      <div className="flex flex-wrap gap-1 mt-1">
-                        {task.task_type && task.task_type !== "task" && (
-                          <span className="text-xs px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
-                            {TYPE_CHIP[task.task_type] ?? task.task_type}
-                          </span>
-                        )}
-                        {task.priority && task.priority !== 3 && (
-                          <span className="text-xs px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
-                            {PRIORITY_CHIP[task.priority as number] ?? `P${task.priority}`}
-                          </span>
-                        )}
-                        {group && (
-                          <span
-                            className="text-xs px-1.5 py-0.5 rounded text-white"
-                            style={{ backgroundColor: group.color || "#6b7280" }}
-                          >
-                            {group.name}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        {/* View 4: Plan mode chat */}
-        {!showPreview && mode === "plan" && (
+        {/* Assistant view */}
+        {mode === "assistant" && (
           <div className="flex-1 flex flex-col min-h-0 gap-3">
-            {/* Message history */}
             <div className="flex-1 overflow-y-auto space-y-3 min-h-0 pr-1">
-              {planMessages.length === 0 && (
+              {messages.length === 0 && (
                 <p className="text-sm text-muted-foreground text-center pt-4">
-                  Describe what you need to plan and I'll help you break it down into tasks.
+                  Tell me what you need — I can build tasks from a brain dump, or manage your
+                  schedule ("move my lunch to 1pm", "extend the washing to 2 hours"). I'll ask if I
+                  need more detail.
                 </p>
               )}
-              {planMessages.map((msg) => (
+              {messages.map((msg) => (
                 <div
                   key={msg.id}
                   className={cn(
@@ -845,50 +840,17 @@ export function AITaskInput({
                   >
                     {msg.content}
                   </div>
-                  {msg.proposedTasks && msg.proposedTasks.length > 0 && (
+                  {msg.actions && msg.actions.length > 0 && (
                     <div className="w-full max-w-[95%] mt-1 space-y-1.5">
                       <p className="text-xs text-muted-foreground font-medium px-1">
-                        {(() => {
-                          const creates = msg.proposedTasks.filter(
-                            (t) => t.action !== "update"
-                          ).length;
-                          const updates = msg.proposedTasks.filter(
-                            (t) => t.action === "update"
-                          ).length;
-                          const parts = [];
-                          if (creates > 0)
-                            parts.push(`${creates} new task${creates !== 1 ? "s" : ""}`);
-                          if (updates > 0)
-                            parts.push(`${updates} update${updates !== 1 ? "s" : ""}`);
-                          return parts.join(", ");
-                        })()}:
+                        Proposed changes — accept or reject each:
                       </p>
-                      {msg.proposedTasks.map((t, idx) => proposedTaskCard(t, idx))}
-                      <div className="flex items-center gap-3 pt-1">
-                        <Button
-                          size="sm"
-                          onClick={() => {
-                            const tasks = msg.proposedTasks;
-                            if (tasks && tasks.length > 0) {
-                              handleApplyProposedTasks(tasks);
-                            }
-                          }}
-                        >
-                          Apply all →
-                        </Button>
-                        <button
-                          type="button"
-                          onClick={() => planTextareaRef.current?.focus()}
-                          className="text-xs text-muted-foreground hover:text-foreground transition-colors"
-                        >
-                          Keep chatting
-                        </button>
-                      </div>
+                      {msg.actions.map((a) => actionCard(a))}
                     </div>
                   )}
                 </div>
               ))}
-              {isPlanLoading && (
+              {isAssistantLoading && (
                 <div className="flex items-start">
                   <div className="bg-muted rounded-2xl rounded-bl-sm px-3 py-2 flex items-center gap-1">
                     <span className="h-1.5 w-1.5 rounded-full bg-muted-foreground/60 animate-bounce [animation-delay:0ms]" />
@@ -897,28 +859,27 @@ export function AITaskInput({
                   </div>
                 </div>
               )}
-              <div ref={planMessagesEndRef} />
+              <div ref={messagesEndRef} />
             </div>
 
-            {/* Plan input */}
             <div className="shrink-0 space-y-1.5">
               <div className="flex gap-2">
                 <textarea
-                  ref={planTextareaRef}
-                  value={planInput}
-                  onChange={(e) => setPlanInput(e.target.value)}
-                  onKeyDown={handlePlanKeyDown}
+                  ref={assistantTextareaRef}
+                  value={assistantInput}
+                  onChange={(e) => setAssistantInput(e.target.value)}
+                  onKeyDown={handleAssistantKeyDown}
                   placeholder="Type your message…"
                   rows={2}
                   className="flex-1 resize-none rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                  disabled={isPlanLoading || isTranscribing}
+                  disabled={isAssistantLoading || isTranscribing}
                 />
                 <div className="flex flex-col gap-1.5">
                   {micButton}
                   <Button
                     size="sm"
-                    onClick={sendPlanMessage}
-                    disabled={!planInput.trim() || isPlanLoading || isTranscribing}
+                    onClick={sendAssistantMessage}
+                    disabled={!assistantInput.trim() || isAssistantLoading || isTranscribing}
                     className="h-auto px-3 py-2"
                   >
                     Send →
@@ -933,11 +894,7 @@ export function AITaskInput({
 
         {/* Footer */}
         <div className="shrink-0 flex items-center justify-between pt-3 border-t">
-          {mode === "plan" && !showPreview ? (
-            <Button variant="ghost" onClick={() => onOpenChange(false)}>
-              Cancel
-            </Button>
-          ) : !showPreview ? (
+          {mode === "quick" ? (
             <>
               {micButton}
               <div className="flex gap-2">
@@ -945,38 +902,27 @@ export function AITaskInput({
                   Cancel
                 </Button>
                 <Button
-                  onClick={mode === "single" ? handleParse : handleBrainDump}
+                  onClick={handleParse}
                   disabled={!text.trim() || isParsing || isTranscribing}
                 >
                   {isParsing ? (
                     <>
                       <span className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                      {mode === "single" ? "Parsing..." : "Analysing..."}
+                      Parsing…
                     </>
                   ) : (
                     <>
                       <Sparkles className="w-4 h-4 mr-2" />
-                      {mode === "single" ? "Parse with AI" : "Generate tasks"}
+                      Parse with AI
                     </>
                   )}
                 </Button>
               </div>
             </>
           ) : (
-            <>
-              <Button variant="ghost" onClick={() => setShowPreview(false)}>
-                <X className="h-4 w-4 mr-1.5" />
-                Back
-              </Button>
-              <div className="flex gap-2 items-center">
-                <span className="text-xs text-muted-foreground">
-                  {selectedIndices.size} selected
-                </span>
-                <Button onClick={handleStartCreating} disabled={selectedIndices.size === 0}>
-                  Start Creating →
-                </Button>
-              </div>
-            </>
+            <Button variant="ghost" onClick={() => onOpenChange(false)}>
+              Done
+            </Button>
           )}
         </div>
       </DialogContent>

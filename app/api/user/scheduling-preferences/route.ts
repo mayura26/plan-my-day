@@ -1,10 +1,16 @@
 import { type NextRequest, NextResponse } from "next/server";
+import { DEFAULT_AI_MODEL } from "@/lib/ai";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/turso";
 import type { SchedulingMode } from "@/lib/types";
 import { SCHEDULING_MODES } from "@/lib/types";
 
 const VALID_MODES = SCHEDULING_MODES;
+const VALID_AI_MODELS = ["full", "mini"] as const;
+
+function normalizeAiModel(value: unknown): "full" | "mini" {
+  return value === "full" || value === "mini" ? value : DEFAULT_AI_MODEL;
+}
 
 // GET /api/user/scheduling-preferences - Get user's scheduling preferences for new tasks
 export async function GET() {
@@ -15,7 +21,7 @@ export async function GET() {
     }
 
     const result = await db.execute(
-      "SELECT auto_schedule_new_tasks, default_schedule_mode, default_ai_group_id, critical_reminder_enabled, critical_reminder_interval_minutes FROM users WHERE id = ?",
+      "SELECT auto_schedule_new_tasks, default_schedule_mode, default_ai_group_id, ai_model, critical_reminder_enabled, critical_reminder_interval_minutes FROM users WHERE id = ?",
       [session.user.id]
     );
 
@@ -24,6 +30,7 @@ export async function GET() {
     }
 
     const row = result.rows[0];
+    const ai_model = normalizeAiModel(row.ai_model);
     const auto_schedule_new_tasks = Boolean(row.auto_schedule_new_tasks ?? 0);
     const rawMode = row.default_schedule_mode as string | null | undefined;
     const default_schedule_mode =
@@ -45,6 +52,7 @@ export async function GET() {
       auto_schedule_new_tasks,
       default_schedule_mode,
       default_ai_group_id,
+      ai_model,
       critical_reminder_enabled,
       critical_reminder_interval_minutes,
     });
@@ -66,9 +74,19 @@ export async function PUT(request: NextRequest) {
       auto_schedule_new_tasks?: boolean;
       default_schedule_mode?: string;
       default_ai_group_id?: string | null;
+      ai_model?: string;
       critical_reminder_enabled?: boolean;
       critical_reminder_interval_minutes?: number;
     } = await request.json();
+
+    if (body.ai_model !== undefined) {
+      if (!VALID_AI_MODELS.includes(body.ai_model as "full" | "mini")) {
+        return NextResponse.json(
+          { error: `ai_model must be one of: ${VALID_AI_MODELS.join(", ")}` },
+          { status: 400 }
+        );
+      }
+    }
 
     if (body.default_schedule_mode !== undefined) {
       if (
@@ -94,6 +112,11 @@ export async function PUT(request: NextRequest) {
     if (body.default_schedule_mode !== undefined) {
       updates.push("default_schedule_mode = ?");
       args.push(body.default_schedule_mode);
+    }
+
+    if (body.ai_model !== undefined) {
+      updates.push("ai_model = ?");
+      args.push(body.ai_model);
     }
 
     if (body.default_ai_group_id !== undefined) {
@@ -134,7 +157,7 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json(
         {
           error:
-            "Provide at least one of: auto_schedule_new_tasks, default_schedule_mode, default_ai_group_id, critical_reminder_enabled, critical_reminder_interval_minutes",
+            "Provide at least one of: auto_schedule_new_tasks, default_schedule_mode, default_ai_group_id, ai_model, critical_reminder_enabled, critical_reminder_interval_minutes",
         },
         { status: 400 }
       );
@@ -146,11 +169,12 @@ export async function PUT(request: NextRequest) {
     await db.execute(`UPDATE users SET ${updates.join(", ")} WHERE id = ?`, args);
 
     const getResult = await db.execute(
-      "SELECT auto_schedule_new_tasks, default_schedule_mode, default_ai_group_id, critical_reminder_enabled, critical_reminder_interval_minutes FROM users WHERE id = ?",
+      "SELECT auto_schedule_new_tasks, default_schedule_mode, default_ai_group_id, ai_model, critical_reminder_enabled, critical_reminder_interval_minutes FROM users WHERE id = ?",
       [session.user.id]
     );
     const row = getResult.rows[0];
     const auto_schedule_new_tasks = Boolean(row?.auto_schedule_new_tasks ?? 0);
+    const ai_model = normalizeAiModel(row?.ai_model);
     const rawMode = row?.default_schedule_mode as string | null | undefined;
     const default_schedule_mode =
       rawMode && VALID_MODES.includes(rawMode as SchedulingMode)
@@ -171,6 +195,7 @@ export async function PUT(request: NextRequest) {
       auto_schedule_new_tasks,
       default_schedule_mode,
       default_ai_group_id,
+      ai_model,
       critical_reminder_enabled,
       critical_reminder_interval_minutes,
     });

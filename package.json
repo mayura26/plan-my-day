@@ -21,6 +21,7 @@
     "db:migrate:reminder-settings": "node scripts/migrate-add-reminder-settings.mjs",
     "db:migrate:scheduling-preferences": "node scripts/migrate-add-scheduling-preferences.mjs",
     "db:migrate:ai-preferences": "node scripts/migrate-add-ai-preferences.mjs",
+    "db:migrate:ai-model": "node scripts/migrate-add-ai-model-preference.mjs",
     "db:migrate:group-shares": "node scripts/migrate-add-group-shares.mjs",
     "db:migrate:critical-reminders": "node scripts/migrate-add-critical-reminders.mjs",
     "reminders:process": "tsx scripts/process-reminders.ts"
