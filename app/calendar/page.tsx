@@ -1945,6 +1945,8 @@ export default function CalendarPage() {
           scheduled_end: t.scheduled_end,
           due_date: t.due_date,
           group_id: t.group_id,
+          description: t.description,
+          energy_level_required: t.energy_level_required,
         }))}
       />
 

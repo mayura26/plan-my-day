@@ -68,12 +68,24 @@ function buildSystemPrompt(
   currentDateStr: string,
   utcOffset: string,
   groups: { id: string; name: string }[],
-  existingTasks: ExistingTask[]
+  existingTasks: ExistingTask[],
+  defaultGroup?: { id: string; name: string } | null
 ): string {
-  const groupSection =
-    groups.length > 0
-      ? `Available task groups:\n${groups.map((g) => `- id: "${g.id}", name: "${g.name}"`).join("\n")}`
-      : "No task groups available.";
+  let groupSection: string;
+  if (groups.length > 0) {
+    const defaultHint = defaultGroup
+      ? `If you cannot confidently match a group, use the user's preferred default: id: "${defaultGroup.id}", name: "${defaultGroup.name}".`
+      : `If you cannot confidently match a group, return null.`;
+    groupSection = `Available task groups:
+${groups.map((g) => `- id: "${g.id}", name: "${g.name}"`).join("\n")}
+Assign "group_id" to the best matching group id using these rules:
+- Only assign a "Work", "Professional" or similar group for explicitly work-related tasks (job deliverables, work meetings, professional responsibilities).
+- Personal/domestic tasks (cooking, cleaning, shopping, errands, appointments, leisure) → life/personal/admin groups.
+- Health, exercise, wellbeing tasks → health/fitness groups.
+- ${defaultHint}`;
+  } else {
+    groupSection = "No task groups available — use group_id null.";
+  }
 
   const tasksSection =
     existingTasks.length > 0
@@ -97,9 +109,9 @@ How the app models a task — fill the right fields for each proposed action:
 - "task_type": "event" (fixed-time meeting/appointment — REQUIRES scheduled_start AND scheduled_end), "todo" (quick item under 30 min — REQUIRES due_date), or "task" (default, schedulable work).
 - "priority": 1=critical, 2=high, 3=normal (default), 4=low, 5=minimal.
 - "energy_level_required": 1=low (passive) … 3=medium (default) … 5=high (deep focus).
-- "duration": estimated minutes (meeting=60, deep work=90, quick todo=15, review=30, writing=120). null only if truly unknowable.
+- "duration": ALWAYS set a realistic estimated duration in minutes for every "task" and "todo" action — never null (meeting=60, deep work=90, quick todo=15, review=30, writing=120; use explicit mentions when given). For "event" actions the duration is derived from scheduled_start/scheduled_end.
 - "scheduled_start"/"scheduled_end"/"due_date": local datetimes "YYYY-MM-DDTHH:MM" in the user's timezone, anchored to the current date/time above. Use null when not applicable. NEVER convert to UTC and NEVER invent a time that the user did not imply.
-- "group_id": one of the group ids above only if it clearly matches, otherwise null.
+- "group_id": follow the group rules above (match a group, else the preferred default if one is given, else null).
 - "subtasks": for "create" actions only, an array of { "title", "duration" } steps. Use [] when the task does not need breaking down.
 
 Behavior:
@@ -124,13 +136,15 @@ export async function POST(request: Request) {
 
   let tz = "UTC";
   let aiModel: string | null = null;
+  let defaultAiGroupId: string | null = null;
   try {
     const userResult = await db.execute({
-      sql: "SELECT timezone, ai_model FROM users WHERE id = ?",
+      sql: "SELECT timezone, ai_model, default_ai_group_id FROM users WHERE id = ?",
       args: [session.user.id],
     });
     tz = (userResult.rows[0]?.timezone as string) || "UTC";
     aiModel = (userResult.rows[0]?.ai_model as string) || null;
+    defaultAiGroupId = (userResult.rows[0]?.default_ai_group_id as string) || null;
   } catch {
     // fall back to defaults
   }
@@ -155,8 +169,20 @@ export async function POST(request: Request) {
   const cappedMessages = messages.slice(-20);
   const cappedTasks = existing_tasks.slice(0, 50);
 
+  // Resolve the default group object from the groups array (if it's still valid)
+  const defaultGroup = defaultAiGroupId
+    ? (groups.find((g) => g.id === defaultAiGroupId) ?? null)
+    : null;
+
   const { currentDateStr, utcOffset } = buildCurrentDateContext(tz);
-  const systemPrompt = buildSystemPrompt(tz, currentDateStr, utcOffset, groups, cappedTasks);
+  const systemPrompt = buildSystemPrompt(
+    tz,
+    currentDateStr,
+    utcOffset,
+    groups,
+    cappedTasks,
+    defaultGroup
+  );
 
   try {
     const parsed = await runStructuredCompletion<{
@@ -176,6 +202,18 @@ export async function POST(request: Request) {
     const needsClarification = parsed.needs_clarification ?? false;
     const proposedActions =
       !needsClarification && Array.isArray(parsed.proposed_actions) ? parsed.proposed_actions : [];
+
+    // Fall back to the user's default AI group for new tasks the model left ungrouped.
+    if (defaultAiGroupId) {
+      for (const action of proposedActions) {
+        if (action && typeof action === "object") {
+          const a = action as Record<string, unknown>;
+          if (a.action === "create" && a.group_id == null) {
+            a.group_id = defaultAiGroupId;
+          }
+        }
+      }
+    }
 
     return NextResponse.json({
       message: parsed.message ?? "",
