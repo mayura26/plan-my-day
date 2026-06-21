@@ -12,6 +12,43 @@ interface TimeSlot {
 export type DependencyMap = Map<string, string[]>;
 
 /**
+ * When an overdue task is rescheduled, its deadline should follow the new schedule.
+ * Returns the due_date to persist: the new scheduled end if the existing deadline is
+ * already in the past, otherwise the unchanged existing due_date (may be null).
+ *
+ * This keeps a task that is overdue on BOTH axes (missed schedule + missed deadline)
+ * from bouncing back as "overdue deadline" after it has been rescheduled. A deadline
+ * that is still in the future is never pulled earlier.
+ */
+export function alignDueDateOnReschedule(
+  currentDueDate: string | null | undefined,
+  newScheduledEnd: Date,
+  now: Date = new Date()
+): string | null {
+  if (currentDueDate && new Date(currentDueDate) < now) {
+    return newScheduledEnd.toISOString();
+  }
+  return currentDueDate ?? null;
+}
+
+/**
+ * Returns the latest scheduled_end across a set of tasks (e.g. a parent's scheduled
+ * subtasks), or null if none are scheduled. Used to derive a parent task's effective
+ * end when only its subtasks carry concrete times.
+ */
+export function latestScheduledEnd(tasks: Task[]): Date | null {
+  let latest: Date | null = null;
+  for (const task of tasks) {
+    if (!task.scheduled_end) continue;
+    const end = new Date(task.scheduled_end);
+    if (!latest || end > latest) {
+      latest = end;
+    }
+  }
+  return latest;
+}
+
+/**
  * Get all dependency task IDs for a task
  * Checks both depends_on_task_id (legacy) and dependencyMap (from task_dependencies table)
  *

@@ -1,6 +1,10 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { scheduleTaskUnified } from "@/lib/scheduler-utils";
+import {
+  alignDueDateOnReschedule,
+  latestScheduledEnd,
+  scheduleTaskUnified,
+} from "@/lib/scheduler-utils";
 import { getUserTimezone } from "@/lib/timezone-utils";
 import { db } from "@/lib/turso";
 import type { Task, TaskGroup, TaskStatus, TaskType } from "@/lib/types";
@@ -233,10 +237,11 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
           // Update subtask with scheduled times
           const updatedAt = new Date().toISOString();
           await db.execute(
-            `UPDATE tasks SET scheduled_start = ?, scheduled_end = ?, updated_at = ? WHERE id = ? AND user_id = ?`,
+            `UPDATE tasks SET scheduled_start = ?, scheduled_end = ?, due_date = ?, updated_at = ? WHERE id = ? AND user_id = ?`,
             [
               scheduleResult.slot.start.toISOString(),
               scheduleResult.slot.end.toISOString(),
+              alignDueDateOnReschedule(subtask.due_date, scheduleResult.slot.end),
               updatedAt,
               subtask.id,
               session.user.id,
@@ -266,11 +271,17 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
         }
       }
 
-      // Unschedule parent task if it was scheduled (only subtasks should be scheduled)
+      // Unschedule parent task if it was scheduled (only subtasks should be scheduled).
+      // If the parent's deadline was already past, let it follow the last subtask end
+      // so the parent doesn't reappear as an "overdue deadline".
       const updatedAt = new Date().toISOString();
+      const lastSubtaskEnd = latestScheduledEnd(scheduledSubtasks);
+      const alignedParentDueDate = lastSubtaskEnd
+        ? alignDueDateOnReschedule(task.due_date, lastSubtaskEnd)
+        : (task.due_date ?? null);
       await db.execute(
-        `UPDATE tasks SET scheduled_start = NULL, scheduled_end = NULL, updated_at = ? WHERE id = ? AND user_id = ?`,
-        [updatedAt, id, session.user.id]
+        `UPDATE tasks SET scheduled_start = NULL, scheduled_end = NULL, due_date = ?, updated_at = ? WHERE id = ? AND user_id = ?`,
+        [alignedParentDueDate, updatedAt, id, session.user.id]
       );
 
       // Fetch updated parent task
@@ -405,13 +416,15 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
       );
     }
 
-    // Update task with the scheduled times
+    // Update task with the scheduled times. If the task's deadline was already past,
+    // let it follow the new schedule so it doesn't reappear as an "overdue deadline".
     const updatedAt = new Date().toISOString();
     await db.execute(
-      `UPDATE tasks SET scheduled_start = ?, scheduled_end = ?, updated_at = ? WHERE id = ? AND user_id = ?`,
+      `UPDATE tasks SET scheduled_start = ?, scheduled_end = ?, due_date = ?, updated_at = ? WHERE id = ? AND user_id = ?`,
       [
         result.slot.start.toISOString(),
         result.slot.end.toISOString(),
+        alignDueDateOnReschedule(task.due_date, result.slot.end),
         updatedAt,
         id,
         session.user.id,

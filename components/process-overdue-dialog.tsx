@@ -449,6 +449,9 @@ function GroupACard({
   };
 
   const parentTask = task.parent_task_id ? tasks.find((t) => t.id === task.parent_task_id) : null;
+  // A task can be blown on both axes at once; flag it so the user knows that
+  // rescheduling here will also clear the missed deadline (one action, both resolved).
+  const deadlineAlsoPassed = !!task.due_date && new Date(task.due_date) < new Date();
 
   return (
     <div
@@ -462,6 +465,7 @@ function GroupACard({
         parentTask={parentTask ?? null}
         timezone={timezone}
         groupLabel="Missed Schedule"
+        deadlineAlsoPassed={deadlineAlsoPassed}
       />
 
       {/* Action buttons */}
@@ -678,6 +682,7 @@ interface TaskCardHeaderProps {
   parentTask: Task | null;
   timezone: string;
   groupLabel: string;
+  deadlineAlsoPassed?: boolean;
 }
 
 const DATE_FORMAT: Intl.DateTimeFormatOptions = {
@@ -688,7 +693,13 @@ const DATE_FORMAT: Intl.DateTimeFormatOptions = {
   minute: "2-digit",
 };
 
-function TaskCardHeader({ task, parentTask, timezone, groupLabel }: TaskCardHeaderProps) {
+function TaskCardHeader({
+  task,
+  parentTask,
+  timezone,
+  groupLabel,
+  deadlineAlsoPassed,
+}: TaskCardHeaderProps) {
   return (
     <div className="flex items-start justify-between gap-2">
       <div className="flex-1 min-w-0">
@@ -717,9 +728,23 @@ function TaskCardHeader({ task, parentTask, timezone, groupLabel }: TaskCardHead
           )}
         </div>
       </div>
-      <span className="shrink-0 text-xs px-2 py-0.5 rounded bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400">
-        {groupLabel}
-      </span>
+      <div className="shrink-0 flex flex-col items-end gap-1">
+        <span className="text-xs px-2 py-0.5 rounded bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400">
+          {groupLabel}
+        </span>
+        {deadlineAlsoPassed && (
+          <span
+            className="text-xs px-2 py-0.5 rounded bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400"
+            title={
+              task.due_date
+                ? `Deadline ${formatDateInTimezone(task.due_date, timezone, DATE_FORMAT)} has passed — rescheduling will move it to the new time`
+                : undefined
+            }
+          >
+            Deadline also passed
+          </span>
+        )}
+      </div>
     </div>
   );
 }

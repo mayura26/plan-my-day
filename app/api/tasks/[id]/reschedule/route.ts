@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { scheduleTaskUnified } from "@/lib/scheduler-utils";
+import { alignDueDateOnReschedule, scheduleTaskUnified } from "@/lib/scheduler-utils";
 import { getUserTimezone } from "@/lib/timezone-utils";
 import { db } from "@/lib/turso";
 import type { RescheduleTaskRequest, Task, TaskGroup, TaskStatus, TaskType } from "@/lib/types";
@@ -220,10 +220,18 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       );
     }
 
-    // Update task with the scheduled times
+    // Update task with the scheduled times. If the task's deadline was already past,
+    // let it follow the new schedule so it doesn't reappear as an "overdue deadline".
     await db.execute(
-      `UPDATE tasks SET scheduled_start = ?, scheduled_end = ?, updated_at = ? WHERE id = ? AND user_id = ?`,
-      [result.slot.start.toISOString(), result.slot.end.toISOString(), now, id, session.user.id]
+      `UPDATE tasks SET scheduled_start = ?, scheduled_end = ?, due_date = ?, updated_at = ? WHERE id = ? AND user_id = ?`,
+      [
+        result.slot.start.toISOString(),
+        result.slot.end.toISOString(),
+        alignDueDateOnReschedule(task.due_date, result.slot.end),
+        now,
+        id,
+        session.user.id,
+      ]
     );
 
     // Update all shuffled tasks if any (for asap mode)
