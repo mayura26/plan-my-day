@@ -3,6 +3,7 @@ import {
   type ReminderEntityType,
   type ReminderNotificationAction,
   snoozeMinutesForAction,
+  verifyPushActionToken,
 } from "@/lib/push-action-token";
 import {
   checkAndCompleteOriginalTask,
@@ -30,12 +31,39 @@ export type ReminderActionFailure = {
 
 export type ReminderActionOutcome = ReminderActionSuccess | ReminderActionFailure;
 
+export interface PerformReminderActionInput {
+  entityType: ReminderEntityType;
+  entityId: string;
+  action: ReminderNotificationAction;
+  actionToken?: string;
+}
+
 interface TaskRow {
   user_id: string;
   title: string;
   status: string;
   parent_task_id: string | null;
   continued_from_task_id: string | null;
+}
+
+let criticalReminderColumnsPromise: Promise<boolean> | null = null;
+
+async function hasCriticalReminderColumns(): Promise<boolean> {
+  if (!criticalReminderColumnsPromise) {
+    criticalReminderColumnsPromise = (async () => {
+      try {
+        const tasksInfo = await db.execute("PRAGMA table_info(tasks)");
+        const taskCols = new Set(tasksInfo.rows.map((r) => String(r.name)));
+        return (
+          taskCols.has("critical_reminder_snoozed_until") &&
+          taskCols.has("critical_reminder_last_sent_at")
+        );
+      } catch {
+        return false;
+      }
+    })();
+  }
+  return criticalReminderColumnsPromise;
 }
 
 async function loadTask(taskId: string): Promise<TaskRow | null> {
@@ -71,6 +99,39 @@ async function verifySubscription(userId: string, subscriptionId?: string): Prom
   return result.rows.length > 0;
 }
 
+async function resolveReminderActionUserId(
+  input: PerformReminderActionInput
+): Promise<string | null> {
+  if (!input.actionToken) {
+    return null;
+  }
+
+  const signed = verifyPushActionToken(input.actionToken);
+  if (signed) {
+    if (signed.entityType !== input.entityType || signed.entityId !== input.entityId) {
+      return null;
+    }
+    if (signed.action !== input.action) {
+      return null;
+    }
+    const subscriptionOk = await verifySubscription(signed.userId, signed.subscriptionId);
+    return subscriptionOk ? signed.userId : null;
+  }
+
+  const legacy = decodePushActionToken(input.actionToken);
+  if (
+    !legacy ||
+    legacy.entityType !== input.entityType ||
+    legacy.entityId !== input.entityId ||
+    legacy.action !== input.action
+  ) {
+    return null;
+  }
+
+  const subscriptionOk = await verifySubscription(legacy.userId, legacy.subscriptionId);
+  return subscriptionOk ? legacy.userId : null;
+}
+
 async function executeComplete(
   taskId: string,
   userId: string
@@ -95,15 +156,23 @@ async function executeComplete(
     };
   }
 
-  await db.execute({
-    sql: `UPDATE tasks
-          SET status = 'completed',
-              critical_reminder_snoozed_until = NULL,
-              critical_reminder_last_sent_at = NULL,
-              updated_at = datetime('now')
-          WHERE id = ?`,
-    args: [taskId],
-  });
+  const hasCritical = await hasCriticalReminderColumns();
+  if (hasCritical) {
+    await db.execute({
+      sql: `UPDATE tasks
+            SET status = 'completed',
+                critical_reminder_snoozed_until = NULL,
+                critical_reminder_last_sent_at = NULL,
+                updated_at = datetime('now')
+            WHERE id = ?`,
+      args: [taskId],
+    });
+  } else {
+    await db.execute({
+      sql: `UPDATE tasks SET status = 'completed', updated_at = datetime('now') WHERE id = ?`,
+      args: [taskId],
+    });
+  }
 
   if (task.parent_task_id) {
     await checkAndUpdateParentStatus(task.parent_task_id, userId);
@@ -139,10 +208,13 @@ async function executeSnooze(
   }
 
   const minutes = snoozeMinutesForAction("snooze");
-  await db.execute({
-    sql: `UPDATE tasks SET critical_reminder_snoozed_until = datetime('now', ?), updated_at = datetime('now') WHERE id = ?`,
-    args: [`+${minutes} minutes`, taskId],
-  });
+  const hasCritical = await hasCriticalReminderColumns();
+  if (hasCritical) {
+    await db.execute({
+      sql: `UPDATE tasks SET critical_reminder_snoozed_until = datetime('now', ?), updated_at = datetime('now') WHERE id = ?`,
+      args: [`+${minutes} minutes`, taskId],
+    });
+  }
 
   return {
     ok: true,
@@ -154,6 +226,31 @@ async function executeSnooze(
   };
 }
 
+export async function performReminderAction(
+  input: PerformReminderActionInput
+): Promise<ReminderActionOutcome> {
+  const userId = await resolveReminderActionUserId(input);
+  if (!userId) {
+    return { ok: false, error: "unauthorized" };
+  }
+
+  if (input.entityType === "test") {
+    return {
+      ok: true,
+      action: input.action,
+      entityType: "test",
+      message:
+        input.action === "complete" ? "Done reached the server." : "Snooze reached the server.",
+    };
+  }
+
+  if (input.action === "complete") {
+    return executeComplete(input.entityId, userId);
+  }
+
+  return executeSnooze(input.entityId, userId);
+}
+
 export async function performReminderActionFromToken(
   token: string | null | undefined
 ): Promise<ReminderActionOutcome> {
@@ -161,31 +258,27 @@ export async function performReminderActionFromToken(
     return { ok: false, error: "missing_token" };
   }
 
-  const payload = decodePushActionToken(token);
-  if (!payload) {
+  const signed = verifyPushActionToken(token);
+  if (signed) {
+    return performReminderAction({
+      entityType: signed.entityType,
+      entityId: signed.entityId,
+      action: signed.action,
+      actionToken: token,
+    });
+  }
+
+  const legacy = decodePushActionToken(token);
+  if (!legacy) {
     return { ok: false, error: "invalid" };
   }
 
-  const subscriptionOk = await verifySubscription(payload.userId, payload.subscriptionId);
-  if (!subscriptionOk) {
-    return { ok: false, error: "unauthorized" };
-  }
-
-  if (payload.entityType === "test") {
-    return {
-      ok: true,
-      action: payload.action,
-      entityType: "test",
-      message:
-        payload.action === "complete" ? "Done reached the server." : "Snooze reached the server.",
-    };
-  }
-
-  if (payload.action === "complete") {
-    return executeComplete(payload.entityId, payload.userId);
-  }
-
-  return executeSnooze(payload.entityId, payload.userId);
+  return performReminderAction({
+    entityType: legacy.entityType,
+    entityId: legacy.entityId,
+    action: legacy.action,
+    actionToken: token,
+  });
 }
 
 /** @deprecated Use performReminderActionFromToken */

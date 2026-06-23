@@ -6,6 +6,17 @@ export type ReminderNotificationAction = "complete" | "snooze";
 /** @deprecated Legacy action types for old notification links */
 export type PushActionType = "snooze15" | "snooze60" | "complete";
 
+export interface SignedPushActionPayload {
+  v: 1;
+  userId: string;
+  subscriptionId?: string;
+  entityType: ReminderEntityType;
+  entityId: string;
+  action: ReminderNotificationAction;
+  expiresAt: number;
+}
+
+/** @deprecated Legacy wrapped JSON token payload */
 export interface PushActionPayload {
   entityType: ReminderEntityType;
   entityId: string;
@@ -23,12 +34,77 @@ function getSecret(): string {
   return s;
 }
 
-function signPayload(payload: string): string {
+function signEncodedPayload(encodedPayload: string): string {
+  return createHmac("sha256", getSecret()).update(encodedPayload).digest("base64url");
+}
+
+function signLegacyPayload(payload: string): string {
   return createHmac("sha256", getSecret()).update(payload).digest("hex");
 }
 
-const PUSH_ACTION_TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+export const PUSH_ACTION_TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
+function isSignedPushActionPayload(value: unknown): value is SignedPushActionPayload {
+  if (!value || typeof value !== "object") return false;
+  const payload = value as Record<string, unknown>;
+  return (
+    payload.v === 1 &&
+    typeof payload.userId === "string" &&
+    payload.userId.length > 0 &&
+    (payload.subscriptionId === undefined ||
+      (typeof payload.subscriptionId === "string" && payload.subscriptionId.length > 0)) &&
+    (payload.entityType === "task-critical" || payload.entityType === "test") &&
+    typeof payload.entityId === "string" &&
+    payload.entityId.length > 0 &&
+    (payload.action === "complete" || payload.action === "snooze") &&
+    typeof payload.expiresAt === "number" &&
+    Number.isFinite(payload.expiresAt)
+  );
+}
+
+export function signPushActionToken(
+  input: Omit<SignedPushActionPayload, "v" | "expiresAt"> & { expiresAt?: number }
+): string {
+  const payload: SignedPushActionPayload = {
+    v: 1,
+    userId: input.userId,
+    ...(input.subscriptionId ? { subscriptionId: input.subscriptionId } : {}),
+    entityType: input.entityType,
+    entityId: input.entityId,
+    action: input.action,
+    expiresAt: input.expiresAt ?? Date.now() + PUSH_ACTION_TOKEN_TTL_MS,
+  };
+  const encodedPayload = Buffer.from(JSON.stringify(payload)).toString("base64url");
+  return `${encodedPayload}.${signEncodedPayload(encodedPayload)}`;
+}
+
+export function verifyPushActionToken(token: string): SignedPushActionPayload | null {
+  const [encodedPayload, signature, extra] = token.split(".");
+  if (!encodedPayload || !signature || extra !== undefined) return null;
+
+  const expected = signEncodedPayload(encodedPayload);
+  const signatureBuffer = Buffer.from(signature);
+  const expectedBuffer = Buffer.from(expected);
+  if (
+    signatureBuffer.length !== expectedBuffer.length ||
+    !timingSafeEqual(signatureBuffer, expectedBuffer)
+  ) {
+    return null;
+  }
+
+  let payload: unknown;
+  try {
+    payload = JSON.parse(Buffer.from(encodedPayload, "base64url").toString());
+  } catch {
+    return null;
+  }
+
+  if (!isSignedPushActionPayload(payload)) return null;
+  if (payload.expiresAt <= Date.now()) return null;
+  return payload;
+}
+
+/** @deprecated Legacy path-token format — use signPushActionToken + query URLs */
 export function encodePushActionToken(
   p: Omit<PushActionPayload, "exp"> & { exp?: number }
 ): string {
@@ -42,11 +118,12 @@ export function encodePushActionToken(
     ...(p.subscriptionId ? { subscriptionId: p.subscriptionId } : {}),
   };
   const json = JSON.stringify(body);
-  const sig = signPayload(json);
+  const sig = signLegacyPayload(json);
   const combined = JSON.stringify({ p: body, s: sig });
   return Buffer.from(combined, "utf8").toString("base64url");
 }
 
+/** @deprecated Legacy path-token format */
 export function decodePushActionToken(token: string): PushActionPayload | null {
   try {
     const combined = Buffer.from(token, "base64url").toString("utf8");
@@ -55,7 +132,6 @@ export function decodePushActionToken(token: string): PushActionPayload | null {
       return null;
     }
 
-    // Support legacy tokens that used taskId instead of entityId
     const entityId = p.entityId ?? (p as { taskId?: string }).taskId;
     const entityType = p.entityType ?? "task-critical";
     if (!entityId) {
@@ -72,7 +148,7 @@ export function decodePushActionToken(token: string): PushActionPayload | null {
     };
 
     const json = JSON.stringify(p);
-    const expected = signPayload(json);
+    const expected = signLegacyPayload(json);
     const a = Buffer.from(expected, "hex");
     const b = Buffer.from(s, "hex");
     if (a.length !== b.length || !timingSafeEqual(a, b)) {
@@ -98,7 +174,7 @@ export function snoozeMinutesForAction(_action?: ReminderNotificationAction): nu
   return 15;
 }
 
-/** @deprecated Use buildReminderActionPaths — kept for old links */
+/** @deprecated Use buildReminderActionPaths */
 export function buildSnoozeApiUrl(taskId: string, userId: string, action: PushActionType): string {
   const token = encodePushActionToken({
     entityType: "task-critical",
@@ -109,7 +185,7 @@ export function buildSnoozeApiUrl(taskId: string, userId: string, action: PushAc
   return `/api/push/snooze?token=${encodeURIComponent(token)}`;
 }
 
-/** @deprecated Use buildReminderActionPaths — kept for old links */
+/** @deprecated Use buildReminderActionPaths */
 export function buildCompletePageUrl(taskId: string, userId: string): string {
   const token = encodePushActionToken({
     entityType: "task-critical",

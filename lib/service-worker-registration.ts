@@ -8,7 +8,7 @@
  * Service worker registration is disabled in development mode to prevent caching issues
  */
 
-export const SERVICE_WORKER_URL = "/sw.js?v=5";
+export const SERVICE_WORKER_URL = "/sw.js?v=6";
 
 export async function registerServiceWorker(): Promise<ServiceWorkerRegistration | null> {
   if (typeof window === "undefined" || !("serviceWorker" in navigator)) {

@@ -1,195 +1,26 @@
-// Get version and cache name dynamically
-async function getCacheName() {
-  try {
-    const response = await fetch("/version.json");
-    if (response.ok) {
-      const data = await response.json();
-      const version = data.version || "1";
-      return `planmyday-v${version}`;
-    }
-  } catch (error) {
-    console.log("Service Worker: Failed to fetch version, using default", error);
-  }
-  // Fallback to default if version fetch fails
-  return "planmyday-v1";
-}
+// Service Worker for PWA push notifications (v6 — no fetch interception)
+// Reminder actions use stable /reminder/action?... URLs; network-only navigation avoids SW breakage.
 
-const STATIC_CACHE_URLS = [
-  "/",
-  "/tasks",
-  "/calendar",
-  "/settings",
-  "/auth/signin",
-  "/manifest.json",
-  "/web-app-manifest-192x192.png",
-];
+const SW_VERSION = "6";
 
-// Install event - cache static assets
 self.addEventListener("install", (event) => {
-  console.log("Service Worker: Installing...");
-  event.waitUntil(
-    getCacheName()
-      .then((CACHE_NAME) => {
-        console.log("Service Worker: Using cache name", CACHE_NAME);
-        return caches
-          .open(CACHE_NAME)
-          .then((cache) => {
-            console.log("Service Worker: Caching static assets");
-            return cache.addAll(STATIC_CACHE_URLS);
-          })
-          .then(() => {
-            console.log("Service Worker: Installation complete");
-            return self.skipWaiting();
-          });
-      })
-      .catch((error) => {
-        console.error("Service Worker: Installation failed", error);
-      })
-  );
+  event.waitUntil(self.skipWaiting());
 });
 
-// Activate event - clean up old caches
 self.addEventListener("activate", (event) => {
-  console.log("Service Worker: Activating...");
   event.waitUntil(
-    getCacheName()
-      .then((CACHE_NAME) => {
-        return caches
-          .keys()
-          .then((cacheNames) => {
-            return Promise.all(
-              cacheNames.map((cacheName) => {
-                // Delete all caches that don't match the current version
-                if (cacheName !== CACHE_NAME && cacheName.startsWith("planmyday-v")) {
-                  console.log("Service Worker: Deleting old cache", cacheName);
-                  return caches.delete(cacheName);
-                }
-              })
-            );
-          })
-          .then(() => {
-            console.log("Service Worker: Activation complete");
-            return self.clients.claim();
-          });
-      })
-      .catch((error) => {
-        console.error("Service Worker: Activation failed", error);
-        return self.clients.claim();
-      })
+    caches
+      .keys()
+      .then((cacheNames) =>
+        Promise.all(
+          cacheNames
+            .filter((name) => name.startsWith("planmyday-v"))
+            .map((name) => caches.delete(name))
+        )
+      )
+      .then(() => self.clients.claim())
   );
 });
-
-// Fetch event - serve from cache when offline
-self.addEventListener("fetch", (event) => {
-  // Skip non-GET requests
-  if (event.request.method !== "GET") {
-    return;
-  }
-
-  // Skip API requests
-  if (event.request.url.includes("/api/")) {
-    return;
-  }
-
-  // Skip unsupported URL schemes
-  if (
-    event.request.url.startsWith("chrome-extension://") ||
-    event.request.url.startsWith("moz-extension://") ||
-    event.request.url.startsWith("safari-extension://") ||
-    event.request.url.startsWith("ms-browser-extension://")
-  ) {
-    return;
-  }
-
-  // Skip data URLs and blob URLs
-  if (event.request.url.startsWith("data:") || event.request.url.startsWith("blob:")) {
-    return;
-  }
-
-  event.respondWith(
-    getCacheName()
-      .then((CACHE_NAME) => {
-        return caches.match(event.request).then((cachedResponse) => {
-          if (cachedResponse) {
-            console.log("Service Worker: Serving from cache", event.request.url);
-            return cachedResponse;
-          }
-
-          // If not in cache, fetch from network
-          return fetch(event.request)
-            .then((response) => {
-              // Don't cache non-successful responses
-              if (!response || response.status !== 200 || response.type !== "basic") {
-                return response;
-              }
-
-              // Skip caching for unsupported schemes
-              if (
-                event.request.url.startsWith("chrome-extension://") ||
-                event.request.url.startsWith("moz-extension://") ||
-                event.request.url.startsWith("safari-extension://") ||
-                event.request.url.startsWith("ms-browser-extension://") ||
-                event.request.url.startsWith("data:") ||
-                event.request.url.startsWith("blob:")
-              ) {
-                return response;
-              }
-
-              // Clone the response
-              const responseToCache = response.clone();
-
-              // Cache the response for future use
-              caches
-                .open(CACHE_NAME)
-                .then((cache) => {
-                  // Double-check URL before caching
-                  if (
-                    event.request.url.startsWith("chrome-extension://") ||
-                    event.request.url.startsWith("moz-extension://") ||
-                    event.request.url.startsWith("safari-extension://") ||
-                    event.request.url.startsWith("ms-browser-extension://") ||
-                    event.request.url.startsWith("data:") ||
-                    event.request.url.startsWith("blob:")
-                  ) {
-                    console.log(
-                      "Service Worker: Skipping cache for unsupported URL:",
-                      event.request.url
-                    );
-                    return;
-                  }
-
-                  cache.put(event.request, responseToCache).catch((error) => {
-                    console.log("Service Worker: Failed to cache specific response:", error);
-                  });
-                })
-                .catch((error) => {
-                  console.log("Service Worker: Failed to open cache:", error);
-                });
-
-              return response;
-            })
-            .catch((error) => {
-              console.log("Service Worker: Network request failed", error);
-
-              // Return offline page for navigation requests
-              if (event.request.destination === "document") {
-                return caches.match("/");
-              }
-
-              throw error;
-            });
-        });
-      })
-      .catch((error) => {
-        console.error("Service Worker: Failed to get cache name", error);
-        // Fallback to network request if cache name fetch fails
-        return fetch(event.request);
-      })
-  );
-});
-
-// Push notification handling (v5 — URL-as-action pattern, track-my-habits style)
-const SW_VERSION = "5";
 
 function sameOriginUrl(path) {
   const url = new URL(path, self.location.origin);
@@ -269,7 +100,6 @@ function resolveNotificationActionTarget(action, data) {
   return null;
 }
 
-// Push notification event
 self.addEventListener("push", (event) => {
   console.log("Service Worker: Push notification received", SW_VERSION);
 
@@ -342,7 +172,6 @@ self.addEventListener("notificationclick", (event) => {
   event.waitUntil(openAppUrl(fallbackUrl));
 });
 
-// Handle messages from the client (e.g., skip waiting)
 self.addEventListener("message", (event) => {
   if (event.data && event.data.type === "SKIP_WAITING") {
     self.skipWaiting();
