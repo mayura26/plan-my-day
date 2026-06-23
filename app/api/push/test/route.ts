@@ -1,7 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { shouldUseSingleReminderAction } from "@/lib/notification-platform";
-import { sendPushNotification } from "@/lib/push-notification";
+import { isStalePushSubscriptionError, sendPushNotification } from "@/lib/push-notification";
 import { buildReminderActionPaths } from "@/lib/reminder-action-urls";
 import { db } from "@/lib/turso";
 
@@ -62,8 +62,7 @@ export async function POST(request: NextRequest) {
         );
         sent++;
       } catch (error) {
-        const statusCode = (error as { statusCode?: number })?.statusCode;
-        if (statusCode === 410 || statusCode === 404) {
+        if (isStalePushSubscriptionError(error)) {
           staleEndpoints.push(row.endpoint as string);
           continue;
         }

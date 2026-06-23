@@ -4,6 +4,7 @@ import {
   createDueReminderPayload,
   createLeadReminderPayload,
   createOnTimeReminderPayload,
+  isStalePushSubscriptionError,
   type NotificationPayload,
   sendPushNotification,
 } from "@/lib/push-notification";
@@ -82,8 +83,7 @@ async function sendToUserSubscriptions(
       successCount++;
     } catch (err) {
       results.errors++;
-      const status = (err as { statusCode?: number })?.statusCode ?? null;
-      if (status === 410 || status === 404) {
+      if (isStalePushSubscriptionError(err)) {
         await db.execute({
           sql: "UPDATE push_subscriptions SET is_active = 0 WHERE endpoint = ?",
           args: [row.endpoint],

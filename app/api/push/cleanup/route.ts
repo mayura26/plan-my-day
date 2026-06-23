@@ -1,6 +1,10 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { initializePushNotifications, sendPushNotification } from "@/lib/push-notification";
+import {
+  initializePushNotifications,
+  isStalePushSubscriptionError,
+  sendPushNotification,
+} from "@/lib/push-notification";
 import { db } from "@/lib/turso";
 
 // biome-ignore lint/correctness/noUnusedFunctionParameters: Next.js route handler requires request parameter
@@ -43,8 +47,10 @@ export async function POST(request: NextRequest) {
         });
 
         validSubscriptions.push(row.id);
-      } catch (error: any) {
-        console.error("Invalid subscription detected:", error);
+      } catch (error: unknown) {
+        if (!isStalePushSubscriptionError(error)) {
+          console.error("Invalid subscription detected:", error);
+        }
         invalidSubscriptions.push(row.id);
       }
     }

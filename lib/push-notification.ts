@@ -15,6 +15,14 @@ export function initializePushNotifications(): void {
   webpush.setVapidDetails(subject, publicKey, privateKey);
 }
 
+export function isStalePushSubscriptionError(error: unknown): boolean {
+  const statusCode =
+    error && typeof error === "object" && "statusCode" in error
+      ? (error as { statusCode: number }).statusCode
+      : undefined;
+  return statusCode === 410 || statusCode === 404;
+}
+
 export interface PushSubscription {
   endpoint: string;
   keys: {
@@ -120,7 +128,9 @@ export async function sendPushNotification(
       }
     );
   } catch (error) {
-    console.error("Error sending push notification:", error);
+    if (!isStalePushSubscriptionError(error)) {
+      console.error("Error sending push notification:", error);
+    }
     throw error;
   }
 }

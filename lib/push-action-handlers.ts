@@ -98,7 +98,6 @@ async function executeComplete(
   await db.execute({
     sql: `UPDATE tasks
           SET status = 'completed',
-              completed_at = datetime('now'),
               critical_reminder_snoozed_until = NULL,
               critical_reminder_last_sent_at = NULL,
               updated_at = datetime('now')
