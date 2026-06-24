@@ -1,4 +1,4 @@
-import { Slot } from "@radix-ui/react-slot";
+import { Slot, Slottable } from "@radix-ui/react-slot";
 import { cva, type VariantProps } from "class-variance-authority";
 import type * as React from "react";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
@@ -61,7 +61,7 @@ function Button({
       {...props}
     >
       {loading && <LoadingSpinner size="sm" className="mr-1" data-loading-spinner />}
-      {children}
+      <Slottable>{children}</Slottable>
     </Comp>
   );
 }
