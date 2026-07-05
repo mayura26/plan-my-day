@@ -1,12 +1,6 @@
 import { ReminderActionView } from "@/components/reminder/ReminderActionView";
-import {
-  performReminderAction,
-  type ReminderActionOutcome,
-} from "@/lib/push-action-handlers";
-import {
-  type ReminderEntityType,
-  type ReminderNotificationAction,
-} from "@/lib/push-action-token";
+import { performReminderAction, type ReminderActionOutcome } from "@/lib/push-action-handlers";
+import type { ReminderEntityType, ReminderNotificationAction } from "@/lib/push-action-token";
 
 interface ReminderActionPageProps {
   searchParams: Promise<Record<string, string | string[] | undefined>>;

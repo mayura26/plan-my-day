@@ -1,9 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { performReminderAction } from "@/lib/push-action-handlers";
-import {
-  type ReminderEntityType,
-  type ReminderNotificationAction,
-} from "@/lib/push-action-token";
+import type { ReminderEntityType, ReminderNotificationAction } from "@/lib/push-action-token";
 
 function getSearchParam(req: NextRequest, key: string): string | undefined {
   const value = req.nextUrl.searchParams.get(key);

@@ -167,7 +167,7 @@ export async function POST(request: Request) {
   }
 
   const cappedMessages = messages.slice(-20);
-  const cappedTasks = existing_tasks.slice(0, 50);
+  const cappedTasks = existing_tasks.slice(0, 100);
 
   // Resolve the default group object from the groups array (if it's still valid)
   const defaultGroup = defaultAiGroupId

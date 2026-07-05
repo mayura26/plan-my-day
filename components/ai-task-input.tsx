@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useUserTimezone } from "@/hooks/use-user-timezone";
+import { getTaskPriorityColor } from "@/lib/task-utils";
 import { formatDateTimeLocalForTimezone, parseDateTimeLocalToUTC } from "@/lib/timezone-utils";
 import type { TaskGroup, TaskType } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -63,7 +64,7 @@ interface AssistantMessage {
   actions?: ProposedAction[];
 }
 
-type ActionStatus = "applying" | "applied" | "rejected" | "error" | "editing";
+type ActionStatus = "applying" | "applied" | "rejected" | "error" | "editing" | "notfound";
 
 const LOCK_THRESHOLD = 60; // px upward drag to lock recording
 
@@ -91,7 +92,7 @@ export function AITaskInput({
 }: AITaskInputProps) {
   const { timezone } = useUserTimezone();
 
-  const [mode, setMode] = useState<Mode>("quick");
+  const [mode, setMode] = useState<Mode>("assistant");
 
   // Quick add state
   const [text, setText] = useState("");
@@ -387,7 +388,14 @@ export function AITaskInput({
         body: JSON.stringify({
           messages: updatedMessages.map((m) => ({ role: m.role, content: m.content })),
           groups: groups.filter((g) => !g.is_parent_group).map((g) => ({ id: g.id, name: g.name })),
-          existing_tasks: existingTasks?.slice(0, 50) ?? [],
+          // Prefer active tasks (drop completed/cancelled) so the ones the user
+          // is most likely to edit stay within the cap and are visible to the model.
+          existing_tasks: (existingTasks ?? [])
+            .filter((t) => {
+              const s = (t.status || "").toLowerCase();
+              return s !== "completed" && s !== "cancelled" && s !== "done";
+            })
+            .slice(0, 100),
         }),
       });
       const data = await res.json();
@@ -431,6 +439,18 @@ export function AITaskInput({
     }
   };
 
+  // Resolve the real task id for an "update" action. Prefer the id the model
+  // returned; fall back to a normalized title match against the full
+  // existingTasks list (recovers ids the model couldn't see because the payload
+  // sent to the API is capped). Returns null when no existing task matches.
+  const resolveUpdateId = (action: ProposedAction): string | null => {
+    if (action.id && existingTasks?.some((t) => t.id === action.id)) return action.id;
+    if (!action.title) return null;
+    const norm = (s: string) => s.trim().toLowerCase();
+    const match = existingTasks?.find((t) => norm(t.title) === norm(action.title));
+    return match?.id ?? null;
+  };
+
   const applyAction = async (action: ProposedAction) => {
     setActionStatus((s) => ({ ...s, [action._id]: "applying" }));
     try {
@@ -440,7 +460,15 @@ export function AITaskInput({
       const endUTC = parseDateTimeLocalToUTC(action.scheduled_end ?? undefined, timezone);
       const dueUTC = parseDateTimeLocalToUTC(action.due_date ?? undefined, timezone);
 
-      if (action.action === "update" && action.id) {
+      // For an "update", never silently fall through to create — that produces a
+      // duplicate. Resolve a valid target id (by id, else title match) or error.
+      const targetId = action.action === "update" ? resolveUpdateId(action) : null;
+      if (action.action === "update" && !targetId) {
+        setActionStatus((s) => ({ ...s, [action._id]: "notfound" }));
+        return;
+      }
+
+      if (targetId) {
         // Only send fields the AI provided (non-null). Avoids clearing unrelated fields.
         const payload: Record<string, unknown> = {};
         if (action.title) payload.title = action.title;
@@ -455,7 +483,7 @@ export function AITaskInput({
         if (dueUTC) payload.due_date = dueUTC;
         if (action.group_id) payload.group_id = action.group_id;
 
-        const res = await fetch(`/api/tasks/${action.id}`, {
+        const res = await fetch(`/api/tasks/${targetId}`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
@@ -557,10 +585,11 @@ export function AITaskInput({
   const buildReviewInitialData = (
     action: ProposedAction
   ): Partial<CreateTaskRequestWithSubtasks> & { id?: string } => {
-    if (action.action === "update" && action.id) {
-      const existing = existingTasks?.find((t) => t.id === action.id);
+    const targetId = action.action === "update" ? resolveUpdateId(action) : null;
+    if (targetId) {
+      const existing = existingTasks?.find((t) => t.id === targetId);
       return {
-        id: action.id,
+        id: targetId,
         title: action.title ?? existing?.title ?? "",
         description: action.description ?? existing?.description ?? undefined,
         priority: action.priority ?? existing?.priority,
@@ -600,8 +629,13 @@ export function AITaskInput({
     try {
       const { subtasks, initial_notes, ...body } = formData;
 
-      if (action.action === "update" && action.id) {
-        const res = await fetch(`/api/tasks/${action.id}`, {
+      const targetId = action.action === "update" ? resolveUpdateId(action) : null;
+      if (action.action === "update" && !targetId) {
+        throw new Error("Could not find the task to edit.");
+      }
+
+      if (targetId) {
+        const res = await fetch(`/api/tasks/${targetId}`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(body),
@@ -786,7 +820,8 @@ export function AITaskInput({
     const group = action.group_id ? groups.find((g) => g.id === action.group_id) : null;
     const isUpdate = action.action === "update";
     const status = actionStatus[action._id];
-    const existing = isUpdate && action.id ? existingTasks?.find((t) => t.id === action.id) : null;
+    const resolvedId = isUpdate ? resolveUpdateId(action) : null;
+    const existing = resolvedId ? existingTasks?.find((t) => t.id === resolvedId) : null;
 
     const newStart = action.scheduled_start
       ? action.scheduled_start.slice(0, 16).replace("T", " ")
@@ -829,9 +864,15 @@ export function AITaskInput({
                   {TYPE_CHIP[action.task_type] ?? action.task_type}
                 </span>
               )}
-              {action.priority && action.priority !== 3 && (
-                <span className="text-xs px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
-                  {PRIORITY_CHIP[action.priority] ?? `P${action.priority}`}
+              {action.priority && (
+                <span
+                  className={cn(
+                    "text-xs px-1.5 py-0.5 rounded font-medium border",
+                    getTaskPriorityColor(action.priority)
+                  )}
+                  title={PRIORITY_CHIP[action.priority]}
+                >
+                  P{action.priority}
                 </span>
               )}
               {!isUpdate && newStart && (
@@ -923,6 +964,11 @@ export function AITaskInput({
         {status === "error" && (
           <p className="text-xs text-destructive mt-1">Failed to apply — try again.</p>
         )}
+        {status === "notfound" && (
+          <p className="text-xs text-destructive mt-1">
+            Couldn't find that task to edit — rename it to match, or use Edit to review.
+          </p>
+        )}
       </div>
     );
   };
@@ -951,22 +997,9 @@ export function AITaskInput({
           <div className="flex rounded-md border border-input overflow-hidden shrink-0">
             <button
               type="button"
-              onClick={() => switchMode("quick")}
-              className={cn(
-                "flex-1 px-3 py-1.5 text-sm font-medium transition-colors flex items-center justify-center gap-1.5",
-                mode === "quick"
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-background text-muted-foreground hover:text-foreground"
-              )}
-            >
-              <Sparkles className="h-3.5 w-3.5" />
-              Quick add
-            </button>
-            <button
-              type="button"
               onClick={() => switchMode("assistant")}
               className={cn(
-                "flex-1 px-3 py-1.5 text-sm font-medium transition-colors border-l border-input flex items-center justify-center gap-1.5",
+                "flex-1 px-3 py-1.5 text-sm font-medium transition-colors flex items-center justify-center gap-1.5",
                 mode === "assistant"
                   ? "bg-primary text-primary-foreground"
                   : "bg-background text-muted-foreground hover:text-foreground"
@@ -974,6 +1007,19 @@ export function AITaskInput({
             >
               <MessageCircle className="h-3.5 w-3.5" />
               Assistant
+            </button>
+            <button
+              type="button"
+              onClick={() => switchMode("quick")}
+              className={cn(
+                "flex-1 px-3 py-1.5 text-sm font-medium transition-colors border-l border-input flex items-center justify-center gap-1.5",
+                mode === "quick"
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-background text-muted-foreground hover:text-foreground"
+              )}
+            >
+              <Sparkles className="h-3.5 w-3.5" />
+              Quick add
             </button>
           </div>
         )}
