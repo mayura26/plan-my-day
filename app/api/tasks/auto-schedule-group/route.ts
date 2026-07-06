@@ -67,6 +67,8 @@ const VALID_MODES: SchedulingMode[] = [
   "today",
   "tomorrow",
   "next-week",
+  "this-weekend",
+  "next-weekend",
   "next-month",
   "asap",
 ];

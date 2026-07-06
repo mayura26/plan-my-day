@@ -535,6 +535,8 @@ function GroupCard({
                   { mode: "today" as SchedulingMode, label: "Schedule Today" },
                   { mode: "tomorrow" as SchedulingMode, label: "Schedule Tomorrow" },
                   { mode: "next-week" as SchedulingMode, label: "Schedule Next Week" },
+                  { mode: "this-weekend" as SchedulingMode, label: "Schedule This Weekend" },
+                  { mode: "next-weekend" as SchedulingMode, label: "Schedule Next Weekend" },
                   { mode: "next-month" as SchedulingMode, label: "Schedule Next Month" },
                   { mode: "asap" as SchedulingMode, label: "Schedule ASAP" },
                 ].map(({ mode, label }) => (

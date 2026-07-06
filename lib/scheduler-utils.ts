@@ -774,6 +774,73 @@ function getStartOfNextWeek(currentDate: Date, timezone: string): Date {
 }
 
 /**
+ * Get the start of a weekend (Saturday midnight) in the user's timezone.
+ * weekOffset 0 = this weekend's Saturday, 1 = next weekend's Saturday.
+ * If today is Sunday, "this weekend's Saturday" is yesterday (the scheduler
+ * clamps startFrom to now, so the remaining Sunday is used).
+ */
+function getStartOfWeekendSaturday(currentDate: Date, timezone: string, weekOffset: number): Date {
+  const tzTime = getTimeInTimezone(currentDate, timezone);
+
+  const formatter = new Intl.DateTimeFormat("en-US", {
+    timeZone: timezone,
+    weekday: "long",
+  });
+  const weekday = formatter.format(currentDate).toLowerCase();
+
+  // Map weekday to day number (0 = Sunday, 1 = Monday, ..., 6 = Saturday)
+  const weekdayMap: Record<string, number> = {
+    sunday: 0,
+    monday: 1,
+    tuesday: 2,
+    wednesday: 3,
+    thursday: 4,
+    friday: 5,
+    saturday: 6,
+  };
+  const dayOfWeek = weekdayMap[weekday] ?? 1;
+
+  // Days from today to this weekend's Saturday.
+  // Sunday: Saturday was yesterday (-1). Otherwise: 6 - dayOfWeek.
+  const daysToSaturday = dayOfWeek === 0 ? -1 : 6 - dayOfWeek;
+  const totalDayOffset = daysToSaturday + weekOffset * 7;
+
+  // Noon UTC on the target Saturday so timezone extraction is stable.
+  const saturdayLocal = new Date(
+    Date.UTC(tzTime.year, tzTime.month, tzTime.day + totalDayOffset, 12, 0, 0, 0)
+  );
+
+  // Midnight on that Saturday in the user's timezone.
+  return createDateInTimezone(saturdayLocal, 0, 0, timezone);
+}
+
+/**
+ * Get the start of this weekend (upcoming Saturday) in the user's timezone.
+ */
+function getStartOfThisWeekend(currentDate: Date, timezone: string): Date {
+  return getStartOfWeekendSaturday(currentDate, timezone, 0);
+}
+
+/**
+ * Get the start of next weekend (the following week's Saturday) in the user's timezone.
+ */
+function getStartOfNextWeekend(currentDate: Date, timezone: string): Date {
+  return getStartOfWeekendSaturday(currentDate, timezone, 1);
+}
+
+/**
+ * Get the end of a weekend (23:59 on Sunday) given that weekend's Saturday start.
+ * Used as maxSearchTime so weekend modes never spill into the following Monday.
+ */
+function getEndOfWeekend(saturdayStartUTC: Date, timezone: string): Date {
+  // Resolve the Saturday's calendar date in the user's timezone, then take the
+  // following day (Sunday) so the window ends on Sunday regardless of UTC offset.
+  const satTz = getTimeInTimezone(saturdayStartUTC, timezone);
+  const sundayLocal = new Date(Date.UTC(satTz.year, satTz.month, satTz.day + 1, 12, 0, 0, 0));
+  return createDateInTimezone(sundayLocal, 23, 59, timezone);
+}
+
+/**
  * Get the start of next month in user's timezone
  * Returns a UTC Date that represents midnight on the first day of next month in the user's timezone
  */
@@ -1133,6 +1200,7 @@ export function scheduleTaskUnified(options: UnifiedSchedulingOptions): Scheduli
   let maxSearchTime: Date;
   let mustBeToday = false;
   let mustBeTomorrow = false;
+  let mustBeWeekend = false;
   let preferGroupRules = false;
 
   switch (mode) {
@@ -1186,6 +1254,22 @@ export function scheduleTaskUnified(options: UnifiedSchedulingOptions): Scheduli
       startFrom = getStartOfNextWeek(nowUTC, timezone);
       maxSearchTime = new Date(startFrom);
       maxSearchTime.setUTCDate(maxSearchTime.getUTCDate() + 30);
+      break;
+
+    case "this-weekend":
+      reportProgress("Mode: Schedule This Weekend - Sat/Sun of the upcoming weekend");
+      startFrom = getStartOfThisWeekend(nowUTC, timezone);
+      maxSearchTime = getEndOfWeekend(startFrom, timezone);
+      mustBeWeekend = true;
+      preferGroupRules = true;
+      break;
+
+    case "next-weekend":
+      reportProgress("Mode: Schedule Next Weekend - Sat/Sun of the following weekend");
+      startFrom = getStartOfNextWeekend(nowUTC, timezone);
+      maxSearchTime = getEndOfWeekend(startFrom, timezone);
+      mustBeWeekend = true;
+      preferGroupRules = true;
       break;
 
     case "next-month":
@@ -1344,8 +1428,8 @@ export function scheduleTaskUnified(options: UnifiedSchedulingOptions): Scheduli
 
     if (daySchedule) {
       // Group hours exist for this day
-      if ((mustBeToday || mustBeTomorrow) && preferGroupRules) {
-        // For today/tomorrow: widen range to include awake hours as fallback
+      if ((mustBeToday || mustBeTomorrow || mustBeWeekend) && preferGroupRules) {
+        // For today/tomorrow/weekend: widen range to include awake hours as fallback
         const awakeDayHours = awakeHours?.[day as keyof GroupScheduleHours];
         if (awakeDayHours) {
           return {
@@ -1358,7 +1442,7 @@ export function scheduleTaskUnified(options: UnifiedSchedulingOptions): Scheduli
     }
 
     // Day has no group hours configured
-    if ((mustBeToday || mustBeTomorrow) && preferGroupRules) {
+    if ((mustBeToday || mustBeTomorrow || mustBeWeekend) && preferGroupRules) {
       // Fallback: awake hours for this day, then default 9-17
       const awakeDayHours = awakeHours?.[day as keyof GroupScheduleHours];
       return awakeDayHours ?? { start: 9, end: 17 };

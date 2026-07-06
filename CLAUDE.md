@@ -164,6 +164,8 @@ export function Component({ prop }: ComponentProps) {
 - `schedule-now`: Schedule immediately
 - `schedule-today`: Fit in today's schedule
 - `schedule-next-week`: Schedule for next week
+- `schedule-this-weekend`: Fit into the upcoming Saturday/Sunday
+- `schedule-next-weekend`: Fit into the following week's Saturday/Sunday
 - `schedule-next-month`: Schedule for next month
 - `schedule-asap`: Find earliest available slot
 

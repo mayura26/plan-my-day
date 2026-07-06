@@ -928,6 +928,8 @@ export function TaskForm({
                           today: "Schedule Today",
                           tomorrow: "Schedule Tomorrow",
                           "next-week": "Schedule Next Week",
+                          "this-weekend": "Schedule This Weekend",
+                          "next-weekend": "Schedule Next Weekend",
                           "next-month": "Schedule Next Month",
                           asap: "Schedule ASAP",
                           "due-date": "Schedule to Due Date",
@@ -958,6 +960,18 @@ export function TaskForm({
                     >
                       <Calendar className="h-4 w-4 mr-2" />
                       Schedule Next Week
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => handleInputChange("schedule_mode", "this-weekend")}
+                    >
+                      <Calendar className="h-4 w-4 mr-2" />
+                      Schedule This Weekend
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => handleInputChange("schedule_mode", "next-weekend")}
+                    >
+                      <Calendar className="h-4 w-4 mr-2" />
+                      Schedule Next Weekend
                     </DropdownMenuItem>
                     <DropdownMenuItem
                       onClick={() => handleInputChange("schedule_mode", "next-month")}

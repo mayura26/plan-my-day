@@ -689,6 +689,8 @@ export function AITaskInput({
             today: "schedule-today",
             tomorrow: "schedule-tomorrow",
             "next-week": "schedule-next-week",
+            "this-weekend": "schedule-this-weekend",
+            "next-weekend": "schedule-next-weekend",
             "next-month": "schedule-next-month",
             asap: "schedule-asap",
             "due-date": "schedule-due-date",

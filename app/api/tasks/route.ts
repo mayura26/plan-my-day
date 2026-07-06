@@ -453,9 +453,17 @@ export async function POST(request: NextRequest) {
         const rawMode = row.default_schedule_mode as string | null | undefined;
         userDefaultScheduleMode =
           rawMode &&
-          ["now", "today", "tomorrow", "next-week", "next-month", "asap", "due-date"].includes(
-            rawMode
-          )
+          [
+            "now",
+            "today",
+            "tomorrow",
+            "next-week",
+            "this-weekend",
+            "next-weekend",
+            "next-month",
+            "asap",
+            "due-date",
+          ].includes(rawMode)
             ? (rawMode as SchedulingMode)
             : "now";
       } else {

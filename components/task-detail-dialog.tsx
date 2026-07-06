@@ -385,6 +385,8 @@ export function TaskDetailDialog({
         today: "schedule-today",
         tomorrow: "schedule-tomorrow",
         "next-week": "schedule-next-week",
+        "this-weekend": "schedule-this-weekend",
+        "next-weekend": "schedule-next-weekend",
         "next-month": "schedule-next-month",
         asap: "schedule-asap",
         "due-date": "schedule-due-date",
@@ -419,6 +421,8 @@ export function TaskDetailDialog({
           today: "schedule-today",
           tomorrow: "schedule-tomorrow",
           "next-week": "schedule-next-week",
+          "this-weekend": "schedule-this-weekend",
+          "next-weekend": "schedule-next-weekend",
           "next-month": "schedule-next-month",
           asap: "schedule-asap",
           "due-date": "schedule-due-date",
@@ -465,6 +469,8 @@ export function TaskDetailDialog({
         today: "Schedule Today",
         tomorrow: "Schedule Tomorrow",
         "next-week": "Schedule Next Week",
+        "this-weekend": "Schedule This Weekend",
+        "next-weekend": "Schedule Next Weekend",
         "next-month": "Schedule Next Month",
         asap: "Schedule ASAP",
         "due-date": "Schedule to Due Date",
@@ -477,6 +483,8 @@ export function TaskDetailDialog({
         today: "schedule-today",
         tomorrow: "schedule-tomorrow",
         "next-week": "schedule-next-week",
+        "this-weekend": "schedule-this-weekend",
+        "next-weekend": "schedule-next-weekend",
         "next-month": "schedule-next-month",
         asap: "schedule-asap",
         "due-date": "schedule-due-date",
@@ -882,6 +890,14 @@ export function TaskDetailDialog({
                               <DropdownMenuItem onClick={() => handleSchedule("next-week")}>
                                 <Calendar className="h-4 w-4 mr-2" />
                                 Schedule Next Week
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleSchedule("this-weekend")}>
+                                <Calendar className="h-4 w-4 mr-2" />
+                                Schedule This Weekend
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleSchedule("next-weekend")}>
+                                <Calendar className="h-4 w-4 mr-2" />
+                                Schedule Next Weekend
                               </DropdownMenuItem>
                               <DropdownMenuItem onClick={() => handleSchedule("next-month")}>
                                 <Calendar className="h-4 w-4 mr-2" />

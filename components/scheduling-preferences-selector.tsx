@@ -20,6 +20,8 @@ const SCHEDULE_MODE_OPTIONS: { value: SchedulingMode; label: string }[] = [
   { value: "today", label: "Schedule Today" },
   { value: "tomorrow", label: "Schedule Tomorrow" },
   { value: "next-week", label: "Schedule Next Week" },
+  { value: "this-weekend", label: "Schedule This Weekend" },
+  { value: "next-weekend", label: "Schedule Next Weekend" },
   { value: "next-month", label: "Schedule Next Month" },
   { value: "asap", label: "Schedule ASAP" },
   { value: "due-date", label: "Schedule to Due Date" },

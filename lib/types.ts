@@ -61,6 +61,8 @@ export const SCHEDULING_MODES = [
   "today",
   "tomorrow",
   "next-week",
+  "this-weekend",
+  "next-weekend",
   "next-month",
   "asap",
   "due-date",

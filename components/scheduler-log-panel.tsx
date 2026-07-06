@@ -26,6 +26,8 @@ export type SchedulerOperation =
   | "schedule-today"
   | "schedule-tomorrow"
   | "schedule-next-week"
+  | "schedule-this-weekend"
+  | "schedule-next-weekend"
   | "schedule-next-month"
   | "schedule-asap"
   | "schedule-due-date"
@@ -89,6 +91,16 @@ const operationConfig: Record<
     label: "Next Week",
     icon: CalendarClock,
     color: "bg-cyan-500/10 text-cyan-600 dark:text-cyan-400",
+  },
+  "schedule-this-weekend": {
+    label: "This Weekend",
+    icon: CalendarClock,
+    color: "bg-fuchsia-500/10 text-fuchsia-600 dark:text-fuchsia-400",
+  },
+  "schedule-next-weekend": {
+    label: "Next Weekend",
+    icon: CalendarClock,
+    color: "bg-pink-500/10 text-pink-600 dark:text-pink-400",
   },
   "schedule-next-month": {
     label: "Next Month",
