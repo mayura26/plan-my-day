@@ -1,4 +1,5 @@
-import { createClient } from "@libsql/client";
+import { AsyncLocalStorage } from "node:async_hooks";
+import { createClient, type Transaction } from "@libsql/client";
 
 const url = process.env.TURSO_DATABASE_URL;
 const authToken = process.env.TURSO_AUTH_TOKEN;
@@ -16,4 +17,30 @@ const turso = createClient({
   authToken,
 });
 
-export { turso as db };
+const transactionContext = new AsyncLocalStorage<Transaction>();
+
+// Route handlers and their helpers share the same atomic scheduling operation.
+export const db = new Proxy(turso, {
+  get(target, property) {
+    const owner =
+      property === "execute" || property === "batch"
+        ? (transactionContext.getStore() ?? target)
+        : target;
+    const value = Reflect.get(owner, property);
+    return typeof value === "function" ? value.bind(owner) : value;
+  },
+});
+
+export async function withTaskTransaction<T>(work: () => Promise<T>): Promise<T> {
+  const transaction = await turso.transaction("write");
+  try {
+    const result = await transactionContext.run(transaction, work);
+    await transaction.commit();
+    return result;
+  } catch (error) {
+    await transaction.rollback();
+    throw error;
+  } finally {
+    transaction.close();
+  }
+}

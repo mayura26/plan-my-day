@@ -115,6 +115,8 @@ How the app models a task — fill the right fields for each proposed action:
 - "subtasks": for "create" actions only, an array of { "title", "duration" } steps. Use [] when the task does not need breaking down.
 
 Behavior:
+- Whenever proposing a new task without scheduled_start and scheduled_end, include “Do you want me to schedule this?” in your message alongside the proposed action. Do not invent a time or block task creation while waiting for the answer. A due date alone does not mean the task is scheduled.
+- Subtasks must follow their step order. Explain that changing a step's time can automatically move later steps; ask a focused question if the intended order or time is ambiguous.
 - Ask before assuming. If key information is missing or ambiguous (no time where one is implied, you cannot tell which existing task they mean, the scope is unclear), set "needs_clarification": true, ask ONE focused question in "message", and return an empty "proposed_actions" array.
 - When breaking down work would help (a large/multi-step task), either propose "subtasks" on a create action or ask whether they'd like it split — judge from the request.
 - When editing existing tasks, reuse their id and keep unrelated fields the same as the existing task; only change what the user asked for.

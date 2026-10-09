@@ -677,7 +677,7 @@ export default function CalendarPage() {
 
       if (response.ok) {
         const data = await response.json();
-        setTasks((prev) => prev.map((task) => (task.id === editingTask.id ? data.task : task)));
+        await fetchTasks(false);
         // Update selected task if it's the one being edited
         if (selectedTask?.id === editingTask.id) {
           setSelectedTask(data.task);
@@ -712,7 +712,7 @@ export default function CalendarPage() {
 
       if (response.ok) {
         const data = await response.json();
-        setTasks((prev) => prev.map((task) => (task.id === taskId ? data.task : task)));
+        await fetchTasks(false);
         // Update selected task if it's the one being unscheduled
         if (selectedTask?.id === taskId) {
           setSelectedTask(data.task);
@@ -767,7 +767,7 @@ export default function CalendarPage() {
 
       if (response.ok) {
         const data = await response.json();
-        setTasks((prev) => prev.map((task) => (task.id === taskId ? data.task : task)));
+        await fetchTasks(false);
         // Update selected task if it's the one being changed
         if (selectedTask?.id === taskId) {
           setSelectedTask(data.task);
@@ -1137,8 +1137,10 @@ export default function CalendarPage() {
       });
 
       if (response.ok) {
-        const data = await response.json();
-        setTasks((prev) => prev.map((t) => (t.id === taskId ? data.task : t)));
+        await fetchTasks(false);
+      } else {
+        const result = await response.json();
+        toast.error(result.error || "Unable to change the schedule.");
       }
     } catch (error) {
       console.error("Error resizing task:", error);
@@ -1176,8 +1178,10 @@ export default function CalendarPage() {
       });
 
       if (response.ok) {
-        const data = await response.json();
-        setTasks((prev) => prev.map((t) => (t.id === taskId ? data.task : t)));
+        await fetchTasks(false);
+      } else {
+        const result = await response.json();
+        toast.error(result.error || "Unable to change the schedule.");
       }
     } catch (error) {
       console.error("Error resizing task start:", error);
@@ -1247,8 +1251,10 @@ export default function CalendarPage() {
       });
 
       if (response.ok) {
-        const data = await response.json();
-        setTasks((prev) => prev.map((t) => (t.id === taskId ? data.task : t)));
+        await fetchTasks(false);
+      } else {
+        const result = await response.json();
+        toast.error(result.error || "Unable to change the schedule.");
       }
     } catch (error) {
       console.error("Error scheduling task:", error);
@@ -1295,8 +1301,10 @@ export default function CalendarPage() {
       });
 
       if (response.ok) {
-        const data = await response.json();
-        setTasks((prev) => prev.map((t) => (t.id === taskId ? data.task : t)));
+        await fetchTasks(false);
+      } else {
+        const result = await response.json();
+        toast.error(result.error || "Unable to change the schedule.");
       }
     } catch (error) {
       console.error("Error rescheduling task:", error);

@@ -1,3 +1,4 @@
+import { withSubtaskScheduleOrder } from "@/lib/task-scheduling-route";
 import { type NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { pullForwardTasksForGroup } from "@/lib/scheduler-utils";
@@ -63,7 +64,7 @@ function mapRowToGroup(row: any): TaskGroup {
 }
 
 // POST /api/tasks/pull-forward - Pull future tasks from a group into today
-export async function POST(request: NextRequest) {
+async function handlePOST(request: NextRequest) {
   try {
     const session = await auth();
     if (!session?.user?.id) {
@@ -154,3 +155,5 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
+
+export const POST = withSubtaskScheduleOrder(handlePOST);

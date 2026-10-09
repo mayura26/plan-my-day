@@ -1,3 +1,4 @@
+import { withSubtaskScheduleOrder } from "@/lib/task-scheduling-route";
 import { type NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { scheduleTask } from "@/lib/scheduler-utils";
@@ -118,7 +119,7 @@ function calculateCarryoverTimestamp(originalSubtask: Task, allSubtasks: Task[])
 }
 
 // POST /api/tasks/[id]/carryover - Create a carryover task from an incomplete task
-export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+async function handlePOST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const session = await auth();
     if (!session?.user?.id) {
@@ -557,3 +558,5 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
+
+export const POST = withSubtaskScheduleOrder(handlePOST);

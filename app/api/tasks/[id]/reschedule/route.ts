@@ -1,3 +1,4 @@
+import { withSubtaskScheduleOrder } from "@/lib/task-scheduling-route";
 import { type NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { alignDueDateOnReschedule, scheduleTaskUnified } from "@/lib/scheduler-utils";
@@ -64,7 +65,7 @@ function mapRowToGroup(row: any): TaskGroup {
 }
 
 // POST /api/tasks/[id]/reschedule - Reschedule a task
-export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+async function handlePOST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const session = await auth();
     if (!session?.user?.id) {
@@ -290,3 +291,5 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     );
   }
 }
+
+export const POST = withSubtaskScheduleOrder(handlePOST);

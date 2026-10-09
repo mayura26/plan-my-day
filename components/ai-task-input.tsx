@@ -62,6 +62,7 @@ interface AssistantMessage {
   role: "user" | "assistant";
   content: string;
   actions?: ProposedAction[];
+  schedulingTaskId?: string;
 }
 
 type ActionStatus = "applying" | "applied" | "rejected" | "error" | "editing" | "notfound";
@@ -451,6 +452,90 @@ export function AITaskInput({
     return match?.id ?? null;
   };
 
+  const offerScheduling = async (taskId: string, title: string) => {
+    const res = await fetch(`/api/tasks/${taskId}?include_subtasks=true`);
+    if (!res.ok) return;
+    const { task } = await res.json();
+    const steps = task.subtasks?.filter(
+      (step: { status: string }) => !["completed", "cancelled", "rescheduled"].includes(step.status)
+    );
+    const scheduled = steps?.length
+      ? steps.every(
+          (step: { scheduled_start?: string; scheduled_end?: string }) =>
+            step.scheduled_start && step.scheduled_end
+        )
+      : task.scheduled_start && task.scheduled_end;
+    if (!scheduled) {
+      setMessages((current) => [
+        ...current,
+        {
+          id: crypto.randomUUID(),
+          role: "assistant",
+          content: `Created “${title}”. Do you want me to schedule this?`,
+          schedulingTaskId: taskId,
+        },
+      ]);
+    }
+  };
+
+  const answerScheduling = async (message: AssistantMessage, schedule: boolean) => {
+    if (!message.schedulingTaskId) return;
+    setIsAssistantLoading(true);
+    try {
+      if (schedule) {
+        const res = await fetch(`/api/tasks/${message.schedulingTaskId}/schedule-smart`, {
+          method: "POST",
+        });
+        const result = await res.json();
+        if (!res.ok)
+          throw new Error(result.error || "Unable to schedule this task. Please choose a time.");
+        await onApplied?.();
+        const saved = await fetch(`/api/tasks/${message.schedulingTaskId}?include_subtasks=true`);
+        if (!saved.ok) throw new Error("Please check the task to confirm its schedule.");
+        const { task } = await saved.json();
+        const steps = task.subtasks?.filter(
+          (step: { status: string }) =>
+            !["completed", "cancelled", "rescheduled"].includes(step.status)
+        );
+        const fullyScheduled = steps?.length
+          ? steps.every(
+              (step: { scheduled_start?: string; scheduled_end?: string }) =>
+                step.scheduled_start && step.scheduled_end
+            )
+          : task.scheduled_start && task.scheduled_end;
+        if (!fullyScheduled)
+          throw new Error(
+            "Some steps could not be scheduled. Please choose a time or adjust their scheduling hours."
+          );
+      }
+      setMessages((current) =>
+        current.map((item) =>
+          item.id === message.id
+            ? {
+                ...item,
+                schedulingTaskId: undefined,
+                content: schedule ? "Scheduled this task." : "Kept this task unscheduled.",
+              }
+            : item
+        )
+      );
+    } catch (error) {
+      setMessages((current) => [
+        ...current,
+        {
+          id: crypto.randomUUID(),
+          role: "assistant",
+          content:
+            error instanceof Error
+              ? error.message
+              : "Unable to schedule this task. Please choose a time.",
+        },
+      ]);
+    } finally {
+      setIsAssistantLoading(false);
+    }
+  };
+
   const applyAction = async (action: ProposedAction) => {
     setActionStatus((s) => ({ ...s, [action._id]: "applying" }));
     try {
@@ -488,7 +573,7 @@ export function AITaskInput({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
         });
-        if (!res.ok) throw new Error("update failed");
+        if (!res.ok) throw new Error((await res.json()).error || "Unable to update this task.");
       } else {
         const payload: Record<string, unknown> = {
           title: action.title,
@@ -509,7 +594,7 @@ export function AITaskInput({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
         });
-        if (!res.ok) throw new Error("create failed");
+        if (!res.ok) throw new Error((await res.json()).error || "Unable to create this task.");
         const data = await res.json();
         const createdId: string | undefined = data.task?.id;
 
@@ -526,11 +611,20 @@ export function AITaskInput({
             });
           }
         }
+        if (createdId) await offerScheduling(createdId, action.title);
       }
 
       setActionStatus((s) => ({ ...s, [action._id]: "applied" }));
       await onApplied?.();
-    } catch {
+    } catch (error) {
+      setMessages((current) => [
+        ...current,
+        {
+          id: crypto.randomUUID(),
+          role: "assistant",
+          content: error instanceof Error ? error.message : "Unable to apply this change.",
+        },
+      ]);
       setActionStatus((s) => ({ ...s, [action._id]: "error" }));
     }
   };
@@ -640,7 +734,7 @@ export function AITaskInput({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(body),
         });
-        if (!res.ok) throw new Error("update failed");
+        if (!res.ok) throw new Error((await res.json()).error || "Unable to update this task.");
       } else {
         const hasSubtasks = (subtasks?.length ?? 0) > 0;
         const wantsAutoSchedule = !!body.auto_schedule;
@@ -655,7 +749,7 @@ export function AITaskInput({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(createBody),
         });
-        if (!res.ok) throw new Error("create failed");
+        if (!res.ok) throw new Error((await res.json()).error || "Unable to create this task.");
         const data = await res.json();
         const createdId: string | undefined = data.task?.id;
 
@@ -699,12 +793,21 @@ export function AITaskInput({
           const endpoint = endpointMap[scheduleMode] ?? "schedule-now";
           await fetch(`/api/tasks/${createdId}/${endpoint}`, { method: "POST" });
         }
+        if (createdId) await offerScheduling(createdId, action.title);
       }
 
       setActionStatus((s) => ({ ...s, [action._id]: "applied" }));
       await onApplied?.();
       advanceReview();
-    } catch {
+    } catch (error) {
+      setMessages((current) => [
+        ...current,
+        {
+          id: crypto.randomUUID(),
+          role: "assistant",
+          content: error instanceof Error ? error.message : "Unable to apply this change.",
+        },
+      ]);
       setActionStatus((s) => ({ ...s, [action._id]: "error" }));
       advanceReview();
     } finally {
@@ -1093,6 +1196,25 @@ export function AITaskInput({
                   >
                     {msg.content}
                   </div>
+                  {msg.schedulingTaskId && (
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        disabled={isAssistantLoading}
+                        onClick={() => answerScheduling(msg, true)}
+                      >
+                        Yes, schedule it
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={isAssistantLoading}
+                        onClick={() => answerScheduling(msg, false)}
+                      >
+                        Leave unscheduled
+                      </Button>
+                    </div>
+                  )}
                   {msg.actions && msg.actions.length > 0 && (
                     <div className="w-full max-w-[95%] mt-1 space-y-1.5">
                       <p className="text-xs text-muted-foreground font-medium px-1">

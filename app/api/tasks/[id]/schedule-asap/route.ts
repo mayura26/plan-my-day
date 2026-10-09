@@ -1,3 +1,4 @@
+import { withSubtaskScheduleOrder } from "@/lib/task-scheduling-route";
 import { type NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { alignDueDateOnReschedule, scheduleTaskUnified } from "@/lib/scheduler-utils";
@@ -64,7 +65,7 @@ function mapRowToGroup(row: any): TaskGroup {
 }
 
 // POST /api/tasks/[id]/schedule-asap - Schedule a task ASAP with shuffling
-export async function POST(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+async function handlePOST(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const session = await auth();
     if (!session?.user?.id) {
@@ -490,3 +491,5 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
     );
   }
 }
+
+export const POST = withSubtaskScheduleOrder(handlePOST);

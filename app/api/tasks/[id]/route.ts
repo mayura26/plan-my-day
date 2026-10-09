@@ -1,3 +1,4 @@
+import { withSubtaskScheduleOrder } from "@/lib/task-scheduling-route";
 import { type NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { scheduleTask } from "@/lib/scheduler-utils";
@@ -144,7 +145,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 }
 
 // PUT /api/tasks/[id] - Update a specific task
-export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+async function handlePUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const session = await auth();
     if (!session?.user?.id) {
@@ -456,7 +457,7 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 }
 
 // DELETE /api/tasks/[id] - Delete a specific task
-export async function DELETE(
+async function handleDELETE(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -502,3 +503,7 @@ export async function DELETE(
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
+
+export const PUT = withSubtaskScheduleOrder(handlePUT);
+
+export const DELETE = withSubtaskScheduleOrder(handleDELETE);

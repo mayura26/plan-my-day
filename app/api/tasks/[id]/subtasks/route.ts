@@ -1,3 +1,4 @@
+import { withSubtaskScheduleOrder } from "@/lib/task-scheduling-route";
 import { type NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { generateDependencyId, generateTaskId, validateTaskData } from "@/lib/task-utils";
@@ -79,7 +80,7 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
 }
 
 // POST /api/tasks/[id]/subtasks - Create a new subtask
-export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+async function handlePOST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const session = await auth();
     if (!session?.user?.id) {
@@ -331,3 +332,5 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
+
+export const POST = withSubtaskScheduleOrder(handlePOST);

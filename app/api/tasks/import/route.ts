@@ -1,3 +1,4 @@
+import { withSubtaskScheduleOrder } from "@/lib/task-scheduling-route";
 import { type NextRequest, NextResponse } from "next/server";
 import { validateAPIKey } from "@/lib/api-auth";
 import { generateGroupId, generateTaskId } from "@/lib/task-utils";
@@ -98,7 +99,7 @@ interface TaskImportResult {
  * POST /api/tasks/import
  * Import one or more tasks via API key authentication
  */
-export async function POST(request: NextRequest) {
+async function handlePOST(request: NextRequest) {
   try {
     // Validate API key
     const userId = await validateAPIKey(request);
@@ -347,3 +348,5 @@ export async function POST(request: NextRequest) {
     );
   }
 }
+
+export const POST = withSubtaskScheduleOrder(handlePOST);

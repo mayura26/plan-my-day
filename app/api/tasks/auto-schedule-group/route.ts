@@ -1,3 +1,4 @@
+import { withSubtaskScheduleOrder } from "@/lib/task-scheduling-route";
 import { type NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { scheduleTaskUnified } from "@/lib/scheduler-utils";
@@ -74,7 +75,7 @@ const VALID_MODES: SchedulingMode[] = [
 ];
 
 // POST /api/tasks/auto-schedule-group - Auto-schedule top N unscheduled tasks in a group
-export async function POST(request: NextRequest) {
+async function handlePOST(request: NextRequest) {
   try {
     const session = await auth();
     if (!session?.user?.id) {
@@ -297,3 +298,5 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
+
+export const POST = withSubtaskScheduleOrder(handlePOST);
