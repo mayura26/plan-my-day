@@ -71,13 +71,13 @@ export function withSubtaskScheduleOrder<A extends unknown[]>(
           );
         }
         const now = new Date().toISOString();
-        for (const task of moved) {
-          await db.execute(
-            "UPDATE tasks SET scheduled_start = ?, scheduled_end = ?, updated_at = ?, notification_sent = 0, lead_reminder_sent = 0 WHERE id = ? AND user_id = ?",
-            [task.scheduled_start ?? null, task.scheduled_end ?? null, now, task.id, userId]
-          );
-        }
         if (!moved.length) return response;
+        await db.batch(
+          moved.map((task) => ({
+            sql: "UPDATE tasks SET scheduled_start = ?, scheduled_end = ?, updated_at = ?, notification_sent = 0, lead_reminder_sent = 0 WHERE id = ? AND user_id = ?",
+            args: [task.scheduled_start ?? null, task.scheduled_end ?? null, now, task.id, userId],
+          }))
+        );
         const updated = new Map(
           moved.map((task) => [
             task.id,

@@ -309,6 +309,7 @@ export default function CalendarPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ date: dateKey, timezone }),
+        signal: AbortSignal.timeout(60000),
       });
 
       if (response.ok) {
@@ -327,7 +328,7 @@ export default function CalendarPage() {
         if (data.updatedTasks && data.updatedTasks.length > 0) {
           setTasks((prev) => {
             const updatedMap = new Map<string, Task>();
-            for (const task of data.updatedTasks) {
+            for (const task of [...data.updatedTasks, ...(data.adjustedSubtasks ?? [])]) {
               updatedMap.set(task.id, task);
             }
             return prev.map((t) => updatedMap.get(t.id) || t);
@@ -346,7 +347,11 @@ export default function CalendarPage() {
       }
     } catch (error) {
       console.error("Error shuffling tasks:", error);
-      toast.error("Failed to shuffle tasks");
+      toast.error(
+        error instanceof Error && error.name === "TimeoutError"
+          ? "Shuffle took too long. Refresh the calendar to check its status before trying again."
+          : "Failed to shuffle tasks"
+      );
     }
   }, [currentDate, timezone, formatDateKey, addSchedulerLogEntry]);
 

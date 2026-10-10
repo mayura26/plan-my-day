@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { findNearestAvailableSlot } from "./scheduler-utils";
 import { orderSubtaskSchedules } from "./subtask-schedule-order";
 import type { Task } from "./types";
 
@@ -26,6 +27,33 @@ const step = (id: string, order: number, start: number, end: number): Task => ({
   updated_at: at(0),
 });
 const run = (tasks: Task[]) => orderSubtaskSchedules(tasks, new Set(["parent"]), [], null, "UTC");
+
+test("quarter-hour search advances past a day with no working hours", () => {
+  const slot = findNearestAvailableSlot(
+    step("task", 1, 9, 10),
+    [],
+    new Date("2030-01-07T12:15:00Z"),
+    { tuesday: { start: 9, end: 17 } },
+    7,
+    "UTC"
+  );
+  assert.equal(slot?.start.toISOString(), "2030-01-08T12:15:00.000Z");
+});
+
+test("quarter-hour search terminates when duration cannot fit the working window", () => {
+  const slot = findNearestAvailableSlot(
+    { ...step("task", 1, 9, 11), duration: 120 },
+    [],
+    new Date("2030-01-07T09:15:00Z"),
+    {
+      monday: { start: 9, end: 10 },
+      tuesday: { start: 9, end: 10 },
+    },
+    2,
+    "UTC"
+  );
+  assert.equal(slot, null);
+});
 
 test("rescheduling an earlier step cascades and avoids unrelated events", () => {
   const tasks = [

@@ -243,7 +243,7 @@ export function findNearestAvailableSlot(
         }
       }
       // If we didn't find exact midnight, just add 24 hours as fallback
-      if (currentTimeUTC === slotStartUTC) {
+      if (currentTimeUTC.getTime() <= slotStartUTC.getTime()) {
         currentTimeUTC = new Date(slotStartUTC.getTime() + 24 * 60 * 60 * 1000);
         currentTimeUTC.setUTCMinutes(Math.floor(currentTimeUTC.getUTCMinutes() / 15) * 15, 0, 0);
       }
@@ -363,7 +363,7 @@ export function findNearestAvailableSlot(
         }
       }
       // If we didn't find exact start, just add 24 hours as fallback
-      if (currentTimeUTC === slotStartUTC) {
+      if (currentTimeUTC.getTime() <= slotStartUTC.getTime()) {
         currentTimeUTC = new Date(slotStartUTC.getTime() + 24 * 60 * 60 * 1000);
         currentTimeUTC.setUTCMinutes(Math.floor(currentTimeUTC.getUTCMinutes() / 15) * 15, 0, 0);
       }

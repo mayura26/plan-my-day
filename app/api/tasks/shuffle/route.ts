@@ -1,7 +1,7 @@
-import { withSubtaskScheduleOrder } from "@/lib/task-scheduling-route";
 import { type NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { shuffleTasksForDay } from "@/lib/scheduler-utils";
+import { withSubtaskScheduleOrder } from "@/lib/task-scheduling-route";
 import { getUserTimezone } from "@/lib/timezone-utils";
 import { db } from "@/lib/turso";
 import type { Task, TaskGroup, TaskStatus, TaskType } from "@/lib/types";
@@ -125,15 +125,20 @@ async function handlePOST(request: NextRequest) {
 
     // Update all moved tasks in the database
     const now = new Date().toISOString();
-    for (const moved of result.movedTasks) {
-      await db.execute(
-        `UPDATE tasks SET scheduled_start = ?, scheduled_end = ?, updated_at = ? WHERE id = ? AND user_id = ?`,
-        [moved.newStart, moved.newEnd, now, moved.taskId, session.user.id]
+    const finalMoves = [
+      ...new Map(result.movedTasks.map((moved) => [moved.taskId, moved])).values(),
+    ];
+    if (finalMoves.length) {
+      await db.batch(
+        finalMoves.map((moved) => ({
+          sql: "UPDATE tasks SET scheduled_start = ?, scheduled_end = ?, updated_at = ? WHERE id = ? AND user_id = ?",
+          args: [moved.newStart, moved.newEnd, now, moved.taskId, session.user.id],
+        }))
       );
     }
 
     // Re-fetch updated tasks to return fresh data
-    const updatedTaskIds = result.movedTasks.map((m) => m.taskId);
+    const updatedTaskIds = finalMoves.map((m) => m.taskId);
     let updatedTasks: Task[] = [];
     if (updatedTaskIds.length > 0) {
       const placeholders = updatedTaskIds.map(() => "?").join(", ");
@@ -148,7 +153,7 @@ async function handlePOST(request: NextRequest) {
       updatedTasks,
       feedback: result.feedback,
       cascadedDays: result.cascadedDays,
-      movedCount: result.movedTasks.length,
+      movedCount: finalMoves.length,
     });
   } catch (error) {
     console.error("Error shuffling tasks:", error);
