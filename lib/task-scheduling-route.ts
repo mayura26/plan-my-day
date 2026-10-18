@@ -11,14 +11,23 @@ class FailedTaskMutation extends Error {
   }
 }
 
-/** Apply ordering to every task mutation, including edits, shuffles and bulk schedules. */
+/**
+ * Apply ordering to every task mutation, including edits, shuffles and bulk schedules.
+ * Optional `resolveUserId` supports API-key auth (session auth is the default).
+ */
 export function withSubtaskScheduleOrder<A extends unknown[]>(
-  handler: (...args: A) => Promise<Response>
+  handler: (...args: A) => Promise<Response>,
+  resolveUserId?: (...args: A) => Promise<string | null>
 ): (...args: A) => Promise<Response> {
   return async (...args) => {
-    const session = await auth();
-    if (!session?.user?.id) return handler(...args);
-    const userId = session.user.id;
+    let userId: string | null = null;
+    if (resolveUserId) {
+      userId = await resolveUserId(...args);
+    } else {
+      const session = await auth();
+      userId = session?.user?.id ?? null;
+    }
+    if (!userId) return handler(...args);
     try {
       return await withTaskTransaction(async () => {
         const before = await db.execute("SELECT * FROM tasks WHERE user_id = ?", [userId]);
