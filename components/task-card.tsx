@@ -1,7 +1,8 @@
 "use client";
 
-import { Calendar, CheckCircle2, Circle, Clock, Flag, Lock, Trash2, Zap } from "lucide-react";
+import { Calendar, CheckCircle2, Circle, Clock, Flag, Trash2, Zap } from "lucide-react";
 import { useState } from "react";
+import { AISchedulingToggle } from "@/components/ai-scheduling-toggle";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -182,7 +183,7 @@ export function TaskCard({
               </div>
             </div>
             <div className="flex items-center space-x-1 flex-shrink-0">
-              {task.locked && <Lock className="w-3 h-3 text-muted-foreground" />}
+              <AISchedulingToggle task={task} onUpdate={onUpdate} />
               <Badge variant="outline" className={`text-xs ${statusColor}`}>
                 {STATUS_LABELS[task.status]}
               </Badge>
@@ -336,6 +337,7 @@ export function TaskCard({
           </div>
         </div>
         <div className="flex items-center gap-1 flex-shrink-0">
+          <AISchedulingToggle task={subtask} onUpdate={onUpdate} />
           {/* Priority badge */}
           <Badge
             variant="outline"
@@ -543,7 +545,7 @@ export function TaskCard({
               </span>
 
               {/* Lock indicator */}
-              {task.locked && <Lock className="w-3 h-3 text-muted-foreground flex-shrink-0" />}
+              <AISchedulingToggle task={task} onUpdate={onUpdate} />
 
               {/* Overdue indicator */}
               {isOverdue && (

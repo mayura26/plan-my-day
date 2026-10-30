@@ -15,8 +15,8 @@ import {
   Flag,
   GitBranch,
   Link2,
-  Lock,
-  LockOpen,
+  CalendarX2,
+  CalendarCheck2,
   Sparkles,
   Tag,
   Trash2,
@@ -639,6 +639,9 @@ export function TaskDetailDialog({
               <button
                 type="button"
                 disabled={isTogglingLock}
+                aria-pressed={!task.locked}
+                aria-label={`AI scheduling ${task.locked ? "off. Click to include and unlock task" : "on. Click to exclude and lock task"}`}
+                title="Toggle whether AI scheduling can move this task"
                 onClick={async (e) => {
                   e.stopPropagation();
                   if (!task || isTogglingLock) return;
@@ -653,7 +656,7 @@ export function TaskDetailDialog({
                     if (response.ok) {
                       onTaskRefresh?.({ ...task, locked: newLocked });
                       onTaskUpdate?.();
-                      toast.success(newLocked ? "Task locked" : "Task unlocked");
+                      toast.success(newLocked ? "AI scheduling off — task locked" : "AI scheduling on — task unlocked");
                     } else {
                       toast.error("Failed to toggle lock");
                     }
@@ -670,11 +673,11 @@ export function TaskDetailDialog({
                   className="text-xs px-1.5 py-0.5 cursor-pointer hover:opacity-80 transition-opacity"
                 >
                   {task.locked ? (
-                    <Lock className="h-2.5 w-2.5 mr-0.5" />
+                    <CalendarX2 className="h-2.5 w-2.5 mr-0.5" />
                   ) : (
-                    <LockOpen className="h-2.5 w-2.5 mr-0.5" />
+                    <CalendarCheck2 className="h-2.5 w-2.5 mr-0.5" />
                   )}
-                  {task.locked ? "Locked" : "Unlocked"}
+                  {task.locked ? "AI scheduling off" : "AI scheduling on"}
                 </Badge>
               </button>
               {isBlocked && (
