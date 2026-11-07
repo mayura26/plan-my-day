@@ -1,0 +1,11 @@
+{
+  "name": "Plan My Day",
+  "short_name": "Plan My Day",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f4efe6",
+  "theme_color": "#23466a",
+  "icons": [
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}

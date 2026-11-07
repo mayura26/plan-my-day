@@ -4,19 +4,17 @@ import { executeTransactionStatement } from "@/lib/transaction-execute";
 
 const url = process.env.TURSO_DATABASE_URL;
 const authToken = process.env.TURSO_AUTH_TOKEN;
+const fileUrl = Boolean(url?.startsWith("file:"));
 
 if (!url) {
   throw new Error("TURSO_DATABASE_URL environment variable is required");
 }
 
-if (!authToken) {
+if (!fileUrl && !authToken) {
   throw new Error("TURSO_AUTH_TOKEN environment variable is required");
 }
 
-const turso = createClient({
-  url,
-  authToken,
-});
+const turso = createClient(fileUrl ? { url } : { url, authToken });
 
 const transactionContext = new AsyncLocalStorage<Transaction>();
 

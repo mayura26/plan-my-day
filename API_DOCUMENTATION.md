@@ -177,10 +177,10 @@ Reschedules a task using the same scheduling engine and modes as the app UI.
 | `now` | Earliest available slot from now |
 | `today` | Fit into today |
 | `tomorrow` | Fit into tomorrow |
-| `next-week` | From next Monday onward |
-| `this-weekend` | Upcoming Saturday/Sunday |
-| `next-weekend` | Following weekend |
-| `next-month` | From the start of next month |
+| `next-week` | The next Monday–Sunday only. The task is not placed after that Sunday. |
+| `this-weekend` | Upcoming Saturday and Sunday. On Sunday, only the rest of Sunday. |
+| `next-weekend` | The Saturday and Sunday after this weekend |
+| `next-month` | The next calendar month only. The task is not placed after the last day of that month. |
 | `asap` | Earliest slot; may shuffle other tasks |
 | `due-date` | Work backward from the task's due date (requires `due_date`) |
 | `smart` | Smart placement relative to due date (requires `due_date`) |
