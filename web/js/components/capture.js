@@ -260,6 +260,7 @@ class AssistantPanel extends HTMLElement {
     const form = this.querySelector("form");
     form.addEventListener("submit", (event) => this.send(event));
     form.addEventListener("click", (event) => this.onClick(event));
+    form.addEventListener("change", (event) => this.onScheduleToggle(event));
     this.syncChrome();
   }
 
@@ -316,16 +317,55 @@ class AssistantPanel extends HTMLElement {
 
   turnHTML(message, index) {
     const actions = (message.actions || [])
-      .map((action, actionIndex) => {
-        if (action.dismissed) return "";
-        const label = `${action.action || "create"} ${action.title || ""}`.trim();
-        if (action.applied) return `<div class="action-row"><span>${esc(label)}</span><span class="muted">Added</span></div>`;
-        return `<div class="action-row"><span>${esc(label)}</span>
-          <button class="tiny" type="button" data-apply="${actionIndex}" data-message="${index}">Accept</button>
-          <button class="tiny" type="button" data-dismiss="${actionIndex}" data-message="${index}">Dismiss</button></div>`;
-      })
+      .map((action, actionIndex) => this.actionCard(action, index, actionIndex))
       .join("");
-    return `<div class="turn ${message.role}"><div class="bubble">${esc(message.content)}</div>${actions ? `<div class="action-list">${actions}</div>` : ""}</div>`;
+    const wide = actions ? " wide" : "";
+    return `<div class="turn ${message.role}${wide}"><div class="bubble">${esc(message.content)}</div>${actions ? `<div class="action-list">${actions}</div>` : ""}</div>`;
+  }
+
+  actionCard(action, messageIndex, actionIndex) {
+    if (action.dismissed) return "";
+    const isUpdate = action.action === "update";
+    const group = action.group_id ? store.groups.find((item) => item.id === action.group_id) : null;
+    const when = action.scheduled_start
+      ? String(action.scheduled_start).includes("T")
+        ? String(action.scheduled_start).slice(0, 16).replace("T", " ")
+        : String(action.scheduled_start)
+      : "";
+    const typeLabel = action.task_type === "todo" ? "To-Do" : action.task_type === "event" ? "Event" : "Task";
+    const pills = [
+      `<span class="pill">${isUpdate ? "Edit" : "New"}</span>`,
+      `<span class="pill">${esc(typeLabel)}</span>`,
+      action.priority ? `<span class="pill">P${esc(action.priority)} ${esc(PRIORITY[action.priority] || "")}</span>` : "",
+      action.duration ? `<span class="pill">${esc(action.duration)}m</span>` : "",
+      action.energy_level_required ? `<span class="pill">${esc(ENERGY[action.energy_level_required] || "")}</span>` : "",
+      group ? `<span class="pill">${esc(group.name)}</span>` : "",
+      when ? `<span class="pill">${esc(when)}</span>` : "",
+    ].filter(Boolean).join("");
+    const steps = (action.subtasks || []).map((step) => step?.title).filter(Boolean);
+    const summary = steps.length
+      ? `<p class="muted">${steps.length} subtask${steps.length === 1 ? "" : "s"}: ${esc(steps.join(", "))}</p>`
+      : "";
+    const heading = `<header><h3>${esc(action.title || "Untitled")}</h3>${action.applied ? `<span class="muted">Added</span>` : ""}</header>`;
+    if (action.applied) {
+      return `<article class="action-card">${heading}<div class="pills">${pills}</div>${summary}</article>`;
+    }
+    const toggle = isUpdate
+      ? ""
+      : `<label class="row schedule-now"><input type="checkbox" data-schedule-now data-message="${messageIndex}" data-action="${actionIndex}" ${action.scheduleNow ? "checked" : ""} /> Schedule now</label>`;
+    return `<article class="action-card">${heading}<div class="pills">${pills}</div>${summary}
+      <div class="action-card-foot">${toggle}<span class="spacer"></span>
+        <button class="tiny" type="button" data-apply="${actionIndex}" data-message="${messageIndex}">Accept</button>
+        <button class="tiny" type="button" data-dismiss="${actionIndex}" data-message="${messageIndex}">Dismiss</button>
+      </div></article>`;
+  }
+
+  onScheduleToggle(event) {
+    const input = event.target.closest?.("[data-schedule-now]");
+    if (!input) return;
+    const message = this.messages[Number(input.dataset.message)];
+    const action = message?.actions?.[Number(input.dataset.action)];
+    if (action) action.scheduleNow = input.checked;
   }
 
   onClick(event) {
@@ -429,7 +469,14 @@ class AssistantPanel extends HTMLElement {
           existing_tasks: store.tasks.slice(0, 40),
         },
       });
-      this.messages.push({ role: "assistant", content: turn.message || "", actions: turn.proposed_actions || [] });
+      this.messages.push({
+        role: "assistant",
+        content: turn.message || "",
+        actions: (turn.proposed_actions || []).map((action) => ({
+          ...action,
+          scheduleNow: (action.action || "create") !== "update" && !action.scheduled_start,
+        })),
+      });
     } catch (error) {
       this.note = error.message;
       this.querySelector("[data-note]").textContent = this.note;
@@ -446,6 +493,7 @@ class AssistantPanel extends HTMLElement {
 
   async accept(action) {
     if (!action || action.applied) return;
+    const scheduleNow = action.action !== "update" && Boolean(action.scheduleNow);
     const body = {
       title: action.title,
       description: action.description,
@@ -454,17 +502,24 @@ class AssistantPanel extends HTMLElement {
       duration: action.duration,
       energy_level_required: action.energy_level_required,
       group_id: action.group_id,
-      scheduled_start: action.scheduled_start,
-      scheduled_end: action.scheduled_end,
       due_date: action.due_date,
     };
+    if (!scheduleNow) {
+      body.scheduled_start = action.scheduled_start;
+      body.scheduled_end = action.scheduled_end;
+    }
+    let createdId = null;
     try {
       if (action.action === "update" && action.id) {
         await api(`/api/tasks/${action.id}`, { method: "PUT", body });
       } else {
         const created = await api("/api/tasks", { method: "POST", body });
+        createdId = created.task.id;
         for (const step of action.subtasks || []) {
-          await api(`/api/tasks/${created.task.id}/subtasks`, { method: "POST", body: step });
+          await api(`/api/tasks/${createdId}/subtasks`, { method: "POST", body: step });
+        }
+        if (scheduleNow) {
+          await api(`/api/tasks/${createdId}/schedule`, { method: "POST", body: { mode: "now" } });
         }
       }
       action.applied = true;
@@ -472,6 +527,12 @@ class AssistantPanel extends HTMLElement {
       await refresh();
       this.renderTranscript();
     } catch (error) {
+      if (createdId) {
+        action.applied = true;
+        const { refresh } = await import("../state.js");
+        await refresh();
+        this.renderTranscript();
+      }
       this.note = error.message;
       const note = this.querySelector("[data-note]");
       if (note) note.textContent = error.message;

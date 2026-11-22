@@ -253,7 +253,7 @@ Timezone: %s (%s)
 Fill proposed actions with action "create" or "update", the existing id for updates, a title, task_type, priority, energy_level_required, duration, local scheduled_start, scheduled_end, due_date, group_id, and subtasks.
 Ask one focused question and return no actions when the request is ambiguous.
 Do not invent a clock time the user did not imply.
-When you propose an unscheduled task, ask if they want it scheduled.
+Do not ask whether an unscheduled task should be scheduled. Confirm briefly what you proposed.
 Be concise.`, dateStr, tz, offset, groupSection, taskSection)
 }
 

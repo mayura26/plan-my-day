@@ -1132,7 +1132,21 @@ textarea { min-height: 70px; resize: vertical; }
 .turn.user { align-self: flex-end; align-items: flex-end; }
 .bubble { max-width: 100%; padding: 8px 12px; border-radius: 16px 16px 16px 4px; background: var(--paper-3); font-size: 0.9rem; white-space: pre-wrap; }
 .turn.user .bubble { background: var(--ink); color: var(--paper); border-radius: 16px 16px 4px 16px; }
-.action-list { display: grid; gap: 6px; width: 100%; }
+.turn.wide { max-width: 100%; align-self: stretch; }
+.action-list { display: grid; gap: 8px; width: 100%; }
+.action-card {
+  display: grid;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--rule);
+  border-radius: var(--r-card);
+  background: var(--paper-2);
+}
+.action-card header { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.action-card h3 { margin: 0; font-size: 0.95rem; }
+.action-card .muted { margin: 0; font-size: 0.8rem; }
+.action-card-foot { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.action-card-foot .schedule-now { font-size: 0.8rem; gap: 6px; }
 .action-row { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; }
 .action-row span { flex: 1; min-width: 0; }
 .composer { display: flex; gap: 8px; align-items: stretch; }
