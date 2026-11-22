@@ -1,5 +1,6 @@
 import { api } from "../api.js";
 import { blockHTML, DAY_HEIGHT, gutterLabels, hourLines, installPointer, layoutTasks, nowMarker, scrollToNow } from "../blocks.js";
+import { icon } from "../icons.js";
 import { bus, esc, gridTasks, store } from "../state.js";
 import { addDays, dayKey, zonedParts, zonedToUtc } from "../time.js";
 
@@ -38,7 +39,7 @@ class WeekGrid extends HTMLElement {
       const key = dayKey(date, tz);
       const parts = zonedParts(date, tz);
       const placed = layoutTasks(gridTasks().filter((task) => dayKey(new Date(task.scheduled_start), tz) === key), tz);
-      heads.push(`<div class="day-head ${key === today ? "today" : ""}"><span>${esc(parts.weekday)}</span><strong>${parts.day}</strong><button class="icon" type="button" data-note-day="${key}" title="Day note">Note</button></div>`);
+      heads.push(`<div class="day-head ${key === today ? "today" : ""}"><span>${esc(parts.weekday)}</span><strong>${parts.day}</strong><button class="icon-btn" type="button" data-note-day="${key}" title="Day note" aria-label="Day note">${icon("sticky-note")}</button></div>`);
       columns.push(`<div class="day-col" data-key="${key}">${hourLines()}${placed.map((item) => blockHTML(item, tz)).join("")}${key === today ? nowMarker(tz) : ""}</div>`);
     }
     const scroll = this.querySelector(".week-scroll")?.scrollTop || 0;

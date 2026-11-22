@@ -1,4 +1,5 @@
 import { api } from "../api.js";
+import { icon } from "../icons.js";
 import { pendingCount } from "../offline.js";
 import { bus, esc, refresh, store } from "../state.js";
 import { zonedToUtc } from "../time.js";
@@ -10,10 +11,10 @@ import "./pages.js";
 import "./capture.js";
 
 const LINKS = [
-  ["/calendar", "Calendar"],
-  ["/tasks", "Tasks"],
-  ["/tags", "Tags"],
-  ["/settings", "Settings"],
+  ["/calendar", "Calendar", "calendar"],
+  ["/tasks", "Tasks", "check-square"],
+  ["/tags", "Tags", "tag"],
+  ["/settings", "Settings", "settings"],
 ];
 
 class AppShell extends HTMLElement {
@@ -25,7 +26,17 @@ class AppShell extends HTMLElement {
     });
     this.addEventListener("open-task", (event) => this.openTask(event.detail));
     this.addEventListener("create-task", (event) => {
-      this.dialog.open({ title: "", priority: 3, energy_level_required: 3, task_type: "task", duration: 60, group_id: event.detail || null });
+      const detail = event.detail;
+      const groupId = detail && typeof detail === "object" ? detail.group_id : detail;
+      const taskType = detail && typeof detail === "object" && detail.task_type ? detail.task_type : "task";
+      this.dialog.open({
+        title: "",
+        priority: 3,
+        energy_level_required: 3,
+        task_type: taskType,
+        duration: 60,
+        group_id: groupId || null,
+      });
     });
     this.addEventListener("create-at", (event) => this.createAt(event.detail));
     this.addEventListener("open-ai", () => {
@@ -79,8 +90,9 @@ class AppShell extends HTMLElement {
     }
     const path = this.path();
     const nav = LINKS.map(
-      ([href, label]) => `<a data-link href="${href}" ${path === href ? 'aria-current="page"' : ""}>${label}</a>`,
+      ([href, label, name]) => `<a data-link href="${href}" ${path === href ? 'aria-current="page"' : ""}>${icon(name)}<span>${label}</span></a>`,
     ).join("");
+    const dark = document.documentElement.dataset.theme === "dark";
     const calendar = path === "/calendar" || path === "/";
     let body = "";
     if (path === "/tasks") body = "<pmd-tasks-page></pmd-tasks-page>";
@@ -90,22 +102,25 @@ class AppShell extends HTMLElement {
     else if (path.startsWith("/reminder")) body = "<pmd-reminder-page></pmd-reminder-page>";
     else body = `<section class="sheet calendar"><div class="cal-head" data-chrome></div><div data-grid></div><pmd-assistant hidden></pmd-assistant></section>`;
     this.innerHTML = `<header class="topbar">
-      <button class="tiny menu-btn" type="button" data-sidebar>Groups</button>
+      <button class="tiny icon-btn menu-btn" type="button" data-sidebar aria-label="Groups">${icon("menu")}</button>
       <a class="brand" data-link href="/calendar">Plan My Day</a>
       <nav class="nav">${nav}</nav>
       <span class="spacer"></span>
       <span class="who">${esc(store.user.name || store.user.email || "")}</span>
-      <button class="tiny" type="button" data-theme>Theme</button>
-      <button class="tiny" type="button" data-out>Sign out</button>
+      <button class="tiny icon-btn" type="button" data-theme aria-label="${dark ? "Switch to light theme" : "Switch to dark theme"}">${icon(dark ? "sun" : "moon")}</button>
+      <button class="tiny icon-btn" type="button" data-out aria-label="Sign out">${icon("log-out")}</button>
     </header>
     <div class="banner" data-offline hidden></div>
     <div class="layout">${calendar ? "<pmd-group-rail></pmd-group-rail>" : ""}${body}</div>`;
     this.append(this.dialog);
     if (calendar) this.syncChrome();
-    this.querySelector("[data-theme]")?.addEventListener("click", () => {
+    this.querySelector("[data-theme]")?.addEventListener("click", (event) => {
       const next = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
       document.documentElement.dataset.theme = next;
       localStorage.setItem("pmd-theme", next);
+      const button = event.currentTarget;
+      button.innerHTML = icon(next === "dark" ? "sun" : "moon");
+      button.setAttribute("aria-label", next === "dark" ? "Switch to light theme" : "Switch to dark theme");
     });
     this.querySelector("[data-out]")?.addEventListener("click", async () => {
       await api("/api/auth/logout", { method: "POST" });
@@ -140,9 +155,9 @@ class AppShell extends HTMLElement {
           <button class="tiny" type="button" data-view="month">Month</button>
         </div>
         <span class="spacer"></span>
-        <button class="tiny" type="button" data-shift="-1">Prev</button>
-        <button class="tiny" type="button" data-shift="1">Next</button>
-        <button class="tiny" type="button" data-compress>Compress</button>`;
+        <button class="tiny icon-btn" type="button" data-shift="-1" aria-label="Previous">${icon("chevron-left")}</button>
+        <button class="tiny icon-btn" type="button" data-shift="1" aria-label="Next">${icon("chevron-right")}</button>
+        <button class="tiny icon-btn" type="button" data-compress aria-label="Shuffle tasks">${icon("shuffle")}</button>`;
       host.addEventListener("click", (event) => this.onChrome(event));
     }
     host.querySelector("[data-title]").textContent = title;

@@ -1,6 +1,18 @@
 import { api } from "./api.js";
 
-const hiddenSaved = JSON.parse(localStorage.getItem("pmd-hidden-groups") || "[]");
+function readJSON(key, fallback) {
+  try {
+    const value = JSON.parse(localStorage.getItem(key) || "");
+    return value ?? fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+const hiddenSaved = readJSON("pmd-hidden-groups", []);
+const sectionSaved = readJSON("pmd-sections", null);
+const expandedSaved = readJSON("pmd-expanded-groups", []);
+const showAllSaved = localStorage.getItem("pmd-show-all-tasks") === "1";
 
 export const store = {
   user: null,
@@ -9,24 +21,46 @@ export const store = {
   cursor: new Date(),
   mode: "week",
   offline: 0,
-  hidden: new Set(hiddenSaved),
+  hidden: new Set(Array.isArray(hiddenSaved) ? hiddenSaved : []),
   selectedGroupId: null,
-  sections: { groups: true, bench: true, metrics: true },
+  sections: {
+    groups: sectionSaved?.groups !== false,
+    bench: sectionSaved?.bench !== false,
+    metrics: sectionSaved?.metrics !== false,
+  },
+  expandedGroups: new Set(Array.isArray(expandedSaved) ? expandedSaved : []),
   metricOpen: {},
+  showAllTasks: showAllSaved,
 };
 
 export function persistHidden() {
   localStorage.setItem("pmd-hidden-groups", JSON.stringify([...store.hidden]));
 }
 
+export function persistSections() {
+  localStorage.setItem("pmd-sections", JSON.stringify(store.sections));
+}
+
+export function persistExpanded() {
+  localStorage.setItem("pmd-expanded-groups", JSON.stringify([...store.expandedGroups]));
+}
+
+export function persistShowAll() {
+  localStorage.setItem("pmd-show-all-tasks", store.showAllTasks ? "1" : "0");
+}
+
+export function groupKey(task) {
+  return task?.group_id || "ungrouped";
+}
+
 export function shownTasks() {
-  return store.tasks.filter((task) => !store.hidden.has(task.group_id || ""));
+  return store.tasks.filter((task) => !store.hidden.has(groupKey(task)) && !store.hidden.has(task.group_id || ""));
 }
 
 export function gridTasks() {
   return shownTasks().filter((task) => {
     if (task.parent_task_id || task.status === "cancelled" || task.status === "rescheduled") return false;
-    if (store.selectedGroupId && (task.group_id || "") !== store.selectedGroupId) return false;
+    if (store.selectedGroupId && groupKey(task) !== store.selectedGroupId && (task.group_id || "") !== store.selectedGroupId) return false;
     return Boolean(task.scheduled_start);
   });
 }
