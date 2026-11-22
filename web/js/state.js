@@ -60,7 +60,6 @@ export function shownTasks() {
 export function gridTasks() {
   return shownTasks().filter((task) => {
     if (task.parent_task_id || task.status === "cancelled" || task.status === "rescheduled") return false;
-    if (store.selectedGroupId && groupKey(task) !== store.selectedGroupId && (task.group_id || "") !== store.selectedGroupId) return false;
     return Boolean(task.scheduled_start);
   });
 }

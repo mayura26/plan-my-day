@@ -1,5 +1,6 @@
 import { api } from "./api.js";
-import { esc, groupById, priorityColor, refresh } from "./state.js";
+import { icon } from "./icons.js";
+import { esc, groupById, groupKey, priorityColor, refresh, store } from "./state.js";
 import { dayKey, zonedParts, zonedToUtc } from "./time.js";
 
 export const HOUR_PX = 48;
@@ -21,8 +22,46 @@ export function shortDue(iso, tz) {
   return new Intl.DateTimeFormat("en-GB", { timeZone: tz, day: "numeric", month: "short" }).format(new Date(iso));
 }
 
+function endsAt(task) {
+  if (task.scheduled_end) return new Date(task.scheduled_end).getTime();
+  if (!task.scheduled_start) return 0;
+  return new Date(task.scheduled_start).getTime() + (task.duration || 30) * 60000;
+}
+
+function overlaps(a, b) {
+  if (!a.scheduled_start || !b.scheduled_start) return false;
+  return new Date(a.scheduled_start).getTime() < endsAt(b) && endsAt(a) > new Date(b.scheduled_start).getTime();
+}
+
+function hexToRgba(hex, alpha) {
+  const raw = String(hex || "").replace("#", "");
+  if (raw.length < 6) return `rgba(107, 114, 128, ${alpha})`;
+  const n = Number.parseInt(raw.slice(0, 6), 16);
+  if (Number.isNaN(n)) return `rgba(107, 114, 128, ${alpha})`;
+  return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${alpha})`;
+}
+
+function pastEvent(task) {
+  return task.task_type === "event" && task.status !== "completed" && task.scheduled_end && new Date(task.scheduled_end) < new Date();
+}
+
+function overdue(task) {
+  if (task.task_type === "event" || task.status === "completed" || task.status === "cancelled" || task.status === "rescheduled" || task.ignored) return false;
+  const now = Date.now();
+  if (task.due_date && new Date(task.due_date).getTime() < now) return true;
+  return Boolean(task.scheduled_end && new Date(task.scheduled_end).getTime() < now);
+}
+
 export function layoutTasks(tasks, tz) {
-  const items = tasks
+  const active = tasks.filter((task) => task.status !== "completed");
+  const completed = tasks.filter((task) => task.status === "completed");
+  const hidden = new Map();
+  for (const task of active) {
+    const covered = completed.filter((done) => overlaps(task, done));
+    if (covered.length) hidden.set(task.id, covered.map((done) => done.id));
+  }
+  const visible = [...active, ...completed.filter((done) => !active.some((task) => overlaps(task, done)))];
+  const items = visible
     .filter((task) => task.scheduled_start)
     .map((task) => {
       const begin = new Date(task.scheduled_start);
@@ -30,7 +69,7 @@ export function layoutTasks(tasks, tz) {
       const finish = new Date(task.scheduled_end || begin.getTime() + (task.duration || 30) * 60000);
       let end = dayKey(finish, tz) === dayKey(begin, tz) ? minuteOf(finish, tz) : 24 * 60;
       if (end <= start) end = Math.min(24 * 60, start + (task.duration || 30));
-      return { task, start, end, col: 0, cols: 1 };
+      return { task, start, end, col: 0, cols: 1, hiddenCompleted: hidden.get(task.id) || [] };
     })
     .sort((a, b) => a.start - b.start || a.end - b.end);
   let group = [];
@@ -42,17 +81,17 @@ export function layoutTasks(tasks, tz) {
     });
     group = [];
   };
-  const active = [];
+  const lanes = [];
   for (const item of items) {
     if (group.length && item.start >= groupEnd) flush();
-    for (let i = active.length - 1; i >= 0; i -= 1) {
-      if (active[i].end <= item.start) active.splice(i, 1);
+    for (let i = lanes.length - 1; i >= 0; i -= 1) {
+      if (lanes[i].end <= item.start) lanes.splice(i, 1);
     }
-    const used = new Set(active.map((entry) => entry.col));
+    const used = new Set(lanes.map((entry) => entry.col));
     let col = 0;
     while (used.has(col)) col += 1;
     item.col = col;
-    active.push(item);
+    lanes.push(item);
     group.push(item);
     groupEnd = Math.max(groupEnd, item.end);
   }
@@ -63,14 +102,29 @@ export function layoutTasks(tasks, tz) {
 export function blockHTML(item, tz) {
   const task = item.task;
   const group = groupById(task.group_id);
+  const color = group?.color || "#6b7280";
   const top = (item.start / 1440) * DAY_HEIGHT;
   const height = Math.max(22, ((item.end - item.start) / 1440) * DAY_HEIGHT);
-  const due = shortDue(task.due_date, tz);
-  const meta = [due, group?.name].filter(Boolean).join(" · ");
-  return `<article class="block" role="button" tabindex="0" data-id="${esc(task.id)}" data-minute="${item.start}" data-dur="${item.end - item.start}" style="top:${top}px;height:${height}px;left:${(item.col / item.cols) * 100}%;width:calc(${100 / item.cols}% - 6px);--group:${esc(group?.color || "#23466a")}">
+  const done = task.status === "completed";
+  const past = pastEvent(task);
+  const selected = store.selectedGroupId;
+  const faded = selected && (selected === "ungrouped" ? Boolean(task.group_id) : groupKey(task) !== selected);
+  const classes = ["block", done || past ? "done" : "", overdue(task) ? "overdue" : "", task.status === "in_progress" ? "progress" : "", faded ? "faded" : ""].filter(Boolean).join(" ");
+  const energy = task.energy_level_required
+    ? `<span class="block-energy">${icon("zap")}<span>${esc(task.energy_level_required)}</span></span>`
+    : "";
+  const archive = !done && item.hiddenCompleted.length
+    ? `<button class="block-archive${task.energy_level_required ? "" : " alone"}" type="button" data-archive="${esc(item.hiddenCompleted[0])}" title="${item.hiddenCompleted.length === 1 ? "View completed task" : `${item.hiddenCompleted.length} completed tasks hidden`}">${icon("archive")}</button>`
+    : "";
+  const duration = task.duration || item.end - item.start;
+  const badge = group && duration >= 45
+    ? `<em class="block-group" style="background:${hexToRgba(color, 0.8)}">${esc(group.name.length > 10 ? `${group.name.slice(0, 10)}...` : group.name)}</em>`
+    : "";
+  return `<article class="${classes}" role="button" tabindex="0" data-id="${esc(task.id)}" data-minute="${item.start}" data-dur="${item.end - item.start}" style="top:${top}px;height:${height}px;left:${(item.col / item.cols) * 100}%;width:calc(${100 / item.cols}% - 6px);background:${hexToRgba(color, 0.4)};border-color:${task.status === "in_progress" ? "#86efac" : color}">
     <span class="priority" style="background:${priorityColor(task.priority)}"></span>
+    ${energy}${archive}
     <strong>${esc(task.title)}</strong>
-    <small>${esc(meta)}</small>
+    ${badge}
     <div class="resize" data-resize="1"></div>
   </article>`;
 }
@@ -92,6 +146,13 @@ export function nowMarker(tz) {
 
 export function installPointer(root) {
   root.addEventListener("pointerdown", (event) => {
+    const archive = event.target.closest("[data-archive]");
+    if (archive) {
+      event.preventDefault();
+      event.stopPropagation();
+      root.dispatchEvent(new CustomEvent("open-task", { bubbles: true, detail: archive.dataset.archive }));
+      return;
+    }
     const block = event.target.closest(".block");
     if (!block || event.button !== 0) return;
     event.preventDefault();

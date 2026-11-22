@@ -262,29 +262,60 @@ pmd-group-rail { display: block; min-width: 0; min-height: 0; height: 100%; }
 .block {
   position: absolute;
   border-radius: 8px;
-  padding: 4px 8px 8px 10px;
+  padding: 8px 8px 6px;
   overflow: hidden;
-  border: 1px solid color-mix(in srgb, var(--group, var(--ink)) 55%, white);
-  background: color-mix(in srgb, var(--group, var(--ink)) 82%, #101820);
-  color: #f7f4ee;
-  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.18);
+  border: 1px solid #6b7280;
+  color: #fff;
   cursor: grab;
   z-index: 1;
 }
 
-.block.dragging { cursor: grabbing; box-shadow: var(--shadow); z-index: 5; }
+.block.done { opacity: 0.5; }
+.block.done strong { text-decoration: line-through; }
+.block.overdue { box-shadow: 0 0 0 2px #ef4444; }
+.block.faded { opacity: 0.3; }
+.block.dragging { cursor: grabbing; box-shadow: var(--shadow); z-index: 5; opacity: 0.7; }
 
-.block strong { display: block; font-size: 0.95rem; }
+.block strong { display: block; margin-top: 4px; font-size: 0.78rem; font-weight: 600; }
 
-.block small { color: rgba(247, 244, 238, 0.82); font-size: 0.75rem; }
+.block-energy, .block-archive {
+  position: absolute;
+  top: 8px;
+  right: 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  color: #fff;
+  font-size: 10px;
+}
+
+.block-archive { top: 24px; border: 0; background: rgba(255, 255, 255, 0.2); border-radius: 999px; width: 16px; height: 16px; padding: 0; cursor: pointer; }
+.block-archive.alone { top: 8px; }
+.block-energy .svg-icon, .block-archive .svg-icon { width: 12px; height: 12px; }
+
+.block-group {
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  max-width: 70%;
+  padding: 0 3px;
+  border-radius: 4px;
+  font-style: normal;
+  font-size: 9px;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+}
 
 .priority {
   position: absolute;
   left: 0;
+  right: 0;
   top: 0;
-  bottom: 0;
-  width: 4px;
+  height: 4px;
 }
+
+.cell em.done { text-decoration: line-through; opacity: 0.55; }
 
 .resize {
   position: absolute;
@@ -899,3 +930,30 @@ html[data-theme="dark"] .badge.unsched { background: rgba(124, 45, 18, 0.5); col
 
 .crit { display: inline-flex; }
 .crit .svg-icon { width: 0.9rem; height: 0.9rem; }
+
+.brand { display: inline-flex; align-items: center; gap: 10px; }
+.brand-mark { width: 36px; height: 36px; border-radius: 12px; object-fit: cover; box-shadow: 0 0 0 1px var(--rule); }
+.brand-version { font-family: var(--body, inherit); font-size: 0.75rem; font-weight: 450; letter-spacing: 0; color: var(--muted); }
+
+.page-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
+.page-head h1, .settings-card h2, .tag-card h2 { margin: 0; }
+.tag-list { display: grid; gap: 12px; }
+.tag-card, .settings-card { background: var(--paper-2); border: 1px solid var(--rule); border-radius: 16px; padding: 16px; display: grid; gap: 10px; }
+.tag-card header, .dialog-title { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.tag-card h2, .dialog-title h2 { display: flex; align-items: center; gap: 8px; font-size: 1.15rem; }
+.tag-card.empty { justify-items: center; text-align: center; padding: 32px; }
+.pills, .modes { display: flex; flex-wrap: wrap; gap: 6px; }
+.pill { display: inline-flex; align-items: center; gap: 4px; border: 1px solid var(--rule); border-radius: 999px; padding: 2px 8px; font-size: 12px; }
+.pill.solid, .tiny.on, .tabs button.on { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+.pill .svg-icon, .tabs .svg-icon { width: 12px; height: 12px; }
+.tabs { display: flex; border: 1px solid var(--rule); border-radius: 10px; overflow: hidden; }
+.tabs button { flex: 1; border: 0; background: transparent; color: var(--muted); padding: 8px; display: inline-flex; justify-content: center; align-items: center; gap: 6px; }
+.transcript { display: grid; align-content: start; gap: 8px; min-height: 140px; max-height: 280px; overflow: auto; }
+.bubble { max-width: 85%; padding: 8px 12px; border-radius: 16px; background: var(--paper-3); }
+.bubble.user { justify-self: end; background: var(--ink); color: var(--paper); }
+.assistant, .task-form { width: min(720px, 100%); display: grid; gap: 12px; }
+.swatch { width: 12px; height: 12px; border-radius: 999px; flex: none; }
+.type-menu { display: flex; align-items: center; gap: 6px; font-size: 0.85rem; }
+details { border: 1px solid var(--rule); border-radius: 12px; padding: 8px 12px; }
+.center { text-align: center; }
+.settings-card h2 { font-size: 1.2rem; }

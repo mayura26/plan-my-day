@@ -92,7 +92,8 @@ class MonthGrid extends HTMLElement {
         .slice(0, 3)
         .map((task) => {
           const group = store.groups.find((item) => item.id === task.group_id);
-          return `<em style="color:${esc(group?.color || "#9aabbc")}">${esc(task.title)}</em>`;
+          const marked = task.status === "completed" || (task.task_type === "event" && task.scheduled_end && new Date(task.scheduled_end) < new Date());
+          return `<em class="${marked ? "done" : ""}" style="color:${esc(group?.color || "#9aabbc")}">${esc(task.title)}</em>`;
         })
         .join("");
       const inMonth = key.startsWith(`${parts.year}-${String(parts.month).padStart(2, "0")}`);

@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"encoding/json"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -42,6 +43,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /auth/callback/google", s.callbackGoogle)
 	mux.HandleFunc("GET /auth/callback/github", s.callbackGitHub)
 
+	mux.HandleFunc("GET /api/version", s.version)
 	mux.HandleFunc("GET /api/me", s.me)
 	mux.HandleFunc("GET /api/user/timezone", s.getTimezone)
 	mux.HandleFunc("PUT /api/user/timezone", s.putTimezone)
@@ -119,6 +121,20 @@ func (s *Server) Handler() http.Handler {
 	return mux
 }
 
+func (s *Server) version(w http.ResponseWriter, r *http.Request) {
+	version := "1"
+	raw, err := os.ReadFile(filepath.Join(filepath.Dir(s.WebRoot), "public", "version.json"))
+	if err == nil {
+		var body struct {
+			Version string `json:"version"`
+		}
+		if json.Unmarshal(raw, &body) == nil && body.Version != "" {
+			version = body.Version
+		}
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"version": version})
+}
+
 func (s *Server) health(w http.ResponseWriter, r *http.Request) {
 	if s.Store == nil {
 		writeError(w, http.StatusServiceUnavailable, "database is not configured")
@@ -142,6 +158,13 @@ func (s *Server) frontend(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	clean := filepath.Clean(rel)
+	if clean == "icon.png" {
+		icon := filepath.Join(filepath.Dir(s.WebRoot), "public", "icon.png")
+		if _, err := os.Stat(icon); err == nil {
+			http.ServeFile(w, r, icon)
+			return
+		}
+	}
 	full := filepath.Join(s.WebRoot, clean)
 	root, _ := filepath.Abs(s.WebRoot)
 	abs, err := filepath.Abs(full)

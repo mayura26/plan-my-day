@@ -1,73 +1,177 @@
 import { api } from "../api.js";
+import { icon } from "../icons.js";
 import { esc, store } from "../state.js";
+
+const PRIORITY = { 1: "Critical", 2: "High", 3: "Medium", 4: "Low", 5: "Very Low" };
+const ENERGY = { 1: "Low Energy", 2: "Low-Medium", 3: "Medium", 4: "Medium-High", 5: "High Energy" };
+const OFFSETS = [["Now", 0], ["15 min", 15], ["30 min", 30], ["1 hour", 60], ["2 hours", 120]];
+
+function offsetLabel(minutes) {
+  const value = Number(minutes) || 0;
+  if (value === 0) return "Now";
+  if (value < 60) return `${value} min`;
+  const hours = value / 60;
+  if (hours === Math.floor(hours)) return `${hours}h`;
+  return `${Math.floor(hours)}h ${value % 60}m`;
+}
+
+function leafGroups() {
+  const parents = new Set(store.groups.filter((group) => group.is_parent_group).map((group) => group.id));
+  store.groups.forEach((group) => {
+    if (group.parent_group_id) parents.add(group.parent_group_id);
+  });
+  return store.groups.filter((group) => !parents.has(group.id));
+}
 
 class TagsPage extends HTMLElement {
   connectedCallback() {
+    this.tags = [];
+    this.editor = null;
+    this.copied = "";
     this.render();
   }
 
   async render() {
     const data = await api("/api/quick-tags");
-    const tags = data.tags || [];
+    this.tags = data.tags || [];
+    const cards = this.tags.length
+      ? this.tags.map((tag) => this.card(tag)).join("")
+      : `<article class="tag-card empty"><div>${icon("tag")}<h3>No Quick Tags yet</h3><p class="muted">Create a Quick Tag to generate a short URL you can program into an NFC tag.</p><button class="solid" type="button" data-new>Create Your First Tag</button></div></article>`;
     this.innerHTML = `<section class="sheet reveal stack">
-      <p class="kicker">Quick tags</p>
-      <h1 class="day-title">Capture in <span>one tap</span>.</h1>
-      ${tags
-        .map(
-          (tag) => `<div class="row"><div><strong>${esc(tag.name)}</strong><div class="muted">${esc(tag.task_title)}</div></div>
-            <button class="tiny" type="button" data-copy="${esc(tag.id)}">Copy link</button>
-            <button class="tiny" type="button" data-run="${esc(tag.id)}">Run</button>
-            <button class="tiny" type="button" data-del="${esc(tag.id)}">Delete</button></div>`,
-        )
-        .join("")}
-      <form class="form-grid" data-create>
-        <label>Name<input name="name" required /></label>
-        <label>Task title<input name="task_title" required /></label>
-        <label>Minutes<input name="duration_minutes" type="number" value="30" /></label>
-        <label>Priority<input name="priority" type="number" min="1" max="5" value="3" /></label>
-        <label>Offset minutes<input name="schedule_offset_minutes" type="number" value="0" /></label>
-        <label class="row"><input name="auto_accept" type="checkbox" /> Run without asking</label>
-        <label class="row"><input name="default_locked" type="checkbox" /> Pin the new task</label>
-        <button class="solid" type="submit">Save tag</button>
-      </form>
+      <div class="page-head">
+        <div><h1>Quick Tags</h1><p class="muted">Create NFC-triggered shortcuts for quick task creation</p></div>
+        <button class="solid with-icon" type="button" data-new>${icon("plus")} New Tag</button>
+      </div>
+      <div class="tag-list">${cards}</div>
       <p class="muted" data-msg></p>
+      ${this.editor ? this.editorForm() : ""}
     </section>`;
-    this.querySelector("[data-create]").addEventListener("submit", async (event) => {
-      event.preventDefault();
-      const form = new FormData(event.target);
-      await api("/api/quick-tags", {
-        method: "POST",
-        body: {
-          name: form.get("name"),
-          task_title: form.get("task_title"),
-          duration_minutes: Number(form.get("duration_minutes")),
-          priority: Number(form.get("priority")),
-          schedule_offset_minutes: Number(form.get("schedule_offset_minutes")),
-          auto_accept: form.get("auto_accept") === "on",
-          default_locked: form.get("default_locked") === "on",
-          task_type: "task",
-          energy_level: 3,
-        },
-      });
-      await this.render();
-    });
-    this.querySelectorAll("[data-copy]").forEach((button) => {
-      button.addEventListener("click", async () => {
-        await navigator.clipboard.writeText(`${location.origin}/q/${button.dataset.copy}`);
-        this.querySelector("[data-msg]").textContent = "Link copied.";
-      });
-    });
-    this.querySelectorAll("[data-run]").forEach((button) => {
+    this.querySelectorAll("[data-new]").forEach((button) => button.addEventListener("click", () => this.openEditor(null)));
+    this.querySelectorAll("[data-edit]").forEach((button) => button.addEventListener("click", () => this.openEditor(this.tags.find((tag) => tag.id === button.dataset.edit))));
+    this.querySelectorAll("[data-del]").forEach((button) => button.addEventListener("click", () => this.remove(button.dataset.del)));
+    this.querySelectorAll("[data-copy]").forEach((button) => button.addEventListener("click", () => this.copy(button.dataset.copy)));
+    this.querySelector("[data-editor]")?.addEventListener("submit", (event) => this.save(event));
+    this.querySelectorAll("[data-offset]").forEach((button) => {
       button.addEventListener("click", () => {
-        location.assign(`/q/${button.dataset.run}`);
+        this.querySelector('[name="schedule_offset_minutes"]').value = button.dataset.offset;
+        this.querySelectorAll("[data-offset]").forEach((item) => item.classList.toggle("on", item === button));
       });
     });
-    this.querySelectorAll("[data-del]").forEach((button) => {
-      button.addEventListener("click", async () => {
-        await api(`/api/quick-tags/${button.dataset.del}`, { method: "DELETE" });
-        await this.render();
-      });
+    this.querySelector("[data-cancel]")?.addEventListener("click", () => {
+      this.editor = null;
+      this.render();
     });
+  }
+
+  card(tag) {
+    return `<article class="tag-card">
+      <header>
+        <div><h2>${icon("tag")} ${esc(tag.name)}</h2><p class="muted">${esc(tag.task_title)}</p></div>
+        <div class="row">
+          <button class="tiny icon-btn" type="button" data-edit="${esc(tag.id)}" aria-label="Edit tag">${icon("pencil")}</button>
+          <button class="tiny icon-btn" type="button" data-del="${esc(tag.id)}" aria-label="Delete tag">${icon("trash")}</button>
+        </div>
+      </header>
+      <div class="pills">
+        <span class="pill">${tag.task_type === "todo" ? "To-Do" : "Task"}</span>
+        <span class="pill">P${esc(tag.priority)}: ${esc(PRIORITY[tag.priority] || "Medium")}</span>
+        ${tag.duration_minutes ? `<span class="pill">${icon("clock")} ${esc(tag.duration_minutes)}m</span>` : ""}
+        <span class="pill">${icon("zap")} ${esc(ENERGY[tag.energy_level] || "Medium")}</span>
+        <span class="pill">Schedules in ${esc(offsetLabel(tag.schedule_offset_minutes))}</span>
+        ${tag.auto_accept ? `<span class="pill solid">Auto-create</span>` : ""}
+        ${tag.default_locked ? `<span class="pill">${icon("lock")} Locked</span>` : ""}
+      </div>
+      <div class="row">
+        <input readonly value="${esc(`${location.origin}/q/${tag.id}`)}" />
+        <button class="tiny icon-btn" type="button" data-copy="${esc(tag.id)}" aria-label="Copy URL">${icon(this.copied === tag.id ? "check" : "copy")}</button>
+      </div>
+    </article>`;
+  }
+
+  openEditor(tag) {
+    this.editor = tag || {
+      name: "",
+      task_title: "",
+      task_description: "",
+      task_type: "task",
+      priority: 3,
+      duration_minutes: 30,
+      energy_level: 3,
+      schedule_offset_minutes: 0,
+      group_id: "",
+      auto_accept: false,
+      default_locked: false,
+    };
+    this.render();
+  }
+
+  editorForm() {
+    const tag = this.editor;
+    const groups = leafGroups().map((group) => `<option value="${esc(group.id)}" ${group.id === tag.group_id ? "selected" : ""}>${esc(group.name)}</option>`).join("");
+    const offsets = OFFSETS.map(([label, value]) => `<button class="tiny ${Number(tag.schedule_offset_minutes) === value ? "on" : ""}" type="button" data-offset="${value}">${label}</button>`).join("");
+    return `<div class="dialog-back"><form class="dialog" data-editor>
+      <h2>${tag.id ? "Edit Quick Tag" : "Create Quick Tag"}</h2>
+      <p class="muted">${tag.id ? "Update this tag's configuration. Changes apply to future scans." : "Configure a quick tag for NFC-triggered task creation."}</p>
+      <label>Tag Name<input name="name" required value="${esc(tag.name)}" placeholder="e.g., Laundry, Take Medication" /></label>
+      <label>Task Title<input name="task_title" required value="${esc(tag.task_title)}" placeholder="e.g., Collect Laundry" /></label>
+      <label>Description (optional)<textarea name="task_description">${esc(tag.task_description || "")}</textarea></label>
+      <div class="form-grid">
+        <label>Type<select name="task_type"><option value="task" ${tag.task_type === "task" ? "selected" : ""}>Task</option><option value="todo" ${tag.task_type === "todo" ? "selected" : ""}>To-Do</option></select></label>
+        <label>Priority<select name="priority">${[1, 2, 3, 4, 5].map((n) => `<option value="${n}" ${Number(tag.priority) === n ? "selected" : ""}>${n} - ${PRIORITY[n]}</option>`).join("")}</select></label>
+        <label>Duration (minutes)<input name="duration_minutes" type="number" min="1" value="${esc(tag.duration_minutes || "")}" /></label>
+        <label>Energy Level<select name="energy_level">${[1, 2, 3, 4, 5].map((n) => `<option value="${n}" ${Number(tag.energy_level) === n ? "selected" : ""}>${n} - ${ENERGY[n]}</option>`).join("")}</select></label>
+      </div>
+      <label>Schedule Offset<div class="modes">${offsets}</div><span class="row"><input name="schedule_offset_minutes" type="number" min="0" value="${esc(tag.schedule_offset_minutes || 0)}" /> <span class="muted">minutes from now</span></span></label>
+      <label>Group (optional)<select name="group_id"><option value="">No group</option>${groups}</select></label>
+      <label class="row"><input name="auto_accept" type="checkbox" ${tag.auto_accept ? "checked" : ""} /> Auto-create without asking</label>
+      <label class="row"><input name="default_locked" type="checkbox" ${tag.default_locked ? "checked" : ""} /> Lock the new task</label>
+      <p class="error" data-error></p>
+      <div class="actions"><button class="tiny" type="button" data-cancel>Cancel</button><button class="solid" type="submit">${tag.id ? "Save" : "Create Tag"}</button></div>
+    </form></div>`;
+  }
+
+  async save(event) {
+    event.preventDefault();
+    const form = new FormData(event.target);
+    const body = {
+      name: form.get("name"),
+      task_title: form.get("task_title"),
+      task_description: form.get("task_description") || null,
+      task_type: form.get("task_type"),
+      priority: Number(form.get("priority")),
+      duration_minutes: Number(form.get("duration_minutes")) || null,
+      energy_level: Number(form.get("energy_level")),
+      schedule_offset_minutes: Number(form.get("schedule_offset_minutes")) || 0,
+      group_id: form.get("group_id") || null,
+      auto_accept: form.get("auto_accept") === "on",
+      default_locked: form.get("default_locked") === "on",
+    };
+    try {
+      if (this.editor.id) await api(`/api/quick-tags/${this.editor.id}`, { method: "PUT", body });
+      else await api("/api/quick-tags", { method: "POST", body });
+      this.editor = null;
+      await this.render();
+    } catch (error) {
+      this.querySelector("[data-error]").textContent = error.message;
+    }
+  }
+
+  async copy(id) {
+    await navigator.clipboard.writeText(`${location.origin}/q/${id}`);
+    this.copied = id;
+    await this.render();
+    setTimeout(() => {
+      if (this.copied === id) {
+        this.copied = "";
+        this.render();
+      }
+    }, 2000);
+  }
+
+  async remove(id) {
+    if (!window.confirm("Delete this quick tag?")) return;
+    await api(`/api/quick-tags/${id}`, { method: "DELETE" });
+    await this.render();
   }
 }
 
@@ -117,41 +221,125 @@ class ReminderPage extends HTMLElement {
 class AssistantPanel extends HTMLElement {
   connectedCallback() {
     this.messages = [];
-    this.innerHTML = `<form class="stack" style="margin-top:14px">
-      <p class="kicker">Assistant</p>
-      <div data-log class="muted"></div>
-      <div class="row"><input name="text" placeholder="Add a call with Sam tomorrow at 9" /><button class="tiny" type="submit">Ask</button></div>
-      <div data-actions></div>
-    </form>`;
-    this.querySelector("form").addEventListener("submit", (event) => this.ask(event));
+    this.mode = "assistant";
+    this.busy = false;
+    this.note = "";
+    this.hidden = true;
   }
 
-  async ask(event) {
+  open() {
+    this.hidden = false;
+    this.paint();
+  }
+
+  close() {
+    this.hidden = true;
+    this.innerHTML = "";
+  }
+
+  paint() {
+    const assistant = this.mode === "assistant";
+    const log = this.messages.length
+      ? this.messages.map((message, index) => `<div class="bubble ${message.role}">${esc(message.content)}${this.actionsHTML(message, index)}</div>`).join("")
+      : `<p class="muted center">Tell me what you need — I can build tasks from a brain dump, or manage your schedule ("move my lunch to 1pm", "extend the washing to 2 hours"). I'll ask if I need more detail.</p>`;
+    this.innerHTML = `<div class="dialog-back"><form class="dialog assistant">
+      <div class="dialog-title"><h2>${icon("sparkles")} ${assistant ? "AI Assistant" : "Add Task with AI"}</h2><button class="tiny icon-btn" type="button" data-close aria-label="Close">${icon("x")}</button></div>
+      <div class="tabs">
+        <button class="${assistant ? "on" : ""}" type="button" data-mode="assistant">${icon("message-circle")} Assistant</button>
+        <button class="${assistant ? "" : "on"}" type="button" data-mode="quick">${icon("sparkles")} Quick add</button>
+      </div>
+      ${assistant ? `<div class="transcript">${log}</div><label class="grow">Message<textarea name="text" placeholder="Add a call with Sam tomorrow at 9"></textarea></label>` : `<label class="grow">Describe your task<textarea name="quick" placeholder="Describe your task in plain English…"></textarea></label><label class="row"><input name="subtasks" type="checkbox" /> Generate subtasks</label>`}
+      <p class="error" data-note>${esc(this.note)}</p>
+      <div class="actions">
+        <button class="tiny with-icon" type="button" data-voice>${icon("mic")} Voice</button>
+        <span class="spacer"></span>
+        <button class="tiny" type="button" data-close>Done</button>
+        <button class="solid" type="submit" ${this.busy ? "disabled" : ""}>Send</button>
+      </div>
+    </form></div>`;
+    this.querySelector("form").addEventListener("submit", (event) => this.send(event));
+    this.querySelectorAll("[data-close]").forEach((button) => button.addEventListener("click", () => this.close()));
+    this.querySelectorAll("[data-mode]").forEach((button) => button.addEventListener("click", () => {
+      this.mode = button.dataset.mode;
+      this.note = "";
+      this.paint();
+    }));
+    this.querySelector("[data-voice]").addEventListener("click", () => {
+      this.note = "Voice input is not available in this browser.";
+      this.querySelector("[data-note]").textContent = this.note;
+    });
+    this.querySelectorAll("[data-apply]").forEach((button) => {
+      button.addEventListener("click", () => this.accept(this.messages[Number(button.dataset.message)].actions[Number(button.dataset.apply)]));
+    });
+  }
+
+  actionsHTML(message, index) {
+    if (!message.actions?.length) return "";
+    return `<div class="modes">${message.actions.map((action, actionIndex) => `<button class="tiny" type="button" data-message="${index}" data-apply="${actionIndex}">${esc(action.action || "create")} ${esc(action.title || "")}</button>`).join("")}</div>`;
+  }
+
+  async send(event) {
     event.preventDefault();
-    const text = new FormData(event.target).get("text");
-    if (!text) return;
-    event.target.reset();
-    this.messages.push({ role: "user", content: String(text) });
-    const turn = await api("/api/ai/assistant", {
-      method: "POST",
-      body: {
-        messages: this.messages,
-        groups: store.groups.map((group) => ({ id: group.id, name: group.name })),
-        existing_tasks: store.tasks.slice(0, 40),
-      },
-    });
-    this.messages.push({ role: "assistant", content: turn.message || "" });
-    this.querySelector("[data-log]").textContent = turn.message || "";
-    const actions = turn.proposed_actions || [];
-    this.querySelector("[data-actions]").innerHTML = actions
-      .map(
-        (action, index) =>
-          `<button class="chip" type="button" data-index="${index}">${esc(action.action)} ${esc(action.title)}</button>`,
-      )
-      .join("");
-    this.querySelectorAll("[data-index]").forEach((button) => {
-      button.addEventListener("click", () => this.accept(actions[Number(button.dataset.index)]));
-    });
+    if (this.busy) return;
+    const form = new FormData(event.target);
+    this.busy = true;
+    this.note = "";
+    try {
+      if (this.mode === "quick") {
+        const text = String(form.get("quick") || "").trim();
+        if (!text) return;
+        const parsed = await api("/api/ai/parse-task", {
+          method: "POST",
+          body: {
+            text,
+            generate_subtasks: form.get("subtasks") === "on",
+            groups: store.groups.map((group) => ({ id: group.id, name: group.name })),
+          },
+        });
+        const task = parsed.task || {};
+        const { fromLocalValue } = await import("../time.js");
+        const tz = store.user?.timezone || "UTC";
+        const local = (value) => (value && String(value).includes("T") && !String(value).endsWith("Z") ? fromLocalValue(String(value).slice(0, 16), tz) : value || null);
+        this.close();
+        this.dispatchEvent(new CustomEvent("create-task", {
+          bubbles: true,
+          detail: {
+            title: task.title || text,
+            description: task.description || "",
+            task_type: task.task_type || "task",
+            priority: task.priority || 3,
+            energy_level_required: task.energy_level_required || 3,
+            duration: task.duration || 30,
+            group_id: task.group_id || null,
+            scheduled_start: local(task.scheduled_start),
+            scheduled_end: local(task.scheduled_end),
+            due_date: local(task.due_date),
+            subtasks: task.subtasks || [],
+          },
+        }));
+        return;
+      }
+      const text = String(form.get("text") || this.querySelector("textarea")?.value || "").trim();
+      const field = this.querySelector("textarea");
+      const spoken = field ? field.value.trim() : text;
+      if (!spoken) return;
+      this.messages.push({ role: "user", content: spoken });
+      this.paint();
+      const turn = await api("/api/ai/assistant", {
+        method: "POST",
+        body: {
+          messages: this.messages.map(({ role, content }) => ({ role, content })),
+          groups: store.groups.map((group) => ({ id: group.id, name: group.name })),
+          existing_tasks: store.tasks.slice(0, 40),
+        },
+      });
+      this.messages.push({ role: "assistant", content: turn.message || "", actions: turn.proposed_actions || [] });
+    } catch (error) {
+      this.note = error.message;
+    } finally {
+      this.busy = false;
+      if (!this.hidden) this.paint();
+    }
   }
 
   async accept(action) {

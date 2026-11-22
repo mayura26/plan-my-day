@@ -27,6 +27,10 @@ class AppShell extends HTMLElement {
     this.addEventListener("open-task", (event) => this.openTask(event.detail));
     this.addEventListener("create-task", (event) => {
       const detail = event.detail;
+      if (detail && typeof detail === "object" && (detail.title || detail.subtasks)) {
+        this.dialog.open(detail);
+        return;
+      }
       const groupId = detail && typeof detail === "object" ? detail.group_id : detail;
       const taskType = detail && typeof detail === "object" && detail.task_type ? detail.task_type : "task";
       this.dialog.open({
@@ -39,10 +43,7 @@ class AppShell extends HTMLElement {
       });
     });
     this.addEventListener("create-at", (event) => this.createAt(event.detail));
-    this.addEventListener("open-ai", () => {
-      const panel = this.querySelector("pmd-assistant");
-      if (panel) panel.hidden = !panel.hidden;
-    });
+    this.addEventListener("open-ai", () => this.querySelector("pmd-assistant")?.open());
     this.addEventListener("click", (event) => {
       const link = event.target.closest("[data-link]");
       if (!link) return;
@@ -66,7 +67,7 @@ class AppShell extends HTMLElement {
         return;
       }
       this.innerHTML = `<section class="signin"><div class="card">
-        <p class="kicker">Plan My Day</p>
+        ${brandHTML()}
         <h1>A desk for the <em style="color:var(--seal)">hours you actually have</em>.</h1>
         <p class="muted">The same tasks, a calmer way to place them.</p>
         <div class="stack">
@@ -86,6 +87,7 @@ class AppShell extends HTMLElement {
           await loadSession();
         });
       });
+      this.loadVersion();
       return;
     }
     const path = this.path();
@@ -103,7 +105,7 @@ class AppShell extends HTMLElement {
     else body = `<section class="sheet calendar"><div class="cal-head" data-chrome></div><div data-grid></div><pmd-assistant hidden></pmd-assistant></section>`;
     this.innerHTML = `<header class="topbar">
       <button class="tiny icon-btn menu-btn" type="button" data-sidebar aria-label="Groups">${icon("menu")}</button>
-      <a class="brand" data-link href="/calendar">Plan My Day</a>
+      ${brandHTML()}
       <nav class="nav">${nav}</nav>
       <span class="spacer"></span>
       <span class="who">${esc(store.user.name || store.user.email || "")}</span>
@@ -130,6 +132,7 @@ class AppShell extends HTMLElement {
     this.querySelector("[data-sidebar]")?.addEventListener("click", () => {
       this.querySelector(".layout")?.classList.toggle("sidebar-open");
     });
+    this.loadVersion();
     pendingCount().then((count) => {
       const banner = this.querySelector("[data-offline]");
       if (!banner) return;
@@ -203,10 +206,24 @@ class AppShell extends HTMLElement {
     });
   }
 
+  loadVersion() {
+    api("/api/version")
+      .then((data) => {
+        this.querySelectorAll("[data-version]").forEach((node) => {
+          if (data.version) node.textContent = `v${data.version}`;
+        });
+      })
+      .catch(() => {});
+  }
+
   openTask(id) {
     const task = id ? store.tasks.find((item) => item.id === id) : null;
     this.dialog.open(task || null);
   }
+}
+
+function brandHTML() {
+  return `<a class="brand" data-link href="/calendar"><img class="brand-mark" src="/icon.png" alt="" width="36" height="36" /><span>Plan My Day</span><span class="brand-version" data-version></span></a>`;
 }
 
 customElements.define("pmd-app", AppShell);
