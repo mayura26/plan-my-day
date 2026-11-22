@@ -202,7 +202,7 @@ class GroupRail extends HTMLElement {
   slimCard(task, nested, siblings) {
     const index = nested ? siblings.findIndex((item) => item.id === task.id) : -1;
     const step = nested && index >= 0 ? `<span class="step">Step ${index + 1} of ${siblings.length}</span>` : "";
-    const lock = task.locked ? `<span class="lock">🔒</span>` : "";
+    const lock = task.locked ? `<span class="lock">${icon("lock")}</span>` : "";
     const unscheduled = !task.scheduled_start || !task.scheduled_end;
     const unsched = store.showAllTasks && unscheduled ? `<span class="badge unsched">${icon("calendar")} Unscheduled</span>` : "";
     const duration = task.duration ? `<span class="dur">${icon("clock")} ${formatDuration(task.duration)}</span>` : "";

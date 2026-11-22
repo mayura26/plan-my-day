@@ -83,6 +83,7 @@ class MonthGrid extends HTMLElement {
     const first = zonedToUtc(parts.year, parts.month, 1, 12, 0, tz);
     const weekday = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].indexOf(String(zonedParts(first, tz).weekday).slice(0, 3));
     const start = addDays(first, -Math.max(0, weekday));
+    const today = dayKey(new Date(), tz);
     const cells = [];
     for (let i = 0; i < 42; i += 1) {
       const day = addDays(start, i);
@@ -97,7 +98,7 @@ class MonthGrid extends HTMLElement {
         })
         .join("");
       const inMonth = key.startsWith(`${parts.year}-${String(parts.month).padStart(2, "0")}`);
-      cells.push(`<button class="cell ${inMonth ? "" : "muted"}" data-key="${key}"><strong>${key.slice(-2)}</strong>${lines}</button>`);
+      cells.push(`<button class="cell ${inMonth ? "" : "muted"} ${key === today ? "today" : ""}" data-key="${key}"><strong>${key.slice(-2)}</strong>${lines}</button>`);
     }
     this.innerHTML = `<div class="month">${cells.join("")}</div>`;
     this.querySelectorAll(".cell").forEach((node) => {

@@ -33,14 +33,6 @@ function overlaps(a, b) {
   return new Date(a.scheduled_start).getTime() < endsAt(b) && endsAt(a) > new Date(b.scheduled_start).getTime();
 }
 
-function hexToRgba(hex, alpha) {
-  const raw = String(hex || "").replace("#", "");
-  if (raw.length < 6) return `rgba(107, 114, 128, ${alpha})`;
-  const n = Number.parseInt(raw.slice(0, 6), 16);
-  if (Number.isNaN(n)) return `rgba(107, 114, 128, ${alpha})`;
-  return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${alpha})`;
-}
-
 function pastEvent(task) {
   return task.task_type === "event" && task.status !== "completed" && task.scheduled_end && new Date(task.scheduled_end) < new Date();
 }
@@ -118,9 +110,9 @@ export function blockHTML(item, tz) {
     : "";
   const duration = task.duration || item.end - item.start;
   const badge = group && duration >= 45
-    ? `<em class="block-group" style="background:${hexToRgba(color, 0.8)}">${esc(group.name.length > 10 ? `${group.name.slice(0, 10)}...` : group.name)}</em>`
+    ? `<em class="block-group">${esc(group.name.length > 10 ? `${group.name.slice(0, 10)}...` : group.name)}</em>`
     : "";
-  return `<article class="${classes}" role="button" tabindex="0" data-id="${esc(task.id)}" data-minute="${item.start}" data-dur="${item.end - item.start}" style="top:${top}px;height:${height}px;left:${(item.col / item.cols) * 100}%;width:calc(${100 / item.cols}% - 6px);background:${hexToRgba(color, 0.4)};border-color:${task.status === "in_progress" ? "#86efac" : color}">
+  return `<article class="${classes}" role="button" tabindex="0" data-id="${esc(task.id)}" data-minute="${item.start}" data-dur="${item.end - item.start}" style="top:${top}px;height:${height}px;left:${(item.col / item.cols) * 100}%;width:calc(${100 / item.cols}% - 6px);--block:${esc(color)}">
     <span class="priority" style="background:${priorityColor(task.priority)}"></span>
     ${energy}${archive}
     <strong>${esc(task.title)}</strong>

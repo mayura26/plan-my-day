@@ -7,6 +7,7 @@ if (saved) document.documentElement.dataset.theme = saved;
 else if (window.matchMedia("(prefers-color-scheme: dark)").matches) {
   document.documentElement.dataset.theme = "dark";
 }
+document.querySelector('meta[name="theme-color"]')?.setAttribute("content", document.documentElement.dataset.theme === "dark" ? "#101820" : "#f3eee4");
 
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.register("/sw.js").catch(() => {});

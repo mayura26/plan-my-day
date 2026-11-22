@@ -68,7 +68,7 @@ class AppShell extends HTMLElement {
       }
       this.innerHTML = `<section class="signin"><div class="card">
         ${brandHTML()}
-        <h1>A desk for the <em style="color:var(--seal)">hours you actually have</em>.</h1>
+        <h1>A desk for the <em>hours you actually have</em>.</h1>
         <p class="muted">The same tasks, a calmer way to place them.</p>
         <div class="stack">
           <a class="solid" href="/auth/google" style="text-align:center">Continue with Google</a>
@@ -120,6 +120,7 @@ class AppShell extends HTMLElement {
       const next = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
       document.documentElement.dataset.theme = next;
       localStorage.setItem("pmd-theme", next);
+      document.querySelector('meta[name="theme-color"]')?.setAttribute("content", next === "dark" ? "#101820" : "#f3eee4");
       const button = event.currentTarget;
       button.innerHTML = icon(next === "dark" ? "sun" : "moon");
       button.setAttribute("aria-label", next === "dark" ? "Switch to light theme" : "Switch to dark theme");
