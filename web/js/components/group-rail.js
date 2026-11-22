@@ -1,5 +1,6 @@
 import { api } from "../api.js";
 import { chevron, icon } from "../icons.js";
+import { overdueTasks } from "./process-dialog.js";
 import { bus, esc, groupKey, persistExpanded, persistHidden, persistSections, persistShowAll, refresh, shownTasks, store } from "../state.js";
 
 const STATUS = {
@@ -573,15 +574,8 @@ class GroupRail extends HTMLElement {
     }
   }
 
-  async process() {
-    const actions = overdueTasks().map((task) => ({ id: task.id, action: "schedule", mode: "now" }));
-    if (!actions.length) return;
-    try {
-      await api("/api/tasks/overdue", { method: "POST", body: { actions } });
-      await refresh();
-    } catch (error) {
-      window.alert(error.message || "Could not process overdue tasks");
-    }
+  process() {
+    this.dispatchEvent(new CustomEvent("open-process", { bubbles: true }));
   }
 
   async removeGroup(id) {
@@ -686,16 +680,6 @@ function formatDuration(minutes) {
   const hours = Math.floor(value / 60);
   const rest = value % 60;
   return rest ? `${hours}h ${rest}m` : `${hours}h`;
-}
-
-function overdueTasks() {
-  const now = Date.now();
-  return shownTasks().filter((task) => {
-    if (task.task_type === "event" || task.ignored) return false;
-    if (["completed", "cancelled", "rescheduled"].includes(task.status)) return false;
-    if (task.due_date && new Date(task.due_date).getTime() < now) return true;
-    return Boolean(task.scheduled_end && new Date(task.scheduled_end).getTime() < now);
-  });
 }
 
 function metricRows() {

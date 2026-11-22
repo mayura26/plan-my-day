@@ -532,7 +532,7 @@ func (s *Store) FillGroup(ctx context.Context, userID, groupID string, now time.
 }
 
 // Carryover closes the original as rescheduled and inserts a successor.
-func (s *Store) Carryover(ctx context.Context, userID, taskID string, auto bool, now time.Time) (Task, error) {
+func (s *Store) Carryover(ctx context.Context, userID, taskID string, auto bool, duration int, notes string, now time.Time) (Task, error) {
 	var created Task
 	err := s.withTx(ctx, func(tx *sql.Tx) error {
 		orig, err := s.getOwned(ctx, tx, userID, taskID)
@@ -551,9 +551,21 @@ func (s *Store) Carryover(ctx context.Context, userID, taskID string, auto bool,
 		if orig.TaskType == "subtask" {
 			parent = orig.ParentTaskID
 		}
+		dur := orig.Duration
+		if duration > 0 {
+			dur = &duration
+		}
+		desc := orig.Description
+		if note := strings.TrimSpace(notes); note != "" {
+			combined := note
+			if orig.Description != nil && strings.TrimSpace(*orig.Description) != "" {
+				combined = strings.TrimSpace(*orig.Description) + "\n" + note
+			}
+			desc = &combined
+		}
 		created, err = s.InsertTask(ctx, tx, userID, TaskInput{
-			Title: orig.Title, Description: orig.Description, Priority: orig.Priority,
-			Duration: orig.Duration, DueDate: orig.DueDate, GroupID: orig.GroupID,
+			Title: orig.Title, Description: desc, Priority: orig.Priority,
+			Duration: dur, DueDate: orig.DueDate, GroupID: orig.GroupID,
 			TaskType: taskType, Energy: orig.Energy, ParentID: parent, Continued: &orig.ID,
 			StepOrder: orig.StepOrder,
 		})

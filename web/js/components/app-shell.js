@@ -9,6 +9,7 @@ import "./task-dialog.js";
 import "./group-rail.js";
 import "./pages.js";
 import "./capture.js";
+import "./process-dialog.js";
 
 const LINKS = [
   ["/calendar", "Calendar", "calendar"],
@@ -20,6 +21,7 @@ const LINKS = [
 class AppShell extends HTMLElement {
   connectedCallback() {
     this.dialog = document.createElement("pmd-task-dialog");
+    this.processDialog = document.createElement("pmd-process-dialog");
     bus.addEventListener("change", () => {
       if (!store.user || !this.querySelector("[data-grid]")) this.paint();
       else this.syncChrome();
@@ -44,6 +46,7 @@ class AppShell extends HTMLElement {
     });
     this.addEventListener("create-at", (event) => this.createAt(event.detail));
     this.addEventListener("open-ai", () => this.querySelector("pmd-assistant")?.open());
+    this.addEventListener("open-process", () => this.processDialog.open());
     this.addEventListener("click", (event) => {
       const link = event.target.closest("[data-link]");
       if (!link) return;
@@ -115,6 +118,7 @@ class AppShell extends HTMLElement {
     <div class="banner" data-offline hidden></div>
     <div class="layout">${calendar ? "<pmd-group-rail></pmd-group-rail>" : ""}${body}</div>`;
     this.append(this.dialog);
+    this.append(this.processDialog);
     if (calendar) this.syncChrome();
     this.querySelector("[data-theme]")?.addEventListener("click", (event) => {
       const next = document.documentElement.dataset.theme === "dark" ? "light" : "dark";

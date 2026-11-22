@@ -6,17 +6,19 @@ import { addDays, fromLocalValue, toLocalValue, zonedParts, zonedToUtc } from ".
 const PRIORITY = { 1: "Critical", 2: "High", 3: "Medium", 4: "Low", 5: "Very Low" };
 const ENERGY = { 1: "Low Energy", 2: "Low-Medium", 3: "Medium", 4: "Medium-High", 5: "High Energy" };
 const MODES = [
-  ["now", "Schedule Now"],
-  ["today", "Schedule Today"],
-  ["tomorrow", "Schedule Tomorrow"],
-  ["this-weekend", "Schedule This Weekend"],
-  ["next-weekend", "Schedule Next Weekend"],
-  ["next-week", "Schedule Next Week"],
-  ["next-month", "Schedule Next Month"],
-  ["asap", "Schedule ASAP"],
-  ["due-date", "Schedule to Due Date"],
-  ["smart", "Smart Schedule"],
+  ["now", "Schedule Now", "clock"],
+  ["today", "Schedule Today", "calendar-clock"],
+  ["tomorrow", "Schedule Tomorrow", "calendar-clock"],
+  ["next-week", "Schedule Next Week", "calendar"],
+  ["this-weekend", "Schedule This Weekend", "calendar"],
+  ["next-weekend", "Schedule Next Weekend", "calendar"],
+  ["next-month", "Schedule Next Month", "calendar"],
+  ["due-date", "Schedule to Due Date", "flag"],
+  ["asap", "Schedule ASAP", "zap"],
+  ["smart", "Smart Schedule", "sparkles"],
 ];
+const MODE_LABEL = Object.fromEntries(MODES.map(([mode, label]) => [mode, label]));
+const GATED = new Set(["due-date", "smart"]);
 const DUE = [
   ["today", "TDY"],
   ["tomorrow", "TMRW"],
@@ -62,6 +64,43 @@ function duePreset(preset, tz) {
   return toLocalValue(zonedToUtc(day.year, day.month, day.day, 17, 0, tz).toISOString(), tz);
 }
 
+function modeMenu(modes, key) {
+  return `<div class="menu-pop" data-mode-menu data-for="${key}" hidden>${modes
+    .map(([mode, label, glyph]) => {
+      const hint = GATED.has(mode) ? `<span class="menu-hint">(no due date)</span>` : "";
+      return `<button type="button" data-mode="${mode}" data-gated="${GATED.has(mode) ? "1" : "0"}">${icon(glyph)}<span>${label}</span>${hint}</button>`;
+    })
+    .join("")}</div>`;
+}
+
+function scheduleActions(task) {
+  const scheduled = task.scheduled_start || task.scheduled_end;
+  return `<div class="schedule-row" data-schedule-actions>
+    <div class="split-btn">
+      <button class="solid with-icon" type="button" data-act="schedule-now" data-schedule-primary>
+        ${icon("clock")}<span data-schedule-label>Schedule Now</span>
+      </button>
+      <button class="solid split-chevron" type="button" data-act="toggle-menu" data-menu="schedule" aria-label="More schedule modes">${icon("chevron-down")}</button>
+      ${modeMenu(MODES.filter(([mode]) => mode !== "now"), "schedule")}
+    </div>
+    ${scheduled ? `<button class="tiny with-icon" type="button" data-act="unschedule">${icon("calendar-x")} Unschedule</button>` : ""}
+  </div>`;
+}
+
+function schedulePicker(task) {
+  const mode = task.schedule_mode || "now";
+  return `<div class="schedule-settings">
+    <label class="row"><input name="auto_schedule" type="checkbox" ${task.auto_schedule ? "checked" : ""} /> Auto-schedule</label>
+    <div class="mode-picker" data-mode-picker ${task.auto_schedule ? "" : "hidden"}>
+      <button class="tiny with-icon" type="button" data-act="toggle-menu" data-menu="picker">
+        <span data-mode-label>${esc(MODE_LABEL[mode] || "Schedule Now")}</span>${icon("chevron-down")}
+      </button>
+      <input type="hidden" name="schedule_mode" value="${esc(mode)}" />
+      ${modeMenu(MODES, "picker")}
+    </div>
+  </div>`;
+}
+
 class TaskDialog extends HTMLElement {
   connectedCallback() {
     this.hidden = true;
@@ -96,10 +135,7 @@ class TaskDialog extends HTMLElement {
     const options = groups
       .map((group) => `<option value="${esc(group.id)}" ${group.id === task.group_id ? "selected" : ""}>${esc(group.name)}</option>`)
       .join("");
-    const modes = task.id
-      ? `<div class="modes">${MODES.map(([mode, label]) => `<button class="tiny" data-mode="${mode}" type="button">${label}</button>`).join("")}</div>`
-      : `<label class="row"><input name="auto_schedule" type="checkbox" ${task.auto_schedule ? "checked" : ""} /> Auto-schedule</label>
-         <label>Schedule mode<select name="schedule_mode">${MODES.map(([mode, label]) => `<option value="${mode}" ${task.schedule_mode === mode ? "selected" : ""}>${label}</option>`).join("")}</select></label>`;
+    const modes = task.id ? scheduleActions(task) : schedulePicker(task);
     this.innerHTML = `<div class="dialog-back"><form class="dialog task-form">
       <div class="dialog-title">
         <h2>${task.id ? esc(task.title) : "Create New Task"}</h2>
@@ -144,13 +180,24 @@ class TaskDialog extends HTMLElement {
       </div>
     </form></div>`;
     this.querySelector("form").addEventListener("submit", (event) => this.save(event));
-    this.querySelectorAll("[data-mode]").forEach((button) => button.addEventListener("click", () => this.schedule(button.dataset.mode)));
-    this.querySelectorAll("[data-act]").forEach((button) => button.addEventListener("click", () => this.act(button.dataset.act)));
+    this.querySelectorAll("[data-mode]").forEach((button) => button.addEventListener("click", () => this.pickMode(button)));
+    this.querySelectorAll("[data-act]").forEach((button) => button.addEventListener("click", () => this.act(button.dataset.act, button)));
+    this.querySelector(".dialog-back").addEventListener("click", (event) => {
+      if (event.target.closest("[data-act='toggle-menu'], [data-mode-menu]")) return;
+      this.closeMenus();
+    });
+    this.querySelector('[name="due_date"]')?.addEventListener("input", () => this.syncGated());
+    this.querySelector('[name="auto_schedule"]')?.addEventListener("change", (event) => {
+      const picker = this.querySelector("[data-mode-picker]");
+      if (picker) picker.hidden = !event.target.checked;
+    });
     this.querySelectorAll("[data-due]").forEach((button) => {
       button.addEventListener("click", () => {
         this.querySelector('[name="due_date"]').value = duePreset(button.dataset.due, tz);
+        this.syncGated();
       });
     });
+    this.syncGated();
     this.querySelector('[name="group_id"]')?.addEventListener("change", (event) => {
       const group = store.groups.find((item) => item.id === event.target.value);
       this.querySelector("[data-swatch]").style.background = group?.color || "#9aabbc";
@@ -217,9 +264,86 @@ class TaskDialog extends HTMLElement {
     }
   }
 
+  closeMenus() {
+    this.querySelectorAll("[data-mode-menu]").forEach((menu) => {
+      menu.hidden = true;
+    });
+  }
+
+  syncGated() {
+    const due = Boolean(this.querySelector('[name="due_date"]')?.value);
+    this.querySelectorAll('[data-gated="1"]').forEach((button) => {
+      button.disabled = !due;
+      const hint = button.querySelector(".menu-hint");
+      if (hint) hint.hidden = due;
+    });
+  }
+
+  toggleMenu(button) {
+    const menu = this.querySelector(`[data-mode-menu][data-for="${button.dataset.menu}"]`);
+    if (!menu) return;
+    const willOpen = menu.hidden;
+    this.closeMenus();
+    if (!willOpen) return;
+    const host = this.querySelector(".dialog-back");
+    host.append(menu);
+    menu.hidden = false;
+    const rect = button.getBoundingClientRect();
+    const hostRect = host.getBoundingClientRect();
+    menu.style.left = `${rect.left - hostRect.left}px`;
+    menu.style.top = `${rect.bottom - hostRect.top + 4}px`;
+    const box = menu.getBoundingClientRect();
+    if (box.bottom > window.innerHeight - 8) {
+      menu.style.top = `${Math.max(8, rect.top - hostRect.top - box.height - 4)}px`;
+    }
+  }
+
+  pickMode(button) {
+    if (button.disabled) return;
+    const mode = button.dataset.mode;
+    this.closeMenus();
+    if (button.closest("[data-mode-menu]")?.dataset.for === "schedule") {
+      this.schedule(mode);
+      return;
+    }
+    const picker = this.querySelector("[data-mode-picker]");
+    if (!picker) return;
+    picker.querySelector('[name="schedule_mode"]').value = mode;
+    picker.querySelector("[data-mode-label]").textContent = MODE_LABEL[mode] || "Schedule Now";
+    this.task.schedule_mode = mode;
+  }
+
+  setScheduleBusy(on) {
+    const label = this.querySelector("[data-schedule-label]");
+    if (label) label.textContent = on ? "Scheduling..." : "Schedule Now";
+    this.querySelectorAll("[data-schedule-primary], [data-act='toggle-menu'], [data-mode], [data-act='unschedule']").forEach((button) => {
+      button.disabled = on;
+    });
+    if (!on) this.syncGated();
+  }
+
   async schedule(mode) {
+    if (this.scheduling) return;
+    this.scheduling = true;
+    this.setScheduleBusy(true);
     try {
       await api(`/api/tasks/${this.task.id}/schedule`, { method: "POST", body: { mode } });
+      await refresh();
+      this.scheduling = false;
+      this.close();
+    } catch (error) {
+      this.scheduling = false;
+      this.setScheduleBusy(false);
+      this.querySelector("[data-error]").textContent = error.message;
+    }
+  }
+
+  async unschedule() {
+    try {
+      await api(`/api/tasks/${this.task.id}`, {
+        method: "PUT",
+        body: { scheduled_start: null, scheduled_end: null },
+      });
       await refresh();
       this.close();
     } catch (error) {
@@ -227,9 +351,12 @@ class TaskDialog extends HTMLElement {
     }
   }
 
-  async act(name) {
+  async act(name, button) {
     try {
       if (name === "close") return this.close();
+      if (name === "toggle-menu") return this.toggleMenu(button);
+      if (name === "schedule-now") return this.schedule("now");
+      if (name === "unschedule") return this.unschedule();
       if (name === "delete") {
         await api(`/api/tasks/${this.task.id}`, { method: "DELETE" });
       } else if (name === "complete") {

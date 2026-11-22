@@ -193,10 +193,12 @@ func (s *Server) carryover(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var body struct {
-		AutoSchedule bool `json:"auto_schedule"`
+		AutoSchedule       bool   `json:"auto_schedule"`
+		AdditionalDuration int    `json:"additional_duration"`
+		Notes              string `json:"notes"`
 	}
 	_ = readJSONLoose(r, &body)
-	task, err := s.Store.Carryover(r.Context(), id, r.PathValue("id"), body.AutoSchedule, time.Now())
+	task, err := s.Store.Carryover(r.Context(), id, r.PathValue("id"), body.AutoSchedule, body.AdditionalDuration, body.Notes, time.Now())
 	if err != nil {
 		mapStoreError(w, err)
 		return

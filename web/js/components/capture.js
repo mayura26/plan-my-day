@@ -218,76 +218,161 @@ class ReminderPage extends HTMLElement {
   }
 }
 
+const ASSISTANT_EMPTY = `Tell me what you need — I can build tasks from a brain dump, or manage your schedule ("move my lunch to 1pm", "extend the washing to 2 hours"). I'll ask if I need more detail.`;
+
 class AssistantPanel extends HTMLElement {
   connectedCallback() {
     this.messages = [];
     this.mode = "assistant";
     this.busy = false;
     this.note = "";
+    this.assistantDraft = "";
+    this.quickDraft = "";
+    this.quickSubs = false;
+    this.mounted = false;
     this.hidden = true;
   }
 
   open() {
     this.hidden = false;
-    this.paint();
+    if (!this.mounted) this.mount();
+    else this.syncChrome();
   }
 
   close() {
     this.hidden = true;
     this.innerHTML = "";
+    this.mounted = false;
   }
 
-  paint() {
-    const assistant = this.mode === "assistant";
-    const log = this.messages.length
-      ? this.messages.map((message, index) => `<div class="bubble ${message.role}">${esc(message.content)}${this.actionsHTML(message, index)}</div>`).join("")
-      : `<p class="muted center">Tell me what you need — I can build tasks from a brain dump, or manage your schedule ("move my lunch to 1pm", "extend the washing to 2 hours"). I'll ask if I need more detail.</p>`;
+  mount() {
+    this.mounted = true;
     this.innerHTML = `<div class="dialog-back"><form class="dialog assistant">
-      <div class="dialog-title"><h2>${icon("sparkles")} ${assistant ? "AI Assistant" : "Add Task with AI"}</h2><button class="tiny icon-btn" type="button" data-close aria-label="Close">${icon("x")}</button></div>
+      <div class="dialog-title"><h2 data-title>${icon("sparkles")} AI Assistant</h2><button class="tiny icon-btn" type="button" data-close aria-label="Close">${icon("x")}</button></div>
       <div class="tabs">
-        <button class="${assistant ? "on" : ""}" type="button" data-mode="assistant">${icon("message-circle")} Assistant</button>
-        <button class="${assistant ? "" : "on"}" type="button" data-mode="quick">${icon("sparkles")} Quick add</button>
+        <button type="button" data-mode="assistant">${icon("message-circle")} Assistant</button>
+        <button type="button" data-mode="quick">${icon("sparkles")} Quick add</button>
       </div>
-      ${assistant ? `<div class="transcript">${log}</div><label class="grow">Message<textarea name="text" placeholder="Add a call with Sam tomorrow at 9"></textarea></label>` : `<label class="grow">Describe your task<textarea name="quick" placeholder="Describe your task in plain English…"></textarea></label><label class="row"><input name="subtasks" type="checkbox" /> Generate subtasks</label>`}
-      <p class="error" data-note>${esc(this.note)}</p>
-      <div class="actions">
-        <button class="tiny with-icon" type="button" data-voice>${icon("mic")} Voice</button>
-        <span class="spacer"></span>
-        <button class="tiny" type="button" data-close>Done</button>
-        <button class="solid" type="submit" ${this.busy ? "disabled" : ""}>Send</button>
-      </div>
+      <div data-body></div>
+      <p class="error" data-note></p>
+      <div class="assistant-foot" data-foot></div>
     </form></div>`;
-    this.querySelector("form").addEventListener("submit", (event) => this.send(event));
-    this.querySelectorAll("[data-close]").forEach((button) => button.addEventListener("click", () => this.close()));
-    this.querySelectorAll("[data-mode]").forEach((button) => button.addEventListener("click", () => {
+    const form = this.querySelector("form");
+    form.addEventListener("submit", (event) => this.send(event));
+    form.addEventListener("click", (event) => this.onClick(event));
+    this.syncChrome();
+  }
+
+  captureDraft() {
+    const text = this.querySelector('[name="text"]');
+    const quick = this.querySelector('[name="quick"]');
+    const subtasks = this.querySelector('[name="subtasks"]');
+    if (text) this.assistantDraft = text.value;
+    if (quick) this.quickDraft = quick.value;
+    if (subtasks) this.quickSubs = subtasks.checked;
+  }
+
+  syncChrome() {
+    const assistant = this.mode === "assistant";
+    this.querySelector("[data-title]").innerHTML = `${icon("sparkles")} ${assistant ? "AI Assistant" : "Add Task with AI"}`;
+    this.querySelectorAll("[data-mode]").forEach((button) => {
+      button.classList.toggle("on", button.dataset.mode === this.mode);
+    });
+    const body = this.querySelector("[data-body]");
+    const foot = this.querySelector("[data-foot]");
+    if (assistant) {
+      body.innerHTML = `<div class="transcript" data-transcript></div>
+        <div class="composer">
+          <textarea name="text" rows="2" placeholder="Type your message…">${esc(this.assistantDraft)}</textarea>
+          <div class="composer-side">
+            <button class="tiny with-icon" type="button" data-voice>${icon("mic")} Voice</button>
+            <button class="solid" type="submit" data-send ${this.busy ? "disabled" : ""}>Send →</button>
+          </div>
+        </div>`;
+      foot.innerHTML = `<button class="tiny" type="button" data-close>Done</button>`;
+      this.renderTranscript();
+    } else {
+      body.innerHTML = `<label>Describe your task<textarea name="quick" placeholder="Describe your task in plain English…">${esc(this.quickDraft)}</textarea></label>
+        <label class="row"><input name="subtasks" type="checkbox" ${this.quickSubs ? "checked" : ""} /> Generate subtasks</label>`;
+      foot.innerHTML = `<button class="tiny with-icon" type="button" data-voice>${icon("mic")} Voice</button>
+        <span class="spacer"></span>
+        <button class="tiny" type="button" data-close>Cancel</button>
+        <button class="solid with-icon" type="submit" ${this.busy ? "disabled" : ""}>${icon("sparkles")} Parse with AI</button>`;
+    }
+    this.querySelector("[data-note]").textContent = this.note;
+  }
+
+  renderTranscript() {
+    const host = this.querySelector("[data-transcript]");
+    if (!host) return;
+    const waiting = this.busy
+      ? `<div class="turn assistant"><div class="bubble waiting" aria-label="Waiting"><i></i><i></i><i></i></div></div>`
+      : "";
+    host.innerHTML = this.messages.length
+      ? `${this.messages.map((message, index) => this.turnHTML(message, index)).join("")}${waiting}`
+      : `<p class="empty center">${esc(ASSISTANT_EMPTY)}</p>${waiting}`;
+    host.scrollTop = host.scrollHeight;
+  }
+
+  turnHTML(message, index) {
+    const actions = (message.actions || [])
+      .map((action, actionIndex) => {
+        if (action.dismissed) return "";
+        const label = `${action.action || "create"} ${action.title || ""}`.trim();
+        if (action.applied) return `<div class="action-row"><span>${esc(label)}</span><span class="muted">Added</span></div>`;
+        return `<div class="action-row"><span>${esc(label)}</span>
+          <button class="tiny" type="button" data-apply="${actionIndex}" data-message="${index}">Accept</button>
+          <button class="tiny" type="button" data-dismiss="${actionIndex}" data-message="${index}">Dismiss</button></div>`;
+      })
+      .join("");
+    return `<div class="turn ${message.role}"><div class="bubble">${esc(message.content)}</div>${actions ? `<div class="action-list">${actions}</div>` : ""}</div>`;
+  }
+
+  onClick(event) {
+    const button = event.target.closest("button");
+    if (!button) return;
+    if (button.dataset.close !== undefined) {
+      this.close();
+      return;
+    }
+    if (button.dataset.mode) {
+      if (button.dataset.mode === this.mode) return;
+      this.captureDraft();
       this.mode = button.dataset.mode;
       this.note = "";
-      this.paint();
-    }));
-    this.querySelector("[data-voice]").addEventListener("click", () => {
+      this.syncChrome();
+      return;
+    }
+    if (button.dataset.voice !== undefined) {
       this.note = "Voice input is not available in this browser.";
       this.querySelector("[data-note]").textContent = this.note;
-    });
-    this.querySelectorAll("[data-apply]").forEach((button) => {
-      button.addEventListener("click", () => this.accept(this.messages[Number(button.dataset.message)].actions[Number(button.dataset.apply)]));
-    });
-  }
-
-  actionsHTML(message, index) {
-    if (!message.actions?.length) return "";
-    return `<div class="modes">${message.actions.map((action, actionIndex) => `<button class="tiny" type="button" data-message="${index}" data-apply="${actionIndex}">${esc(action.action || "create")} ${esc(action.title || "")}</button>`).join("")}</div>`;
+      return;
+    }
+    if (button.dataset.apply !== undefined) {
+      const message = this.messages[Number(button.dataset.message)];
+      this.accept(message.actions[Number(button.dataset.apply)]);
+      return;
+    }
+    if (button.dataset.dismiss !== undefined) {
+      const message = this.messages[Number(button.dataset.message)];
+      message.actions[Number(button.dataset.dismiss)].dismissed = true;
+      this.renderTranscript();
+    }
   }
 
   async send(event) {
     event.preventDefault();
     if (this.busy) return;
     const form = new FormData(event.target);
-    this.busy = true;
     this.note = "";
-    try {
-      if (this.mode === "quick") {
-        const text = String(form.get("quick") || "").trim();
-        if (!text) return;
+    this.querySelector("[data-note]").textContent = "";
+    if (this.mode === "quick") {
+      const text = String(form.get("quick") || "").trim();
+      if (!text) return;
+      this.captureDraft();
+      this.busy = true;
+      this.syncChrome();
+      try {
         const parsed = await api("/api/ai/parse-task", {
           method: "POST",
           body: {
@@ -300,6 +385,7 @@ class AssistantPanel extends HTMLElement {
         const { fromLocalValue } = await import("../time.js");
         const tz = store.user?.timezone || "UTC";
         const local = (value) => (value && String(value).includes("T") && !String(value).endsWith("Z") ? fromLocalValue(String(value).slice(0, 16), tz) : value || null);
+        this.busy = false;
         this.close();
         this.dispatchEvent(new CustomEvent("create-task", {
           bubbles: true,
@@ -317,14 +403,24 @@ class AssistantPanel extends HTMLElement {
             subtasks: task.subtasks || [],
           },
         }));
-        return;
+      } catch (error) {
+        this.busy = false;
+        this.note = error.message;
+        if (!this.hidden) this.syncChrome();
       }
-      const text = String(form.get("text") || this.querySelector("textarea")?.value || "").trim();
-      const field = this.querySelector("textarea");
-      const spoken = field ? field.value.trim() : text;
-      if (!spoken) return;
-      this.messages.push({ role: "user", content: spoken });
-      this.paint();
+      return;
+    }
+    const field = this.querySelector('[name="text"]');
+    const spoken = String(field?.value || "").trim();
+    if (!spoken) return;
+    this.assistantDraft = "";
+    field.value = "";
+    this.messages.push({ role: "user", content: spoken });
+    this.busy = true;
+    const send = this.querySelector("[data-send]");
+    if (send) send.disabled = true;
+    this.renderTranscript();
+    try {
       const turn = await api("/api/ai/assistant", {
         method: "POST",
         body: {
@@ -336,13 +432,20 @@ class AssistantPanel extends HTMLElement {
       this.messages.push({ role: "assistant", content: turn.message || "", actions: turn.proposed_actions || [] });
     } catch (error) {
       this.note = error.message;
+      this.querySelector("[data-note]").textContent = this.note;
     } finally {
       this.busy = false;
-      if (!this.hidden) this.paint();
+      if (this.hidden || !this.mounted) return;
+      if (this.mode === "assistant") {
+        const again = this.querySelector("[data-send]");
+        if (again) again.disabled = false;
+        this.renderTranscript();
+      } else this.syncChrome();
     }
   }
 
   async accept(action) {
+    if (!action || action.applied) return;
     const body = {
       title: action.title,
       description: action.description,
@@ -355,16 +458,24 @@ class AssistantPanel extends HTMLElement {
       scheduled_end: action.scheduled_end,
       due_date: action.due_date,
     };
-    if (action.action === "update" && action.id) {
-      await api(`/api/tasks/${action.id}`, { method: "PUT", body });
-    } else {
-      const created = await api("/api/tasks", { method: "POST", body });
-      for (const step of action.subtasks || []) {
-        await api(`/api/tasks/${created.task.id}/subtasks`, { method: "POST", body: step });
+    try {
+      if (action.action === "update" && action.id) {
+        await api(`/api/tasks/${action.id}`, { method: "PUT", body });
+      } else {
+        const created = await api("/api/tasks", { method: "POST", body });
+        for (const step of action.subtasks || []) {
+          await api(`/api/tasks/${created.task.id}/subtasks`, { method: "POST", body: step });
+        }
       }
+      action.applied = true;
+      const { refresh } = await import("../state.js");
+      await refresh();
+      this.renderTranscript();
+    } catch (error) {
+      this.note = error.message;
+      const note = this.querySelector("[data-note]");
+      if (note) note.textContent = error.message;
     }
-    const { refresh } = await import("../state.js");
-    await refresh();
   }
 }
 
